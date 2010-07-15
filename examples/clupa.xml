@@ -18,9 +18,9 @@
    <execute>
       <processor name="MyAIDAProcessor"/>
       <processor name="MyClupatraProcessor"/>
-      <processor name="MyMyProcessor"/>
+      <Xprocessor name="MyMyProcessor"/>
       <Xprocessor name="MyGenericViewer"/>
-      <Xprocessor name="MyCEDViewer"/>
+      <processor name="MyCEDViewer"/>
       <Xprocessor name="MyLCIOOutputProcessor"/>
       <!--processor name="MyAbsCalibr"/-->
       <!--processor name="MyCCDDigitizer"/-->
@@ -87,7 +87,7 @@
    <global>
       <parameter name="LCIOInputFiles"> recfile.slcio </parameter>
       <parameter name="GearXMLFile" value="gear_ILD_00.xml"/>
-      <parameter name="MaxRecordNumber" value="0"/>
+      <parameter name="MaxRecordNumber" value="5"/>
       <parameter name="SkipNEvents" value="0"/>
       <parameter name="SupressCheck" value="false"/>
       <parameter name="Verbosity" value="DEBUG"/>
@@ -161,6 +161,7 @@
   <!--parameter name="DrawCollection" type="StringVec"> DrawCollection 0 3 </parameter-->
   <!-- Sorry, this parameter isn't a default parameter for this processor: description and type lost!!  -->
   <parameter name="DrawInLayer"> 
+    AllTrackClusters 0 3 18
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
     OddClu_3 0 3  3 
@@ -169,6 +170,7 @@
     OddCluTracks 0 3 11 
     OddMCPTracks 0 3 12 
     MergedTrackSegements 0 3 13
+    TrueTracks 0 3 14
   </parameter>
 </processor>
 

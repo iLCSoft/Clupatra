@@ -29,6 +29,13 @@ using namespace CLHEP ;
 template <class U>
 class GenericCluster ;
 
+//helper function that checks if an integer is in a range [0,N] 
+template <unsigned Min,unsigned Max > 
+inline unsigned inRange( int i){   return ( (unsigned int) ( i - Min )  <= (unsigned int) ( Max - Min ) ); }
+
+template <unsigned Min,unsigned Max >
+inline unsigned notInRange( int i){   return ( (unsigned int) ( i - Min )  > (unsigned int) ( Max - Min ) ); }
+
 
 /** Simple nearest neighbour (NN) clustering algorithm. Users have to provide an input iterator of
  *  GenericHit objects and an output iterator for the clusters found. The predicate has to have 
@@ -56,17 +63,10 @@ void cluster( In first, In last, Out result, Pred* pred , const unsigned minSize
   ClusterList tmp ; 
   tmp.reserve( 1024 ) ;
   
-  //   int i(0),j(0) ;
+   while( first != last ) {
 
-  while( first != last ) {
+      for( In other = first+1 ;   other != last ; other ++ ) {
 
-    //     j=i+1 ;
-
-    for( In other = first+1 ; other != last  ; other ++ ) {
-      
-      //       std::cout << "  in nested loop " << i << " , " << j << std::endl ;
-      
-      
       if( pred->mergeHits( (*first) , (*other) ) ) {
 	
         if( (*first)->second == 0 && (*other)->second == 0 ) {  // no cluster exists
@@ -80,10 +80,83 @@ void cluster( In first, In last, Out result, Pred* pred , const unsigned minSize
         }
         else if( (*first)->second != 0 && (*other)->second != 0 ) { // two clusters
 	  
-          // 	  if(  (*first)->second == (*other)->second ) 
-          // 	    std::cout << " Merging identical clusters !? " << std::endl ;
+          if(  (*first)->second != (*other)->second )  // don't call merge on identical clusters
+            (*first)->second->mergeClusters( (*other)->second ) ;
+	  
+        } else {  // one cluster exists
+	  
+          if( (*first)->second != 0 ) {
+	    
+            (*first)->second->addHit( (*other)  ) ;
+	    
+          } else {                           
+	    
+            (*other)->second->addHit( (*first)  ) ;
+          }
+        }
+	
+      } // dCut 
+      //       ++j ;
+    }
+    //     ++i ;
+    ++first ;
+  }
 
-          if(  (*first)->second != (*other)->second )  // this is a bug fix for old gcc 3.2 compiler !
+  // remove empty clusters 
+  //   std::remove_copy_if( tmp.begin() , tmp.end() , result , &empty_list< GenericCluster<HitType > > ) ;
+
+  for( typename ClusterList::iterator i = tmp.begin(); i !=  tmp.end() ; i++ ){
+
+    if( (*i)->size() > minSize-1 ) {
+
+      result++ = *i ;
+    } 
+    else {  
+
+      delete *i ; 
+    }
+  }
+}
+/** Same as above - but requires the hits to be sorted in index0 (only compare neighbouring bins in index0). */
+template <class In, class Out, class Pred > 
+void cluster_sorted( In first, In last, Out result, Pred* pred , const unsigned minSize=1) {
+
+  typedef typename In::value_type GenericHitPtr ;
+  typedef typename Pred::hit_type HitType ;
+
+  typedef std::vector< GenericCluster<HitType >* >  ClusterList ;
+
+  ClusterList tmp ; 
+  tmp.reserve( 1024 ) ;
+  
+  //   int i(0),j(0) ;
+
+  while( first != last ) {
+
+    //     j=i+1 ;
+
+ 
+    for( In other = first+1 ;   other != last ; other ++ ) {
+
+      
+      if( notInRange<-1,1>(   (*first)->Index0 - (*other)->Index0  )   ) 
+         break ;
+
+
+      if( pred->mergeHits( (*first) , (*other) ) ) {
+	
+        if( (*first)->second == 0 && (*other)->second == 0 ) {  // no cluster exists
+	  
+          GenericCluster<HitType >* cl = new GenericCluster<HitType >( (*first) ) ;
+
+          cl->addHit( (*other) ) ;
+	  
+          tmp.push_back( cl ) ;
+
+        }
+        else if( (*first)->second != 0 && (*other)->second != 0 ) { // two clusters
+	  
+          if(  (*first)->second != (*other)->second )  // don't call merge on identical clusters
             (*first)->second->mergeClusters( (*other)->second ) ;
 	  
         } else {  // one cluster exists
@@ -258,7 +331,6 @@ void addToGenericHitVec(GenericHitVec<T>& v, LCCollection* col, Pred pred ){
     }
   }
 } 
-
 /** Same as addToGenericHitVec(GenericHitVec<T>& v, LCCollection* col, Pred pred ) except that
  *  an additional order function/functor can be given that defines the index of the hit, e.g.
  *  @see ZIndex.
@@ -292,6 +364,20 @@ void addToGenericHitVec(GenericHitVec<T>& v, In first, In last, Pred pred , Orde
     }
   }
 } 
+// /** Helper method that copies all hit pointers from a container of LCIO objects that fullfill the predicate to
+//  *  a GenericHitVec. The predicate can either be a bool funtion or functor that takes a T*, e.g.
+//  *  @see EnergyCut
+//  */
+// template <class T, class IT, class Pred> 
+// void copyToGenericHitVec(GenericHitVec<T>& v, IT start, IT end,  Pred pred ){
+//   for(IT it = start; it != end ; ++it ){
+//     T* hit = (T*) *(it) ;
+//     if( pred( hit ) ){
+//       v.push_back( new GenericHit<T>( hit ) ) ;
+//     }
+//   } 
+// }
+
 
 /**Splits a list into two based on a predicate. The new list will 
  * hold all elements for which Pred is true which are in turn removed 
@@ -489,7 +575,6 @@ struct LCIOCluster{
   }
 
 } ;
-
 
 
 #endif

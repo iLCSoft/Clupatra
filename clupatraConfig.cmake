@@ -11,7 +11,7 @@ SET( clupatra_INCLUDE_DIR clupatra_INCLUDE_DIR-NOTFOUND )
 
 FIND_PATH( clupatra_INCLUDE_DIR
 	NAMES clupatra.h
-	PATHS /Users/gaede/marlin/Clupatra
+	PATHS /Users/gaede/marlin/clupatra
 	PATH_SUFFIXES include
 	NO_DEFAULT_PATH
 )
@@ -28,7 +28,7 @@ SET( clupatra_LIB clupatra_LIB-NOTFOUND )
 
 FIND_LIBRARY( clupatra_LIB
 	NAMES clupatra
-	PATHS /Users/gaede/marlin/Clupatra
+	PATHS /Users/gaede/marlin/clupatra
 	PATH_SUFFIXES lib
 	NO_DEFAULT_PATH
 )
@@ -44,7 +44,7 @@ ENDIF( NOT clupatra_LIB )
 IF( clupatra_INCLUDE_DIR AND clupatra_LIB )
     SET( clupatra_FOUND TRUE )
     SET( clupatra_INCLUDE_DIRS ${clupatra_INCLUDE_DIR} )
-    SET( clupatra_LIBRARY_DIRS "/Users/gaede/marlin/Clupatra/lib" )
+    SET( clupatra_LIBRARY_DIRS "/Users/gaede/marlin/clupatra/lib" )
 	SET( clupatra_LIBRARIES ${clupatra_LIB} )
     MARK_AS_ADVANCED( clupatra_INCLUDE_DIRS clupatra_LIBRARY_DIRS clupatra_LIBRARIES )
 	MESSAGE( STATUS "Check for clupatra: ${clupatra_HOME} -- works" )

@@ -76,6 +76,16 @@ ENDIF()
 
 ### INCLUDES #################################################################
 
+#### FIXME: need KalFit  finder module ########################
+
+#INCLUDE_DIRECTORIES( "${KalFit_HOME}/include" )
+
+#################################################################
+
+
+
+
+
 #include directories
 INCLUDE_DIRECTORIES( "${PROJECT_SOURCE_DIR}/include" )
 
@@ -173,6 +183,13 @@ ENDIF()
 
 # LIBRARY
 ADD_LIBRARY( lib_${PROJECT_NAME} ${library_sources} )
+
+#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4Kalman.dylib)
+#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4Kaltrack.dylib)
+#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4KalGeom.dylib)
+#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4Utils.dylib)
+
+
 # create symbolic lib target for calling target lib_XXX
 ADD_CUSTOM_TARGET( lib DEPENDS lib_${PROJECT_NAME} )
 # change lib_target properties

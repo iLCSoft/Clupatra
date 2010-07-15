@@ -36,6 +36,21 @@ struct HitInfoStruct{
 } ;
 struct HitInfo : LCOwnedExtension<HitInfo,HitInfoStruct> {} ;
 
+//------------------------------
+//helpers for z ordering of hits
+struct TrackerHitCast{
+  TrackerHit* operator()(LCObject* o) { return (TrackerHit*) o ; }
+};
+struct ZSort {
+  bool operator()( const TrackerHit* l, const TrackerHit* r) {
+    return ( l->getPosition()[2] < r->getPosition()[2] );
+  }
+};
+void printZ(TrackerHit* h) { 
+  std::cout << h->getPosition()[2] << ", " ;
+  if(!( h->id() % 30 )) std::cout << std::endl ;
+}
+//-------------------------------
 
 /** Simple predicate class for applying an r cut to the objects of type T.
  *  Requires float T::getR().
@@ -309,7 +324,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   RCut<TrackerHit> rCut( _rCut ) ;
   
-  ZIndex<TrackerHit,80> zIndex( -2750. , 2750. ) ; 
+  ZIndex<TrackerHit,200> zIndex( -2750. , 2750. ) ; 
   
   //  NNDistance< TrackerHit, double> dist( _distCut )  ;
   HitDistance dist( _distCut ) ;
@@ -323,7 +338,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   // create a vector of generic hits from the collection applying a cut on r_min
   for( StringVec::iterator it = _colNames.begin() ; it !=  _colNames.end() ; it++ ){  
     
-    LCCollection* col =  evt->getCollection( *it )  ; 
+    LCCollectionVec* col =  dynamic_cast<LCCollectionVec*> (evt->getCollection( *it )  ); 
     
     
     //--- assign the layer number to the TrackerHits
@@ -355,13 +370,27 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
     } //-------------------- end assign layernumber ---------
     
-    addToGenericHitVec( h , col , rCut , zIndex ) ;
-  }  
+    //addToGenericHitVec( h , col , rCut , zIndex ) ;
+    std::list< TrackerHit*> hitList ;
+    TrackerHitCast cast ;
+    ZSort zsort ;
+    std::transform(  col->begin(), col->end(), std::back_inserter( hitList ), cast ) ;
+    hitList.sort( zsort ) ;
+    //    std::for_each( hitList.begin() , hitList.end() , printZ ) ;
 
-  // cluster the hits with a nearest neighbour condition
-  cluster( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
+    addToGenericHitVec( h, hitList.begin() , hitList.end() , rCut ,  zIndex ) ;
+  }  
+  
+  // cluster the sorted hits  ( if |diff(z_index)|>1 the loop is stopped)
+  cluster_sorted( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
   
   streamlog_out( DEBUG ) << "   ***** clusters: " << cluList.size() << std::endl ; 
+
+  LCCollectionVec* allClu = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform(cluList.begin(), cluList.end(), std::back_inserter( *allClu ) , converter ) ;
+  evt->addCollection( allClu , "AllTrackClusters" ) ;
+
+
 
   // find 'odd' clusters that have duplicate hits in pad rows
   GenericClusterVec<TrackerHit> ocs ;
@@ -508,7 +537,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   for( GenericClusterVec< ClusterSegment >::iterator it = mergedSegs.begin() ;
        it != mergedSegs.end() ; ++it){
 
-    std::cout <<  " ===== merged segements =========" << std::endl ;
+    streamlog_out( DEBUG)  <<  " ===== merged segements =========" << std::endl ;
 
     GenericCluster<ClusterSegment>::iterator si = (*it)->begin() ;
    
@@ -529,7 +558,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     } 
     mergedClusters.push_back( merged->Cluster ) ; 
 
-    std::cout <<  " ===== " << std::endl ;
+    streamlog_out( DEBUG) <<  " ===== " << std::endl ;
 
   }
 
@@ -554,7 +583,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   clock_t end = clock () ; 
   
   streamlog_out( DEBUG )  << "---  clustering time: " 
-			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
+ 			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
 }
 
 
