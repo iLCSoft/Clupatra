@@ -210,7 +210,7 @@ class GenericHit : public  std::pair< T*, GenericCluster<T>* >{
 
 public:
 
-  /** Default c'tor takes a pointer to the original hit type object. The optioal index can be used to 
+  /** Default c'tor takes a pointer to the original hit type object. The optional index can be used to 
    *  code nearest neighbour bins, e.g. in z-coordinate to speed up the clustering process.
    */
   GenericHit(T* hit, int index0 = 0 ) : Index0( index0 )   {  

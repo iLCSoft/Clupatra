@@ -14,7 +14,7 @@
 #include "IMPL/TrackImpl.h"
 #include "IMPL/TrackerHitImpl.h"
 #include "EVENT/SimTrackerHit.h"
-//#include "UTIL/LCTypedVector.h"
+#include "UTIL/Operators.h"
 
 //---- GEAR ----
 #include "marlin/Global.h"
@@ -172,7 +172,7 @@ struct DuplicatePadRows{
     unsigned nDuplicate = 0 ;
     for(unsigned i=0 ; i < _N ; ++i ) {
       if( hLayer[i] > 1 ) 
-	++nDuplicate ;
+	nDuplicate += hLayer[i] ;
     }
     return double(nDuplicate)/nHit > _f ;
   }
@@ -200,13 +200,19 @@ public:
     
     if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
 
-    const PosType* pos0 =  h0->first->getPosition() ;
-    const PosType* pos1 =  h1->first->getPosition() ;
-    
-    //------- don't merge hits from same layer !
+//     int l0 =  h0->first->ext<HitInfo>()->layerID ;
+//     int l1 =  h1->first->ext<HitInfo>()->layerID ;
+
+//     //------- don't merge hits from same layer !
+//     if( l0 == l1 )
+//       return false ;
+
     if( h0->first->ext<HitInfo>()->layerID == h1->first->ext<HitInfo>()->layerID )
       return false ;
 
+    const PosType* pos0 =  h0->first->getPosition() ;
+    const PosType* pos1 =  h1->first->getPosition() ;
+    
     return 
       ( pos0[0] - pos1[0] ) * ( pos0[0] - pos1[0] ) +
       ( pos0[1] - pos1[1] ) * ( pos0[1] - pos1[1] ) +
@@ -216,6 +222,49 @@ public:
   
 protected:
   HitDistance() ;
+  float _dCutSquared ;
+  float _dCut ;
+} ;
+
+class HitDistance_2{
+  typedef TrackerHit HitClass ;
+  typedef double PosType ;
+public:
+
+  /** Required typedef for cluster algorithm 
+   */
+  typedef HitClass hit_type ;
+
+  /** C'tor takes merge distance */
+  HitDistance_2(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
+
+
+  /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
+  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
+    
+    //if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
+
+    int l0 =  h0->first->ext<HitInfo>()->layerID ;
+    int l1 =  h1->first->ext<HitInfo>()->layerID ;
+
+
+    //------- don't merge hits from same layer !
+    if( l0 == l1 )
+      return false ;
+
+
+    const PosType* pos0 =  h0->first->getPosition() ;
+    const PosType* pos1 =  h1->first->getPosition() ;
+    
+    return inRange<-2,2>(  l0 - l1 )  &&  
+      ( pos0[0] - pos1[0] ) * ( pos0[0] - pos1[0] ) +
+      ( pos0[1] - pos1[1] ) * ( pos0[1] - pos1[1] ) +
+      ( pos0[2] - pos1[2] ) * ( pos0[2] - pos1[2] )   
+      < _dCutSquared ;
+  }
+  
+protected:
+  HitDistance_2() ;
   float _dCutSquared ;
   float _dCut ;
 } ;
@@ -233,13 +282,14 @@ struct LCIOTrack{
     for( typename GenericCluster<T>::iterator hi = c->begin(); hi != c->end() ; hi++) {
       
       trk->addHit(  (*hi)->first ) ;
-      e += (*hi)->first->getdEdx() ;
+      e += (*hi)->first->getEDep() ;
       nHit++ ;
     }
 
    
     trk->setdEdx( e/nHit ) ;
-   
+    trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
+ 
     // FIXME - these are no meaningfull tracks - just a test for clustering tracker hits
     
     return trk ;
@@ -288,7 +338,7 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
   registerProcessorParameter( "DuplicatePadRowFraction" , 
 			      "allowed fraction of hits in same pad row per track"  ,
 			       _duplicatePadRowFraction,
-			      (float) 0.02 ) ;
+			      (float) 0.01 ) ;
 
   registerProcessorParameter( "RCut" , 
 			      "Cut for r_min in mm"  ,
@@ -328,6 +378,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   //  NNDistance< TrackerHit, double> dist( _distCut )  ;
   HitDistance dist( _distCut ) ;
+  HitDistance_2 dist_2( 20. ) ;
   
   LCIOTrack<TrackerHit> converter ;
   
@@ -383,6 +434,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   // cluster the sorted hits  ( if |diff(z_index)|>1 the loop is stopped)
   cluster_sorted( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
+  //cluster( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
   
   streamlog_out( DEBUG ) << "   ***** clusters: " << cluList.size() << std::endl ; 
 
@@ -433,7 +485,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 //   //-------------------- split up cluster with duplicate rows 
-//   // NOTE: a 'simple' combinatorical Kalman filter would do the trick here ...
+//   // NOTE: a 'simple' combinatorical Kalman filter could do the trick here ...
 
   GenericClusterVec<TrackerHit> sclu ; // new split clusters
 
@@ -442,13 +494,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   typedef GenericClusterVec<TrackerHit>::iterator GCVI ;
 
+
+  //========================== first iteration ================================================
   for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
     (*it)->takeHits( std::back_inserter( oddHits )  ) ;
     delete (*it) ;
   }
   ocs.clear() ;
 
-  int _nRowForSplitting = 20 ; //FIXME:  make proc param
+  int _nRowForSplitting = 10 ; //FIXME:  make proc param
   // reset the hits index to row ranges for reclustering
   unsigned nOddHits = oddHits.size() ;
   for(unsigned i=0 ; i< nOddHits ; ++i){
@@ -474,15 +528,61 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCCollectionVec* oddCol3 = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
   evt->addCollection( oddCol3 , "OddClu_3" ) ;
-  oddHits.clear() ;
 
+  //========================== second iteration in shifted pad row ranges ================================================
+
+//   for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
+//     (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+//     delete (*it) ;
+//   }
+  ocs.clear() ;
+
+  oddHits.clear() ;
+  for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
+    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    delete (*it) ;
+  }
+  sclu.clear() ;
+
+  //  int _nRowForSplitting = 10 ; //FIXME:  make proc param
+  // reset the hits index to row ranges for reclustering
+  nOddHits = oddHits.size() ;
+
+  streamlog_out( DEBUG ) << "   left over odd hits for second iteration of pad row range clustering " << nOddHits << std::endl ;
+
+  for(unsigned i=0 ; i< nOddHits ; ++i){
+    int layer =  oddHits[i]->first->ext<HitInfo>()->layerID  ;
+    oddHits[i]->Index0 =   2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
+  }
+
+  //----- recluster in pad row ranges
+  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+
+  LCCollectionVec* oddCol2_1 = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2_1 ) , converter ) ;
+  evt->addCollection( oddCol2_1 , "OddClu_2_1" ) ;
+
+
+  streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
+			 << std::endl ; 
+ 
+ //--------- remove pad row range clusters where merge occured 
+  split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+
+
+  LCCollectionVec* oddCol3_1 = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
+  evt->addCollection( oddCol3_1 , "OddClu_3_1" ) ;
   //----------------end  split up cluster with duplicate rows 
 
 
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
   // --- recluster the good clusters w/ all pad rows
 
+  oddHits.clear() ;
   for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
     (*it)->takeHits( std::back_inserter( oddHits )  ) ;
     delete (*it) ;
@@ -510,6 +610,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   // merge the good clusters to final list
   cluList.merge( sclu ) ;
   
+  LCCollectionVec* cluCol = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
+  evt->addCollection( cluCol , "CluTrackSegments" ) ;
+
 
   //============ now try reclustering with circle segments ======================
   GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
@@ -520,7 +624,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   segs.sort( SortSegmentsWRTRadius() ) ;
 
-  std::for_each( segs.begin(), segs.end() , std::mem_fun( &ClusterSegment::dump )  ) ; 
+  // DEBUG output :
+  //std::for_each( segs.begin(), segs.end() , std::mem_fun( &ClusterSegment::dump )  ) ; 
 
   GenericHitVec< ClusterSegment > segclu ;
   GenericClusterVec< ClusterSegment > mergedSegs ;
@@ -543,7 +648,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
    
     ClusterSegment* merged = (*si)->first  ;
 
-    merged->dump() ;
+    // merged->dump() ;
 
     ++si ;
 
@@ -589,6 +694,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 void ClupatraProcessor::check( LCEvent * evt ) { 
+
+
+  //  UTIL::LCTOOLS::dumpEventDetailed( evt ) ;
 
   bool checkForDuplicatePadRows =  true ;
   bool checkForMCTruth =  true ;
@@ -644,7 +752,8 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
     oddCol->setSubset( true ) ;
 
-    LCIterator<Track> trIt( evt, _outColName ) ;
+    LCIterator<Track> trIt( evt, "CluTrackSegments" ) ;
+    //    LCIterator<Track> trIt( evt, _outColName ) ;
     //    LCIterator<Track> trIt( evt, "TPCTracks" ) ;
     while( Track* tr = trIt.next()  ){
 

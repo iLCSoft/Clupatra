@@ -19,7 +19,7 @@
       <processor name="MyAIDAProcessor"/>
       <processor name="MyClupatraProcessor"/>
       <Xprocessor name="MyMyProcessor"/>
-      <Xprocessor name="MyGenericViewer"/>
+      <processor name="MyGenericViewer"/>
       <processor name="MyCEDViewer"/>
       <Xprocessor name="MyLCIOOutputProcessor"/>
       <!--processor name="MyAbsCalibr"/-->
@@ -87,10 +87,10 @@
    <global>
       <parameter name="LCIOInputFiles"> recfile.slcio </parameter>
       <parameter name="GearXMLFile" value="gear_ILD_00.xml"/>
-      <parameter name="MaxRecordNumber" value="5"/>
-      <parameter name="SkipNEvents" value="0"/>
+      <parameter name="MaxRecordNumber" value="20"/>
+      <parameter name="SkipNEvents" value="10"/>
       <parameter name="SupressCheck" value="false"/>
-      <parameter name="Verbosity" value="DEBUG"/>
+      <parameter name="Verbosity" value="MESSAGE"/>
    </global>
 
  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
@@ -165,12 +165,15 @@
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
     OddClu_3 0 3  3 
+    OddClu_2_1 0 3  12
+    OddClu_3_1 0 3  13 
     OddClu_4 0 3  4 
     CluTracks 0 3 5 
+    CluTrackSegments 0 3 7 
     OddCluTracks 0 3 11 
-    OddMCPTracks 0 3 12 
-    MergedTrackSegements 0 3 13
-    TrueTracks 0 3 14
+    OddMCPTracks 0 3 14 
+    MergedTrackSegements 0 3 15
+    TrueTracks 0 3 16
   </parameter>
 </processor>
 
