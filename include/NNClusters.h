@@ -279,6 +279,18 @@ public :
     }
   }
 
+  /**Remove all hits from the cluster and reset the cluster association.
+   */
+  void freeHits(){
+
+    typename GenericCluster<T>::iterator it = this->begin() ;
+
+    while( it !=  this->end() ){
+      (*it)->second = 0 ;
+      it = this->erase(it) ;
+    }
+  }
+
   /** Merges all hits from the other cluster cl into this cluster */
   void mergeClusters( GenericCluster<T>* cl ) {
     
@@ -420,6 +432,13 @@ public:
 //                 << std::endl ;
       delete *i ;
     }
+  }
+
+  void clear() {
+//     for( typename GenericClusterVec::iterator i = List::begin() ; i != List::end() ; i++) {
+//       delete *i ;
+//     }
+    std::list< GenericCluster<T>* >::clear() ;
   }
 };
 

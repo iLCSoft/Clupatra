@@ -46,10 +46,16 @@ struct ZSort {
     return ( l->getPosition()[2] < r->getPosition()[2] );
   }
 };
+
 void printZ(TrackerHit* h) { 
   std::cout << h->getPosition()[2] << ", " ;
   if(!( h->id() % 30 )) std::cout << std::endl ;
 }
+
+//-------------------------------
+template <class T>
+void delete_elements(T* t) { delete t ; }
+
 //-------------------------------
 
 /** Simple predicate class for applying an r cut to the objects of type T.
@@ -74,6 +80,8 @@ struct ClusterSegment{
   double Y ;
   double R ;
   double ChiS ;
+  double Bz ;
+  double Phi0 ;
   double ZMin ;
   double ZMax ;
   GenericCluster<TrackerHit>* Cluster ;
@@ -172,11 +180,13 @@ struct DuplicatePadRows{
     unsigned nDuplicate = 0 ;
     for(unsigned i=0 ; i < _N ; ++i ) {
       if( hLayer[i] > 1 ) 
-	nDuplicate += hLayer[i] ;
+     	nDuplicate += hLayer[i] ;
     }
     return double(nDuplicate)/nHit > _f ;
   }
 };
+//TODO: create a faster predicate for no duplicate pad rows ....
+
 //---------------------------------------------------------------------------------
 
 /** Predicate class for 'distance' of NN clustering.
@@ -199,7 +209,7 @@ public:
   inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
     
     if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-
+    
 //     int l0 =  h0->first->ext<HitInfo>()->layerID ;
 //     int l1 =  h1->first->ext<HitInfo>()->layerID ;
 
@@ -297,6 +307,64 @@ struct LCIOTrack{
 
 } ;
 
+struct LCIOTrackFromSegment{
+  
+  lcio::Track* operator() (ClusterSegment* s) {  
+    
+    TrackImpl* trk = new TrackImpl ;
+    
+    double e = 0.0 ;
+    int nHit = 0 ;
+
+    double zpos = 0.0 ;
+    for( GenericCluster<TrackerHit>::iterator hi = s->Cluster->begin(); hi != s->Cluster->end() ; hi++) {
+      
+      TrackerHit* th =  (*hi)->first  ; 
+      trk->addHit( th ) ;
+      e +=  th->getEDep() ;
+      zpos = th->getPosition()[2] ; 
+      nHit++ ;
+    }
+
+   
+    trk->setdEdx( e/nHit ) ;
+    trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
+
+    // -------- get track parameters from helix fit:
+    HelixClass * helix = new HelixClass();
+    //    helix->Initialize_BZ(x0, y0, r0,  bz, phi0, _bField, signPz, zBegin);
+
+    double signPz = zpos / std::abs( zpos ) ;
+    helix->Initialize_BZ( s->X, s->Y, s->R , s->Bz, s->Phi0,  3.5 , signPz, s->ZMin);
+
+    trk->setChi2( s->ChiS ) ;
+
+    trk->setD0( helix->getD0() ) ;
+    trk->setPhi( helix->getPhi0() ) ;
+    trk->setOmega( helix->getOmega() ) ;
+    trk->setZ0( helix->getZ0() ) ;
+    trk->setTanLambda( helix->getTanLambda() ) ;
+    
+//   float x0 = par[0];
+//   float y0 = par[1];
+//   float r0 = par[2];
+//   float bz = par[3];
+//   float phi0 = par[4];
+
+  //   HelixClass * helix = new HelixClass();
+  //   helix->Initialize_BZ(x0, y0, r0, 
+  // 		       bz, phi0, _bField,signPz,
+  // 		       zBegin);
+  //   std::cout << "Track " << iclust << " ;  d0 = " << helix->getD0()
+  // 	    << " ; z0 = " << helix->getZ0() 
+  // 	    << " ; omega = " << helix->getOmega() 
+ 
+    
+    return trk ;
+  }
+
+} ;
+
 
 
 ClupatraProcessor aClupatraProcessor ;
@@ -377,8 +445,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   ZIndex<TrackerHit,200> zIndex( -2750. , 2750. ) ; 
   
   //  NNDistance< TrackerHit, double> dist( _distCut )  ;
-  HitDistance dist( _distCut ) ;
-  HitDistance_2 dist_2( 20. ) ;
+  HitDistance dist0( _distCut ) ;
+  HitDistance dist( 20. ) ;
+  //  HitDistance_2 dist_2( 20. ) ;
   
   LCIOTrack<TrackerHit> converter ;
   
@@ -433,7 +502,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   }  
   
   // cluster the sorted hits  ( if |diff(z_index)|>1 the loop is stopped)
-  cluster_sorted( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
+  cluster_sorted( h.begin() , h.end() , std::back_inserter( cluList )  , &dist0 , _minCluSize ) ;
   //cluster( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
   
   streamlog_out( DEBUG ) << "   ***** clusters: " << cluList.size() << std::endl ; 
@@ -529,13 +598,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
   evt->addCollection( oddCol3 , "OddClu_3" ) ;
 
-  //========================== second iteration in shifted pad row ranges ================================================
 
-//   for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-//     (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-//     delete (*it) ;
-//   }
+  
+
+  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
+    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    delete (*it) ;
+  }
   ocs.clear() ;
+
+
+//   //========================== second iteration in shifted pad row ranges ================================================
+
 
   oddHits.clear() ;
   for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
@@ -573,8 +647,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCCollectionVec* oddCol3_1 = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
   evt->addCollection( oddCol3_1 , "OddClu_3_1" ) ;
-  //----------------end  split up cluster with duplicate rows 
 
+  //----------------end  split up cluster with duplicate rows 
+  
+  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
+    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    delete (*it) ;
+  }
+  ocs.clear() ;
+  
 
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -603,10 +684,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   // --- end recluster the good clusters w/ all pad rows
 
-  //TO DO:
-  // ---- check again for duplicate pad rows 
-  //  -> can occur if tracks merged at pad row range border .....
-
   // merge the good clusters to final list
   cluList.merge( sclu ) ;
   
@@ -615,11 +692,31 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   evt->addCollection( cluCol , "CluTrackSegments" ) ;
 
 
+  //================================================================================
+
+  // create collections of used and unused TPC hits:
+  LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+  LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+  usedHits->setSubset() ;
+  unUsedHits->setSubset() ;
+  usedHits->reserve( h.size() ) ;
+  unUsedHits->reserve( h.size() ) ;
+  typedef GenericHitVec<TrackerHit>::iterator GHVI ;
+  for( GHVI it = h.begin(); it != h.end() ;++it){
+    if( (*it)->second != 0 )
+      usedHits->push_back( (*it)->first ) ;
+    else
+      unUsedHits->push_back( (*it)->first ) ;          
+  }
+  evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits" ) ;
+  evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
+
   //============ now try reclustering with circle segments ======================
   GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
 
   std::list< ClusterSegment* > segs ;
   
+  // fit circles (helices actually) to the cluster segments...
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( segs ) , CircleFitter() ) ;
 
   segs.sort( SortSegmentsWRTRadius() ) ;
@@ -642,7 +739,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   for( GenericClusterVec< ClusterSegment >::iterator it = mergedSegs.begin() ;
        it != mergedSegs.end() ; ++it){
 
-    streamlog_out( DEBUG)  <<  " ===== merged segements =========" << std::endl ;
+    streamlog_out( DEBUG)  <<  " ===== merged segments =========" << std::endl ;
 
     GenericCluster<ClusterSegment>::iterator si = (*it)->begin() ;
    
@@ -655,7 +752,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     while( si != (*it)->end() ){
 
       ClusterSegment* seg = (*si)->first ;
-      seg->dump() ;
+      //      seg->dump() ;
 
       merged->Cluster->merge(  *seg->Cluster ) ;
 
@@ -669,17 +766,26 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   LCCollectionVec* mergeCol = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( mergedClusters.begin(), mergedClusters.end(), std::back_inserter( *mergeCol ) , converter ) ;
-  evt->addCollection( mergeCol , "MergedTrackSegements" ) ;
+  evt->addCollection( mergeCol , "MergedTrackSegments" ) ;
   mergedClusters.clear() ;
 
   //============ end reclustering with circle segments ===========================
 
  
+  //====== no fit the new merged clusters ================================
 
-
+  // clean up segment lists
+  std::for_each( segs.begin(), segs.end(), delete_elements<ClusterSegment> ) ;
+  segs.clear() ;
+ 
+  // fit circles (helices actually) to the merged cluster segments...
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( segs ) , CircleFitter() ) ;
 
   // create "lcio::Tracks" from the clustered TrackerHits
-   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *lcioTracks ) , converter ) ;
+  //   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *lcioTracks ) , converter ) ;
+
+  std::transform( segs.begin(), segs.end(), std::back_inserter( *lcioTracks ) , LCIOTrackFromSegment() ) ;
+
    evt->addCollection( lcioTracks , _outColName ) ;
   
   
@@ -693,8 +799,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 
-void ClupatraProcessor::check( LCEvent * evt ) { 
 
+
+
+
+
+
+/*************************************************************************************************/
+  void ClupatraProcessor::check( LCEvent * evt ) { 
+/*************************************************************************************************/
 
   //  UTIL::LCTOOLS::dumpEventDetailed( evt ) ;
 
@@ -809,6 +922,9 @@ void ClupatraProcessor::end(){
 
 
 
+
+//====================================================================================================
+
 ClusterSegment* fitCircle(GenericCluster<TrackerHit>* c){
 
   // code copied from GenericViewer
@@ -861,9 +977,11 @@ ClusterSegment* fitCircle(GenericCluster<TrackerHit>* c){
   shapes.FitHelix(500, 0, 1, par, dpar, chi2, distmax);
 
   ClusterSegment* segment = new ClusterSegment ;
-  segment->X = par[0];
-  segment->Y = par[1];
-  segment->R = par[2];
+  segment->X    = par[0];
+  segment->Y    = par[1];
+  segment->R    = par[2];
+  segment->Bz   = par[3];
+  segment->Phi0 = par[4];
   segment->ChiS = chi2 ;
   segment->ZMin = zmin ;
   segment->ZMax = zmax ;

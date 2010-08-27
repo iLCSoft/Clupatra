@@ -17,79 +17,21 @@
 
    <execute>
       <processor name="MyAIDAProcessor"/>
+      <Xprocessor name="MyMaterialDB"/>
       <processor name="MyClupatraProcessor"/>
+      <processor name="MyFullLDCTracking"/>
       <Xprocessor name="MyMyProcessor"/>
-      <processor name="MyGenericViewer"/>
+      <Xprocessor name="MyGenericViewer"/>
       <processor name="MyCEDViewer"/>
       <Xprocessor name="MyLCIOOutputProcessor"/>
-      <!--processor name="MyAbsCalibr"/-->
-      <!--processor name="MyCCDDigitizer"/-->
-      <!--processor name="MyCalorimeterFinalStage"/-->
-      <!--processor name="MyClusterCheater"/-->
-      <!--processor name="MyClusterCheater5_3"/-->
-      <!--processor name="MyConditionsProcessor"/-->
-      <!--processor name="MyConvertToMIPScale"/-->
-      <!--processor name="MyCreatePDFs"/-->
-      <!--processor name="MyCurlKillerProcessor"/-->
-      <!--processor name="MyCutOnCosThetaQQbar"/-->
-      <!--processor name="MyCutOnGEANT4Bug"/-->
-      <!--processor name="MyDSTViewer"/-->
-      <!--processor name="MyDrawMCParticles"/-->
-      <!--processor name="MyEMShowerFinder"/-->
-      <!--processor name="MyETDDigiProcessor"/-->
-      <!--processor name="MyFTDDigiProcessor"/-->
-      <!--processor name="MyFox"/-->
-      <!--processor name="MyFullLDCTracking"/-->
-      <!--processor name="MyHEP_RecordProcessor"/-->
-      <!--processor name="MyKIT"/-->
-      <!--processor name="MyLDCCaloDigi"/-->
-      <!--processor name="MyLEPTrackingProcessor"/-->
-      <!--processor name="MyMCTruthJetEnergy"/-->
-      <!--processor name="MyMaterialDB"/-->
-      <!--processor name="MyMokkaCaloDigi"/-->
-      <!--processor name="MyNewLDCCaloDigi"/-->
-      <!--processor name="MyPFOID"/-->
-      <!--processor name="MyPGDBP"/-->
-      <!--processor name="MyRecoMCTruthLinker"/-->
-      <!--processor name="MySatoruJetFinderProcessor"/-->
-      <!--processor name="MySelectEvents"/-->
-      <!--processor name="MySelectReconstructedParticle"/-->
-      <!--processor name="MySiliconTracking"/-->
-      <!--processor name="MySimpleCaloDigi"/-->
-      <!--processor name="MySimpleFastMCProcessor"/-->
-      <!--processor name="MySimpleLCalDigi"/-->
-      <!--processor name="MySimpleLHCalDigi"/-->
-      <!--processor name="MySimpleMuonDigi"/-->
-      <!--processor name="MySimpleTimer"/-->
-      <!--processor name="MySkipNEvents"/-->
-      <!--processor name="MySphere"/-->
-      <!--processor name="MyStdHepReader"/-->
-      <!--processor name="MyTPCDigiProcessor"/-->
-      <!--processor name="MyTTBarExample"/-->
-      <!--processor name="MyThrustReconstruction"/-->
-      <!--processor name="MyTrackBasedPFlow"/-->
-      <!--processor name="MyTrackCheater"/-->
-      <!--processor name="MyTrackwiseClustering"/-->
-      <!--processor name="MyV0Finder"/-->
-      <!--processor name="MyVTXBgClusters"/-->
-      <!--processor name="MyVTXDigiProcessor"/-->
-      <!--processor name="MyVTXDigitizer"/-->
-      <!--processor name="MyVTXNoiseHits"/-->
-      <!--processor name="MyVertexViewer"/-->
-      <!--processor name="MyWW5CFit"/-->
-      <!--processor name="MyWolf"/-->
-      <!--processor name="MyYThresh"/-->
-      <!--processor name="MyZFinder"/-->
-      <!--processor name="MyTestProcessor"/-->
-      <!--processor name="MyNNClusterProcessor"/-->
    </execute>
 
    <global>
       <parameter name="LCIOInputFiles"> recfile.slcio </parameter>
       <parameter name="GearXMLFile" value="gear_ILD_00.xml"/>
-      <parameter name="MaxRecordNumber" value="20"/>
-      <parameter name="SkipNEvents" value="10"/>
-      <parameter name="SupressCheck" value="false"/>
+      <parameter name="MaxRecordNumber" value="4"/>
+      <parameter name="SkipNEvents" value="0"/>
+      <parameter name="SupressCheck" value="false true false"/>
       <parameter name="Verbosity" value="MESSAGE"/>
    </global>
 
@@ -100,9 +42,9 @@
   <!--Name of the output collections-->
   <parameter name="OutputCollection" type="string" lcioOutType="Track"> CluTracks </parameter>
   <!--Cut for distance between hits in mm-->
-  <parameter name="DistanceCut" type="float" value="20"/>
+  <parameter name="DistanceCut" type="float" value="40"/>
   <!--fraction of hits in same pad row per track-->
-  <parameter name="DuplicatePadRowFraction" type="float" value="0.02"/>
+  <parameter name="DuplicatePadRowFraction" type="float" value="0.0"/>
   <!--Minimum number of hits per cluster-->
   <parameter name="MinimumClusterSize" type="int" value="3"/>
   <!--Cut for r_min in mm-->
@@ -122,7 +64,7 @@
   <!--Sim Tracker Hit Collection Names-->
   <parameter name="SimTrackerHitCollections" type="StringVec" lcioInType="SimTrackerHit"> ETDCollection FTDCollectio SETCollection SITCollection TPCCollection TPCSpacePointCollection VXDCollection </parameter>
   <!--Track Collection Name-->
-  <parameter name="TrackCollection" type="string" lcioInType="Track"> LDCTracks </parameter>
+  <parameter name="TrackCollection" type="string" lcioInType="Track"> TPCTracks LDCTracks </parameter>
   <!--Tracker Hit Collection Names-->
   <parameter name="TrackerHitCollections" type="StringVec" lcioInType="TrackerHit"> AllTPCTrackerHits ETDTrackerHits FTDTrackerHits SETTrackerHits SITTrackerHits VTXTrackerHits </parameter>
   <!--True Cluster Collection Name-->
@@ -165,15 +107,20 @@
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
     OddClu_3 0 3  3 
-    OddClu_2_1 0 3  12
-    OddClu_3_1 0 3  13 
     OddClu_4 0 3  4 
     CluTracks 0 3 5 
     CluTrackSegments 0 3 7 
     OddCluTracks 0 3 11 
+    UsedTPCCluTrackerHits 1 3  12
+    UnUsedTPCCluTrackerHits 0 3  13
+    OddClu_3_1 0 3  13 
     OddMCPTracks 0 3 14 
     MergedTrackSegements 0 3 15
-    TrueTracks 0 3 16
+    FullCluTracks 0 3 16
+   <!-- TrueTracks 0 3 16
+    OddClu_2_1 0 3  12
+    OddClu_3_1 0 3  13 
+   -->
   </parameter>
 </processor>
 
@@ -410,80 +357,125 @@
 </processor>
 
  <processor name="MyFullLDCTracking" type="FullLDCTracking">
- <!--This processor is NOT installed in your Marlin binary: parameter descriptions and types lost!!-->
-  <parameter name="ETDHitCollection" type="string" lcioInType="TrackerHit"> ETDTrackerHits </parameter>
-  <parameter name="FTDHitCollection" type="string" lcioInType="TrackerHit"> FTDTrackerHits </parameter>
-  <parameter name="SETHitCollection" type="string" lcioInType="TrackerHit"> SETTrackerHits </parameter>
-  <parameter name="SITHitCollection" type="string" lcioInType="TrackerHit"> SITTrackerHits </parameter>
-  <parameter name="SiTracks" type="string" lcioInType="Track"> SiTracks </parameter>
-  <parameter name="SiTracksMCPRelColl" type="string" lcioInType="LCRelation"> SiTracksMCP </parameter>
-  <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit"> TPCTrackerHits </parameter>
-  <parameter name="TPCTracks" type="string" lcioInType="Track"> TPCTracks </parameter>
-  <parameter name="TPCTracksMCPRelColl" type="string" lcioInType="LCRelation"> TPCTracksMCP </parameter>
+
+  <parameter name="LDCTrackCollection" type="string" lcioOutType="Track">FullCluTracks </parameter>
+  <parameter name="LDCTrackMCPRelCollection" type="string" lcioOutType="LCRelation"> CluTracksMCP </parameter>
+  <parameter name="ReffitedTPCTrackCollection" type="string" lcioOutType="Track"> RefittedTPCCluTracks </parameter>
+  <parameter name="RefittedSiTrackCollection" type="string" lcioOutType="Track"> RefittedSiCluTracks </parameter>
+  <parameter name="RefittedSiTrackMCPRelCollection" type="string" lcioOutType="LCRelation"> RefittedSiCluTracksMCP </parameter>
+  <parameter name="RefittedTPCTrackMCPRelCollection" type="string" lcioOutType="LCRelation"> RefittedTPCCluTracksMCP </parameter>
+
+ <!--Performs full tracking in LDC detector-->
+  <!--Assign ETD Hits-->
+  <parameter name="AssignETDHits" type="int"> 1 </parameter>
+  <!--Assign left over FTD hits-->
+  <parameter name="AssignFTDHits" type="int"> 1 </parameter>
+  <!--Assign SET Hits-->
+  <parameter name="AssignSETHits" type="int"> 1 </parameter>
+  <!--Assign left over SIT hits-->
+  <parameter name="AssignSITHits" type="int"> 1 </parameter>
+  <!--Assign left over TPC hits  FIXME: turn this on -->
+  <parameter name="AssignTPCHits" type="int"> 1 </parameter>
+  <!--Assign left over VTX hits-->
+  <parameter name="AssignVTXHits" type="int"> 1 </parameter>
+  <!--Cut on fit Chi2-->
+  <parameter name="Chi2FitCut" type="float">100 </parameter>
+  <!--Cut on fit Chi2-->
+  <parameter name="Chi2PrefitCut" type="float">100000 </parameter>
+  <!--Create Track to MCP Relations-->
+  <parameter name="CreateMap" type="int">1 </parameter>
+  <!--Cut on the number of the TPC hits for tracks with no Si hits-->
+  <parameter name="CutOnTPCHits" type="int"> 35 </parameter>
+  <!--Cut on the track parameter D0-->
+  <parameter name="CutOnTrackD0" type="float"> 500 </parameter>
+  <!--Cut on the track parameter Z0-->
+  <parameter name="CutOnTrackZ0" type="float"> 500 </parameter>
+  <!--Cut on D0 difference for forced merging of Si and TPC segments-->
+  <parameter name="D0CutForForcedMerging" type="float"> 50 </parameter>
+  <!--Cut on D0 difference for merging of Si and TPC segments-->
+  <parameter name="D0CutForMerging" type="float"> 500 </parameter>
+  <!--Cut on D0 difference for merging TPC segments-->
+  <parameter name="D0CutToMergeTPCSegments" type="float">100 </parameter>
+  <!--Activate debugging?-->
+  <parameter name="Debug" type="int"> 0 </parameter>
+  <!--Cut on Omega difference for forced merging of Si and TPC segments-->
+  <parameter name="OmegaCutForForcedMerging" type="float">0.15 </parameter>
+  <!--Cut on Omega difference for merging Si and TPC segments-->
+  <parameter name="OmegaCutForMerging" type="float">0.25 </parameter>
+  <!--Cut on Opening Angle for forced merging of Si and TPC segments-->
+  <parameter name="AngleCutForForcedMerging" type="float">0.05 </parameter>
+  <!--Cut on Opening Angle for merging Si and TPC segments-->
+  <parameter name="AngleCutForMerging" type="float">0.1 </parameter>
+  <!--Cut on dP/P difference for merging TPC segments-->
+  <parameter name="DeltaPCutToMergeTPCSegments" type="float">0.06 </parameter>
+  <!--ETD Hit Collection Name-->
+  <parameter name="ETDHitCollection" type="string" lcioInType="TrackerHit">ETDTrackerHits </parameter>
+  <!--Cut on distance between track and ETD hits-->
+  <parameter name="ETDHitToTrackDistance" type="float">10 </parameter>
+  <!--SET Hit Collection Name-->
+  <parameter name="SETHitCollection" type="string" lcioInType="TrackerHit">SETTrackerHits </parameter>
+  <!--Cut on distance between track and SET hits-->
+  <parameter name="SETHitToTrackDistance" type="float">2 </parameter>
+  <!--FTD Hit Collection Name-->
+  <parameter name="FTDHitCollection" type="string" lcioInType="TrackerHit">FTDTrackerHits </parameter>
+  <!--Cut on distance between track and FTD hits-->
+  <parameter name="FTDHitToTrackDistance" type="float"> 1 </parameter>
+  <!--Forbid overlap in Z for combining TPC segments with tracks having Si hits-->
+  <parameter name="ForbidOverlapInZComb" type="int"> 0 </parameter>
+  <!--Forbid overlap in Z for the merged TPC segments-->
+  <parameter name="ForbidOverlapInZTPC" type="int"> 0 </parameter>
+  <!--Force merging of Si and TPC segments?-->
+  <parameter name="ForceSiTPCMerging" type="int"> 0 </parameter>
+  <!--Force merging of TPC Segments?-->
+  <parameter name="ForceTPCSegmentsMerging" type="int"> 1 </parameter>
+  <!--Option for the LDC Track fit-->
+  <parameter name="OptFit" type="int"> 4 </parameter>
+  <!--Option for Si tracks refitting-->
+  <parameter name="OptFitSi" type="int"> 2 </parameter>
+  <!--Option for TPC tracks refitting-->
+  <parameter name="OptFitTPC" type="int"> 2 </parameter>
+  <!--Refit Si Tracks ?-->
+  <parameter name="RefitSiTracks" type="int"> 0 </parameter>
+  <!--Refit TPC Tracks ?-->
+  <parameter name="RefitTPCTracks" type="int"> 1 </parameter>
+  <!--SIT Hit Collection Name-->
+  <parameter name="SITHitCollection" type="string" lcioInType="TrackerHit">SITTrackerHits </parameter>
+  <!--Cut on distance between track and SIT hits-->
+  <parameter name="SITHitToTrackDistance" type="float"> 1 </parameter>
+  <!--Si Track Collection-->
+  <parameter name="SiTracks" type="string" lcioInType="Track">SiTracks </parameter>
+  <!--Store only hits used in fit?-->
+  <parameter name="StoreHitsInFit" type="int">0 </parameter>
+  <!--Store Refitted Si Tracks ?-->
+  <parameter name="StoreRefittedSiTracks" type="int">0 </parameter>
+  <!--Store Refitted TPC Tracks ?-->
+  <parameter name="StoreRefittedTPCTracks" type="int">0 </parameter>
+  <!--TPC Hit Collection Name-->
+  <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">AllTPCTrackerHits UsedTPCCluTrackerHits </parameter>
+  <!--Cut on distance between track and TPC hits-->
+  <parameter name="TPCHitToTrackDistance" type="float"> 10 </parameter>
+  <!--TPC Track Collection-->
+  <parameter name="TPCTracks" type="string" lcioInType="Track"> CluTracks CluTrackSegments </parameter>
+  <!--Use Extra Point in Fit-->
+  <parameter name="UseExtraPoint" type="int"> 0 </parameter>
+  <!--VTX Hit Collection Name-->
   <parameter name="VTXHitCollection" type="string" lcioInType="TrackerHit"> VTXTrackerHits </parameter>
-  <parameter name="LDCTrackCollection" type="string" lcioOutType="Track"> LDCTracks </parameter>
-  <parameter name="LDCTrackMCPRelCollection" type="string" lcioOutType="LCRelation"> LDCTracksMCP </parameter>
-  <parameter name="ReffitedTPCTrackCollection" type="string" lcioOutType="Track"> RefittedTPCTracks </parameter>
-  <parameter name="RefittedSiTrackCollection" type="string" lcioOutType="Track"> RefittedSiTracks </parameter>
-  <parameter name="RefittedSiTrackMCPRelCollection" type="string" lcioOutType="LCRelation"> RefittedSiTracksMCP </parameter>
-  <parameter name="RefittedTPCTrackMCPRelCollection" type="string" lcioOutType="LCRelation"> RefittedTPCTracksMCP </parameter>
-  <parameter name="AngleCutForForcedMerging" value="0.05"/>
-  <parameter name="AngleCutForMerging" value="0.1"/>
-  <parameter name="AssignETDHits" value="1"/>
-  <parameter name="AssignFTDHits" value="1"/>
-  <parameter name="AssignSETHits" value="1"/>
-  <parameter name="AssignSITHits" value="1"/>
-  <parameter name="AssignTPCHits" value="1"/>
-  <parameter name="AssignVTXHits" value="1"/>
-  <parameter name="Chi2FitCut" value="100"/>
-  <parameter name="Chi2PrefitCut" value="100000"/>
-  <parameter name="CreateMap" value="1"/>
-  <parameter name="CutOnSiHits" value="4"/>
-  <parameter name="CutOnTPCHits" value="35"/>
-  <parameter name="CutOnTrackD0" value="500"/>
-  <parameter name="CutOnTrackZ0" value="500"/>
-  <parameter name="D0CutForForcedMerging" value="50"/>
-  <parameter name="D0CutForMerging" value="500"/>
-  <parameter name="D0CutToMergeTPCSegments" value="100"/>
-  <parameter name="Debug" value="0"/>
-  <parameter name="DeltaPCutToMergeTPCSegments" value="0.1"/>
-  <parameter name="ETDHitToTrackDistance" value="10"/>
-  <parameter name="FTDHitToTrackDistance" value="2"/>
-  <parameter name="ForbidOverlapInZComb" value="0"/>
-  <parameter name="ForbidOverlapInZTPC" value="0"/>
-  <parameter name="ForceSiTPCMerging" value="0"/>
-  <parameter name="ForceTPCSegmentsMerging" value="1"/>
-  <parameter name="NHitsExtrapolation" value="35"/>
-  <parameter name="OmegaCutForForcedMerging" value="0.15"/>
-  <parameter name="OmegaCutForMerging" value="0.25"/>
-  <parameter name="OptFit" value="4"/>
-  <parameter name="OptFitSi" value="2"/>
-  <parameter name="OptFitTPC" value="2"/>
-  <parameter name="PtCutToMergeTPCSegments" value="1.2"/>
-  <parameter name="RefitSiTracks" value="0"/>
-  <parameter name="RefitTPCTracks" value="1"/>
-  <parameter name="SETHitToTrackDistance" value="2"/>
-  <parameter name="SITHitToTrackDistance" value="2"/>
-  <parameter name="StoreHitsInFit" value="0"/>
-  <parameter name="StoreRefittedSiTracks" value="0"/>
-  <parameter name="StoreRefittedTPCTracks" value="0"/>
-  <parameter name="TPCHitToTrackDistance" value="15"/>
-  <parameter name="UseExtraPoint" value="0"/>
-  <parameter name="VTXHitToTrackDistance" value="1.5"/>
-  <parameter name="Z0CutForForcedMerging" value="200"/>
-  <parameter name="Z0CutForMerging" value="1000"/>
-  <parameter name="Z0CutToMergeTPCSegments" value="5000"/>
-  <parameter name="aParameterForIPError" value="0.002"/>
-  <parameter name="bParameterForIPError" value="0.0076"/>
-  <parameter name="cosThetaCutHighPtMerge" value="0.99"/>
-  <parameter name="cosThetaCutSoftHighPtMerge" value="0.998"/>
-  <parameter name="hitDistanceCutHighPtMerge" value="25"/>
-  <parameter name="maxFractionOfOutliersCutHighPtMerge" value="0.95"/>
-  <parameter name="maxHitDistanceCutHighPtMerge" value="50"/>
-  <parameter name="momDiffCutHighPtMerge" value="0.01"/>
-  <parameter name="momDiffCutSoftHighPtMerge" value="0.25"/>
-  <parameter name="sParameterForIPError" value="0.75"/>
-</processor>
+  <!--Cut on distance between track and VTX hits-->
+  <parameter name="VTXHitToTrackDistance" type="float"> 0.5 </parameter>
+  <!--Cut on Z0 difference for forced merging of Si and TPC segments-->
+  <parameter name="Z0CutForForcedMerging" type="float">500 </parameter>
+  <!--Cut on Z0 difference for merging of Si and TPC segments-->
+  <parameter name="Z0CutForMerging" type="float"> 1000 </parameter>
+  <!--Cut on Z0 difference for merging TPC segments-->
+  <parameter name="Z0CutToMergeTPCSegments" type="float">5000 </parameter>
+  <!--Parameter a to define minimal IP error-->
+  <parameter name="aParameterForIPError" type="float">0.002 </parameter>
+  <!--Parameter b to define minimal IP error-->
+  <parameter name="bParameterForIPError" type="float">0.0076 </parameter>
+  <!--Parameter s to define minimal IP error-->
+  <parameter name="sParameterForIPError" type="float">0.75 </parameter>
+ </processor>
+
 
  <processor name="MyHEP_RecordProcessor" type="HEP_RecordProcessor">
  <!--HEP record balance and drawing-->
@@ -545,11 +537,11 @@
 </processor>
 
  <processor name="MyMaterialDB" type="MaterialDB">
- <!--This processor is NOT installed in your Marlin binary: parameter descriptions and types lost!!-->
-  <parameter name="BuildSET" value="1"/>
-  <parameter name="UseExtrapolations" value="1"/>
-  <parameter name="UseMaterials" value="1"/>
+ <!--Material DB builder...-->
+  <parameter name="UseExtrapolations" type="int" value="1"/>
+  <parameter name="UseMaterials" type="int" value="1"/>
 </processor>
+
 
  <processor name="MyMokkaCaloDigi" type="MokkaCaloDigi">
  <!--This processor is NOT installed in your Marlin binary: parameter descriptions and types lost!!-->
