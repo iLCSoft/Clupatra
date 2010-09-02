@@ -25,8 +25,21 @@
 
 #include "LCIterator.h"
 
+//test ...
+//#include "EXKalTest.h"
+
+#include "KalTest.h"
+
 using namespace lcio ;
 using namespace marlin ;
+
+
+typedef GenericCluster<TrackerHit> HitCluster ;
+typedef GenericHit<TrackerHit> Hit ;
+
+
+
+
 
 // helper class to assign additional parameters to TrackerHits
 struct HitInfoStruct{
@@ -36,11 +49,30 @@ struct HitInfoStruct{
 } ;
 struct HitInfo : LCOwnedExtension<HitInfo,HitInfoStruct> {} ;
 
+
+//------------------------------------------------------
+// function to extract position from Hit:
+  TVector3 hitPosition( Hit* h)  { return TVector3( h->first->getPosition()[0], h->first->getPosition()[1], h->first->getPosition()[2] ) ; }   
+// function to extract layerID from Hit:
+  int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID ; }
+// struct HitLayerID{
+//   int operator()( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID ; }
+// };
+// helper for sorting cluster wrt layerID
+struct LayerSort{
+  bool operator()( const Hit* l, const Hit* r) {
+    // sort outside to inside
+    //return r->first->ext<HitInfo>()->layerID <  l->first->ext<HitInfo>()->layerID ;
+    return hitLayerID( r ) < hitLayerID( l ) ; 
+  }
+} ;
+
 //------------------------------
 //helpers for z ordering of hits
 struct TrackerHitCast{
   TrackerHit* operator()(LCObject* o) { return (TrackerHit*) o ; }
 };
+
 struct ZSort {
   bool operator()( const TrackerHit* l, const TrackerHit* r) {
     return ( l->getPosition()[2] < r->getPosition()[2] );
@@ -51,6 +83,8 @@ void printZ(TrackerHit* h) {
   std::cout << h->getPosition()[2] << ", " ;
   if(!( h->id() % 30 )) std::cout << std::endl ;
 }
+
+
 
 //-------------------------------
 template <class T>
@@ -84,10 +118,20 @@ struct ClusterSegment{
   double Phi0 ;
   double ZMin ;
   double ZMax ;
-  GenericCluster<TrackerHit>* Cluster ;
+//   double D0 ;
+//   double Z0 ;
+//   double Omega ;
+//   double TanLambda ;
+//   double tanPhi0 ;
+  HitCluster* Cluster ;
   void dump(){
     std::cout << " ----- cluster segment: "
-	      << " R " << this->R 
+// 	      << "\t" << " D0  " << this->D0
+// 	      << "\t" << " Z0  " << this->Z0
+// 	      << "\t" << " Omega  " << this->Omega
+// 	      << "\t" << " TanLambda  " << this->TanLambda
+// 	      << "\t" << " tanPhi0  " << this->tanPhi0
+	      << "\t" << " R " << this->R 
 	      << "\t" << "X: " << this->X 
 	      << "\t" << "Y: " << this->Y
 	      << "\t" << "ChiS: " << this->ChiS 
@@ -97,11 +141,11 @@ struct ClusterSegment{
   }
 };
 
-ClusterSegment* fitCircle(GenericCluster<TrackerHit>* c) ;
+ClusterSegment* fitCircle(HitCluster* c) ;
 
 /** Helper class that does a 2d circle fit on cluster segemts */
 struct CircleFitter{
-    ClusterSegment* operator() (GenericCluster<TrackerHit>* c) {  
+    ClusterSegment* operator() (HitCluster* c) {  
       ClusterSegment* s =  fitCircle( c ) ;
       
       return s ;
@@ -165,11 +209,11 @@ struct DuplicatePadRows{
   float _f ; 
   DuplicatePadRows(unsigned nPadRows, float fraction) : _N( nPadRows), _f( fraction )  {}
 
-  bool operator()(const GenericCluster<TrackerHit>* cl) const {
+  bool operator()(const HitCluster* cl) const {
  
     // check for duplicate layer numbers
     std::vector<int> hLayer( _N )  ; 
-    typedef GenericCluster<TrackerHit>::const_iterator IT ;
+    typedef HitCluster::const_iterator IT ;
 
     unsigned nHit = 0 ;
     for(IT it=cl->begin() ; it != cl->end() ; ++it ) {
@@ -317,7 +361,7 @@ struct LCIOTrackFromSegment{
     int nHit = 0 ;
 
     double zpos = 0.0 ;
-    for( GenericCluster<TrackerHit>::iterator hi = s->Cluster->begin(); hi != s->Cluster->end() ; hi++) {
+    for( HitCluster::iterator hi = s->Cluster->begin(); hi != s->Cluster->end() ; hi++) {
       
       TrackerHit* th =  (*hi)->first  ; 
       trk->addHit( th ) ;
@@ -420,6 +464,9 @@ void ClupatraProcessor::init() {
 
   // usually a good idea to
   printParameters() ;
+
+
+  _kalTest = new KalTest( *marlin::Global::GEAR ) ;
 
   _nRun = 0 ;
   _nEvt = 0 ;
@@ -719,6 +766,38 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   // fit circles (helices actually) to the cluster segments...
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( segs ) , CircleFitter() ) ;
 
+
+  //*********************************************************
+  //   try  to run KalTest on circle segments ------------------------------------------------------
+  //*********************************************************
+  LCIOTrackFromSegment segToTrack ;
+
+  streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
+			   << std::endl ;
+
+  for( std::list< ClusterSegment* >::iterator it = segs.begin() ;
+       it != segs.end() ; ++it){
+    HitCluster* clu = (*it)->Cluster ;
+    
+    streamlog_out( DEBUG ) << *segToTrack( *it )  << std::endl  ;
+    
+    //     for( GenericClusterVec<TrackerHit>::iterator it =  cluList.begin() ; it != cluList.end() ; ++it) {
+    //     HitCluster* clu = (*it) ;
+    
+    clu->sort( LayerSort() ) ;
+    
+    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
+    
+    _kalTest->fitTrack() ;
+
+    _kalTest->clear() ;
+    
+  }
+  //*********************************************************
+  //   end running KalTest on circle segments-------------------------------------------------------
+  //*********************************************************
+
+
   segs.sort( SortSegmentsWRTRadius() ) ;
 
   // DEBUG output :
@@ -795,14 +874,19 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   streamlog_out( DEBUG )  << "---  clustering time: " 
  			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
+
+
+
+
+//   // test ....
+//   char* name="clupatra" ;
+//   char* nevt="10" ;
+//   char * argv[2] ;
+//   argv[0] = name ;
+//   argv[1] = nevt ;
+//   EXKalTest ( 2 , argv ) ;
+
 }
-
-
-
-
-
-
-
 
 
 /*************************************************************************************************/
@@ -925,7 +1009,7 @@ void ClupatraProcessor::end(){
 
 //====================================================================================================
 
-ClusterSegment* fitCircle(GenericCluster<TrackerHit>* c){
+ClusterSegment* fitCircle(HitCluster* c){
 
   // code copied from GenericViewer
   // should be replaced by a more efficient circle fit...
@@ -940,7 +1024,7 @@ ClusterSegment* fitCircle(GenericCluster<TrackerHit>* c){
   float zmax = -1.0E+10;
 
   int ihit = -1 ;
-  typedef GenericCluster<TrackerHit>::iterator IT ;
+  typedef HitCluster::iterator IT ;
   for( IT it=c->begin() ; it != c->end() ; ++it ){
     
     ++ihit ;
@@ -987,36 +1071,6 @@ ClusterSegment* fitCircle(GenericCluster<TrackerHit>* c){
   segment->ZMax = zmax ;
   segment->Cluster = c ;
  
-//   float x0 = par[0];
-//   float y0 = par[1];
-//   float r0 = par[2];
-//   float bz = par[3];
-//   float phi0 = par[4];
-
-  //   HelixClass * helix = new HelixClass();
-  //   helix->Initialize_BZ(x0, y0, r0, 
-  // 		       bz, phi0, _bField,signPz,
-  // 		       zBegin);
-  //   std::cout << "Track " << iclust << " ;  d0 = " << helix->getD0()
-  // 	    << " ; z0 = " << helix->getZ0() 
-  // 	    << " ; omega = " << helix->getOmega() 
-  // 	    << " ; tanlam = " << helix->getTanLambda()
-  // 	    << " ; tan(phi0) = " << tan(helix->getPhi0()) 
-  // 	    << std::endl;		
-  //   if (chi2 > 0. && chi2 < 10.) {
-  //     for (int iz(0); iz < 500; ++iz) {
-  //       float z1 = zmin + iz*dz;
-  //       float z2 = z1 + dz;
-  //       float x1 = x0 + r0*cos(bz*z1+phi0);
-  //       float y1 = y0 + r0*sin(bz*z1+phi0);
-  //       float x2 = x0 + r0*cos(bz*z2+phi0);
-  //       float y2 = y0 + r0*sin(bz*z2+phi0);			
-  //       ced_line(x1,y1,z1,x2,y2,z2,_layerTracks<<CED_LAYER_SHIFT,1,0xFFFFFF);
-  
-  //     }		
-  //   }
-  //  delete shapes;
-  //  delete helix;
   delete[] xh;
   delete[] yh;
   delete[] zh;

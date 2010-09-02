@@ -10,6 +10,8 @@ using namespace lcio ;
 using namespace marlin ;
 
 
+class KalTest ;
+
 
 /** Clustering based pattern recognition for a TPC...
  */
@@ -58,6 +60,8 @@ class ClupatraProcessor : public Processor {
 
   int _nRun ;
   int _nEvt ;
+
+  KalTest* _kalTest ;
 
 //   NNClusterer* _clusterer ;
 

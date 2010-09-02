@@ -19,7 +19,7 @@
       <processor name="MyAIDAProcessor"/>
       <Xprocessor name="MyMaterialDB"/>
       <processor name="MyClupatraProcessor"/>
-      <processor name="MyFullLDCTracking"/>
+      <Xprocessor name="MyFullLDCTracking"/>
       <Xprocessor name="MyMyProcessor"/>
       <Xprocessor name="MyGenericViewer"/>
       <processor name="MyCEDViewer"/>
@@ -36,6 +36,7 @@
    </global>
 
  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
+   <parameter name="Verbosity" value="DEBUG"/>
  <!--ClupatraProcessor : simple nearest neighbour clustering-->
   <!--Name of the input collections-->
   <parameter name="HitCollections" type="string" lcioInType="TrackerHit"> AllTPCTrackerHits </parameter>

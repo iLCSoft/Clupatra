@@ -38,7 +38,7 @@ OPTION( INSTALL_DOC "Set to OFF to skip build/install Documentation" ON )
 
 # project dependencies
 # e.g. SET( ${PROJECT_NAME}_DEPENDS "Marlin MarlinUtil LCIO GEAR CLHEP GSL RAIDA ROOT" )
-SET( ${PROJECT_NAME}_DEPENDS "Marlin LCIO" )
+SET( ${PROJECT_NAME}_DEPENDS "Marlin LCIO GEAR" )
 
 # set default cmake build type to RelWithDebInfo
 # possible options are: None Debug Release RelWithDebInfo MinSizeRel
@@ -76,9 +76,13 @@ ENDIF()
 
 ### INCLUDES #################################################################
 
-#### FIXME: need KalFit  finder module ########################
 
-#INCLUDE_DIRECTORIES( "${KalFit_HOME}/include" )
+
+
+
+#################################################################
+
+ADD_SUBDIRECTORY( kaltest )
 
 #################################################################
 
@@ -88,6 +92,7 @@ ENDIF()
 
 #include directories
 INCLUDE_DIRECTORIES( "${PROJECT_SOURCE_DIR}/include" )
+INCLUDE_DIRECTORIES( "${PROJECT_SOURCE_DIR}/kaltest" )
 
 # install include files
 INSTALL( DIRECTORY "${PROJECT_SOURCE_DIR}/include"
@@ -184,11 +189,6 @@ ENDIF()
 # LIBRARY
 ADD_LIBRARY( lib_${PROJECT_NAME} ${library_sources} )
 
-#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4Kalman.dylib)
-#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4Kaltrack.dylib)
-#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4KalGeom.dylib)
-#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} ${KalFit_HOME}/lib/libS4Utils.dylib)
-
 
 # create symbolic lib target for calling target lib_XXX
 ADD_CUSTOM_TARGET( lib DEPENDS lib_${PROJECT_NAME} )
@@ -201,6 +201,11 @@ SET_TARGET_PROPERTIES( lib_${PROJECT_NAME} PROPERTIES
     CLEAN_DIRECT_OUTPUT 1
     # avoid conflicts between library and binary target names
     OUTPUT_NAME ${PROJECT_NAME} )
+
+
+#FIXME: need proper way of adding the kaltest library ...
+TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} kaltest )
+
 
 # install library
 INSTALL( TARGETS lib_${PROJECT_NAME} DESTINATION lib PERMISSIONS
