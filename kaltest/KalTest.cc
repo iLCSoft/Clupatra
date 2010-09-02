@@ -46,7 +46,7 @@ void KalTest::init() {
   const gear::TPCParameters& tpcParams = _gearMgr->getTPCParameters();
   
   EXVTXKalDetector* vtxdet = new EXVTXKalDetector ;
-  EXTPCKalDetector* tpcdet = new EXTPCKalDetector ;
+  EXTPCKalDetector* tpcdet = new EXTPCKalDetector( tpcParams )  ;
   
   //_det->Install( *vtxdet ) ;  
   _det->Install( *tpcdet ) ;  
@@ -97,7 +97,6 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
 			 << " detector has  " << _det->GetEntriesFast() << " layers only "
  			 << " - object at given layer : " <<  _det->At( layer )  << std::endl ;
  }
-
 }
 
 void KalTest::fitTrack(){

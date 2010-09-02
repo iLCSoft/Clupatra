@@ -38,7 +38,7 @@ public:
       int l = layer( *first ) ;
       TVector3 pos = position( *first ) ;
       
-      std::cout << " adding hit in layer " << l << " at " << pos(0) << ", "  << pos(1) << ", "  << pos(2) << std::endl ;
+      //      std::cout << " adding hit in layer " << l << " at " << pos(0) << ", "  << pos(1) << ", "  << pos(2) << std::endl ;
       addHit( pos ,  l ) ;
       
       ++first ;

@@ -52,7 +52,9 @@ struct HitInfo : LCOwnedExtension<HitInfo,HitInfoStruct> {} ;
 
 //------------------------------------------------------
 // function to extract position from Hit:
-  TVector3 hitPosition( Hit* h)  { return TVector3( h->first->getPosition()[0], h->first->getPosition()[1], h->first->getPosition()[2] ) ; }   
+TVector3 hitPosition( Hit* h)  { return TVector3( h->first->getPosition()[0] *.1 ,   // convert to cm ...
+						  h->first->getPosition()[1] *.1 ,
+						  h->first->getPosition()[2] *.1 ) ; }   
 // function to extract layerID from Hit:
   int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID ; }
 // struct HitLayerID{
