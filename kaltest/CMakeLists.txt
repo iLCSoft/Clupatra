@@ -26,6 +26,7 @@ LOAD_PACKAGE( Marlin REQUIRED )
 IF( APPLE )
 LOAD_PACKAGE( streamlog REQUIRED )
 ENDIF( APPLE ) 
+LOAD_PACKAGE( LCIO REQUIRED )
 
 
 ###### include directories #######################################

@@ -56,16 +56,16 @@ TVector3 hitPosition( Hit* h)  { return TVector3( h->first->getPosition()[0] *.1
 						  h->first->getPosition()[1] *.1 ,
 						  h->first->getPosition()[2] *.1 ) ; }   
 // function to extract layerID from Hit:
-  int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID ; }
-// struct HitLayerID{
-//   int operator()( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID ; }
-// };
+int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID + 2  ; } 
+//FIXME: +2 hack for now - need 'global' layer ID (incl dead material layers....) 
+
 // helper for sorting cluster wrt layerID
 struct LayerSort{
   bool operator()( const Hit* l, const Hit* r) {
-    // sort outside to inside
-    //return r->first->ext<HitInfo>()->layerID <  l->first->ext<HitInfo>()->layerID ;
+    // sort inside to outside
     return hitLayerID( r ) < hitLayerID( l ) ; 
+    // sort outside to inside
+    //    return hitLayerID( r ) > hitLayerID( l ) ; 
   }
 } ;
 
@@ -777,9 +777,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
 			   << std::endl ;
 
+  LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
+  evt->addCollection( kaltracks , "KalTestTracks" ) ;
+
+  
   for( std::list< ClusterSegment* >::iterator it = segs.begin() ;
        it != segs.end() ; ++it){
     HitCluster* clu = (*it)->Cluster ;
+    
+    if( clu->size() < 3 ) continue ;
     
     streamlog_out( DEBUG ) << *segToTrack( *it )  << std::endl  ;
     
@@ -790,7 +796,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
     
-    _kalTest->fitTrack() ;
+    TrackImpl* kttrk = new TrackImpl ;
+    
+    _kalTest->fitTrack( kttrk  ) ;
+
+    kaltracks->addElement( kttrk ) ;
 
     _kalTest->clear() ;
     

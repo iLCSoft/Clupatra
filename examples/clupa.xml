@@ -29,7 +29,7 @@
    <global>
       <parameter name="LCIOInputFiles"> recfile.slcio </parameter>
       <parameter name="GearXMLFile" value="gear_ILD_00.xml"/>
-      <parameter name="MaxRecordNumber" value="4"/>
+      <parameter name="MaxRecordNumber" value="20"/>
       <parameter name="SkipNEvents" value="0"/>
       <parameter name="SupressCheck" value="false true false"/>
       <parameter name="Verbosity" value="MESSAGE"/>
@@ -118,6 +118,7 @@
     OddMCPTracks 0 3 14 
     MergedTrackSegements 0 3 15
     FullCluTracks 0 3 16
+    KalTestTracks 0 3 20
    <!-- TrueTracks 0 3 16
     OddClu_2_1 0 3  12
     OddClu_3_1 0 3  13 

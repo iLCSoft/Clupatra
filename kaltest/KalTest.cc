@@ -13,12 +13,19 @@
 #include "EXHYBTrack.h"
 
 #include "gear/GEAR.h"
+#include "gear/BField.h"
 #include "gear/TPCParameters.h"
 #include "gear/PadRowLayout2D.h"
 
+#include "IMPL/TrackImpl.h"
+//#include "lcio.h"
+
+#include <math.h>
+#include <cmath>
 
 #include "streamlog/streamlog.h"
 
+//using namespace lcio ;
 
 KalTest::KalTest( const gear::GearMgr& gearMgr) :  _gearMgr( &gearMgr ) {
   
@@ -48,6 +55,8 @@ void KalTest::init() {
   EXVTXKalDetector* vtxdet = new EXVTXKalDetector ;
   EXTPCKalDetector* tpcdet = new EXTPCKalDetector( tpcParams )  ;
   
+  tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z() * 10 ) ; // 10 for Tesla -> kGauss
+
   //_det->Install( *vtxdet ) ;  
   _det->Install( *tpcdet ) ;  
   
@@ -76,6 +85,14 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
     
     ml->ProcessHit( pos, *_kalHits ); // create hit point
     
+
+
+    if( layer % 10 == 0 ){
+      double radius = pos.Perp() ;
+      std::cout << " ***** adding TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
+    }
+
+
   } else {
     
     streamlog_out( WARNING ) << " hit not added to KalTest at : " 
@@ -99,8 +116,9 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
  }
 }
 
-void KalTest::fitTrack(){
 
+void KalTest::fitTrack(IMPL::TrackImpl* trk) {
+  
   const Bool_t gkDir = kIterBackward;
   
   using namespace std ;
@@ -161,6 +179,9 @@ void KalTest::fitTrack(){
   TVector3    x1 = h1.GetMeasLayer().HitToXv(h1);
   TVector3    x2 = h2.GetMeasLayer().HitToXv(h2);
   TVector3    x3 = h3.GetMeasLayer().HitToXv(h3);
+
+  double Bfield =   h1.GetBfield() ;
+
   THelicalTrack helstart(x1, x2, x3, h1.GetBfield(), gkDir); // initial helix 
 
   // ---------------------------
@@ -204,15 +225,22 @@ void KalTest::fitTrack(){
   TVTrackHit *hitp = 0;
   while ((hitp = dynamic_cast<TVTrackHit *>(next()))) {
     TKalTrackSite  &site = *new TKalTrackSite(*hitp); // new site
+
     if (!kaltrack.AddAndFilter(site)) {               // filter it
       cout << " site discarded!" << endl;
       delete &site;                        // delete it if failed
     }
   } // end of Kalman filter
 
+  //fg: set origin as reference point ...
+//    TKalTrackSite* origin = new TKalTrackSite ;
+//    origin->SetPivot( TVector3( 0., 0., 0. ) ) ;
+//    //   kaltrack.AddAndFilter( *origin );
+
   // ---------------------------
   //  Smooth the track
   // ---------------------------
+#define SAVE_RESIDUAL false
 #ifndef SAVE_RESIDUAL
   TVKalSite &cursite = kaltrack.GetCurSite();
 #else
@@ -222,24 +250,99 @@ void KalTest::fitTrack(){
 #endif
 
 
+   TVKalState& trkState = cursite.GetCurState() ;
+//   trkState.Propagate( *origin ) ;
+
+
   // dump fit result for now:
   Int_t    ndf  = kaltrack.GetNDF();
   Double_t chi2 = kaltrack.GetChi2();
   Double_t cl   = TMath::Prob(chi2, ndf);
-  Double_t fi0  = cursite.GetCurState()(1, 0); 
-  Double_t cpa  = cursite.GetCurState()(2, 0); 
-  Double_t tnl  = cursite.GetCurState()(4, 0); 
+  Double_t dr   = trkState(0, 0); 
+  Double_t fi0  = trkState(1, 0); 
+  Double_t cpa  = trkState(2, 0);
+  Double_t dz   = trkState(3, 0);
+  Double_t tnl  = trkState(4, 0); 
   Double_t cs   = tnl/TMath::Sqrt(1.+tnl*tnl);
-  Double_t t0   = cursite.GetCurState()(5, 0); 
+  Double_t t0   = trkState(5, 0); 
   
-  streamlog_out( DEBUG ) << " track parameters: " << std::endl 
-			 << " ndf " << ndf  << std::endl 
-			 << " chi2 " <<  chi2 << std::endl 
-			 << " cl " << cl  << std::endl 
-			 << " fi0 " <<  fi0 << std::endl 
-			 << " cpa " <<  cpa << std::endl 
-			 << " tnl " <<  tnl << std::endl 
-			 << " cs " <<  cs << std::endl 
-			 << " t0 " <<  t0 << std::endl  ;
+//   svd(0,0) = 0.;                        // dr
+//   svd(1,0) = helstart.GetPhi0();        // phi0
+//   svd(2,0) = helstart.GetKappa();       // kappa
+//   svd(3,0) = 0.;                        // dz
+//   svd(4,0) = helstart.GetTanLambda();   // tan(lambda)
 
+//    _FCT = 2.99792458E-4;
+//     _radius = _pxy / (_FCT*B);
+//     _omega = q/_radius;
+
+  const double alpha =  2.99792458E-5 ; // r in cm !! 
+  // 1/ kappa = p_t = alpha * B / omega 
+  // omega = alpha * B * kappa
+
+  if( cl > 0.3 ) 
+    streamlog_out( DEBUG ) << " GOOD FIT !?  - Bfield "  << Bfield <<  std::endl ;
+    
+
+
+  //============== convert parameters to LCIO convention ====
+  double phi = fi0 - M_PI/2. ;  // FIXME : which sign ?
+  double omega =  - cpa * alpha *Bfield  ; 
+  double d0 = -dr * 10. ;
+  double z0 = dz * 10. ;
+  double tanLambda =  -tnl ;
+  //=========================================================
+
+  streamlog_out( DEBUG ) << " kaltest track parameters: "
+			 << " chi2/ndf " << chi2 / ndf  
+    //			 << " chi2 " <<  chi2 << std::endl 
+			 << " conv. level " << cl  
+    			 << "\t D0 " <<  d0 
+			 << "\t Phi :" << phi
+			 << "\t Omega " <<  omega
+			 << "\t Z0 " <<  z0
+			 << "\t tan(Lambda) " <<  tanLambda 
+			 << std::endl ;
+
+  streamlog_out( DEBUG ) << " ----- PIVOT: " << ((TKalTrackSite&) cursite).GetPivot()(0) 
+			 << ", " <<   ((TKalTrackSite&) cursite).GetPivot()(1) 
+			 << ", " <<   ((TKalTrackSite&) cursite).GetPivot()(2) << std::endl ;
+ 
+
+
+  float pivot[3] ;
+  pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;
+  pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) * 10. ;
+  pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) * 10. ;
+
+
+  //-------------- convert parameters to origin ---------------------
+  // L3 Note 1666 "Helicoidal Tracks" - formulas 33, 44, 52 
+
+
+  double xPr(0.),yPr(0.) ; // new reference point/pivot
+  double dx = xPr - pivot[0]  ;
+  double dy = yPr - pivot[1]  ;
+
+  double phiPr = std::atan2(   std::sin( phi ) - ( dx / ( 1./omega - d0 ) ) ,
+			       std::cos( phi ) + ( dy / ( 1./omega - d0 ) ) ) ;
+
+  double d0Pr = d0 + dx * std::sin( phi ) - dy * std::cos( phi ) 
+    - omega/( 2.*( 1.- omega*d0) )  * ( dx*dx +dy*dy)  ;
+
+
+
+  double dPhi = phiPr - phi ;
+  double s = dx  * std::cos( phi ) + dy * std::sin( phi ) / ( std::sin( dPhi ) / dPhi  ) ;
+
+  double z0Pr = z0 + s * tanLambda ;
+
+  trk->setD0( d0Pr ) ;  
+  trk->setPhi( phiPr  ) ; // fi0  - M_PI/2.  ) ;  
+  trk->setOmega( omega  ) ;
+  trk->setZ0( dz  ) ;  
+  trk->setTanLambda( tanLambda ) ;  
+
+
+  //  trk->setReferencePoint( pivot ) ;
 }

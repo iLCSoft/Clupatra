@@ -20,6 +20,8 @@ public:
    static Double_t GetBfield (const TVector3 &xx = TVector3(0.))
                              { return fgBfield; }
 
+  inline void SetBField( double b ) {  fgBfield = b ; }
+
    using  TAttDrawable::Draw;
    virtual void Draw(Int_t color, const Char_t *opt = "");
 

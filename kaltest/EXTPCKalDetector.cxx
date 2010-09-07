@@ -51,9 +51,12 @@ EXTPCKalDetector::EXTPCKalDetector(Int_t m)
    static const Double_t rstep     = 0.76775;       // step length of radius
    static const Double_t rtub      = 39.5;          // inner r of support tube
    static const Double_t outerr    = 206.;          // outer radius of TPC
-   static const Double_t sigmax0   = 55.e-4;
-   static const Double_t sigmax1   = 166.e-4 / 3 / TMath::Sqrt(28);
-   static const Double_t sigmaz    = 600.e-4;
+//   static const Double_t sigmax0   = 55.e-4;
+//   static const Double_t sigmax1   = 166.e-4 / 3 / TMath::Sqrt(28);
+//   static const Double_t sigmaz    = 600.e-4;
+   static const Double_t sigmax0   = .02 ; // 55.e-4;
+   static const Double_t sigmax1   = .02 ; // 166.e-4 / 3 / TMath::Sqrt(28);
+   static const Double_t sigmaz    = .06 ; // 600.e-4;
 
    Bool_t active = EXTPCMeasLayer::kActive;
    Bool_t dummy  = EXTPCMeasLayer::kDummy;
@@ -117,8 +120,13 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   static const Double_t rstep     =  pL.getRowHeight(0) * cm    ;   // 0.76775;       // step length of radius
 
   // assuming that this is the radius of the first measurment layer ....
-  static const Double_t rmin      =  tpcParams.getPlaneExtent()[0] * cm  + rstep/2. ;  // 44.215;        // minimum radius
+  static const Double_t rmin      =  tpcParams.getPlaneExtent()[0] * cm  - rstep/2. ;  // 44.215;        // minimum radius
 
+  std::cout << " ***** TPC rmin  = " << rmin 
+	    << " tpcParams.getPlaneExtent()[0] " << tpcParams.getPlaneExtent()[0] 
+	    << "  pL.getRowHeight(0) "  <<  pL.getRowHeight(0)
+	    << std::endl ;
+  
   static const Double_t rtub      = tpcParams.getDoubleVal("tpcInnerRadius") * cm  ; // 39.5; // inner r of support tube
   static const Double_t outerr    = tpcParams.getDoubleVal("tpcOuterRadius") * cm  ; //206.; // outer radius of TPC
 
@@ -137,9 +145,12 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
 //             <parameter name="tpcOuterWallThickness" type="double" value="1.780000000e+00" />
 
 
-  static const Double_t sigmax0   = 55.e-4;
-  static const Double_t sigmax1   = 166.e-4 / 3 / TMath::Sqrt(28);
-  static const Double_t sigmaz    = 600.e-4;
+   static const Double_t sigmax0   = .02 ; // 55.e-4;
+   static const Double_t sigmax1   = .02 ; // 166.e-4 / 3 / TMath::Sqrt(28);
+   static const Double_t sigmaz    = .06 ; // 600.e-4;
+//   static const Double_t sigmax0   = 55.e-4;
+//   static const Double_t sigmax1   = 166.e-4 / 3 / TMath::Sqrt(28);
+//   static const Double_t sigmaz    = 600.e-4;
   
   Bool_t active = EXTPCMeasLayer::kActive;
   Bool_t dummy  = EXTPCMeasLayer::kDummy;
@@ -153,6 +164,10 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
     ss << "TPC" << std::setw(3) << std::setfill('0') << layer << std::ends;
     Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz, active, ss.str().data()));
     r += rstep;
+
+    if( layer % 10 == 0 ){
+      std::cout << " ***** adding TPC layer : [" << layer <<  "] at R = " << r << std::endl ;
+    }
   }
   Add(new EXTPCMeasLayer(gas, cfrp, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz, dummy));
   Add(new EXTPCMeasLayer(cfrp, air, outerr, lhalf, sigmax0, sigmax1, sigmaz, dummy));

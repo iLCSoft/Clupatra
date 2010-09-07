@@ -10,6 +10,9 @@
 
 class TKalDetCradle ;
 
+namespace IMPL{
+  class TrackImpl ;
+}
 
 /** Simple wrapper class that encapsulates the KaltTest Kalman fitter.
  */
@@ -46,7 +49,7 @@ public:
     
   }
   
-  void fitTrack() ;
+  void fitTrack(IMPL::TrackImpl* trk) ;
   
   
   
