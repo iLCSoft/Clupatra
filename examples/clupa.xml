@@ -104,7 +104,9 @@
   <!--parameter name="DrawCollection" type="StringVec"> DrawCollection 0 3 </parameter-->
   <!-- Sorry, this parameter isn't a default parameter for this processor: description and type lost!!  -->
   <parameter name="DrawInLayer"> 
-    AllTrackClusters 0 3 18
+    KalTestTracks 0 3 1
+    TPCTracks 2 1 2
+  <--  AllTrackClusters 0 3 18
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
     OddClu_3 0 3  3 
@@ -118,8 +120,7 @@
     OddMCPTracks 0 3 14 
     MergedTrackSegements 0 3 15
     FullCluTracks 0 3 16
-    KalTestTracks 0 3 20
-   <!-- TrueTracks 0 3 16
+    TrueTracks 0 3 16
     OddClu_2_1 0 3  12
     OddClu_3_1 0 3  13 
    -->
