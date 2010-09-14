@@ -59,17 +59,18 @@ TVector3 hitPosition( Hit* h)  {
 }   
 
 // function to extract layerID from Hit:
-int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID + 2  ; } 
-//FIXME: +2 hack for now - need 'global' layer ID (incl dead material layers....) 
+template <int Offset>
+int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID + Offset  ; } 
+int hitLayerID( const Hit* h ) { return  hitLayerID<0>( h)   ; } 
 
 //---------------------------------------------------
 // helper for sorting cluster wrt layerID
 struct LayerSort{
   bool operator()( const Hit* l, const Hit* r) {
     // sort inside to outside
-    return hitLayerID( r ) < hitLayerID( l ) ; 
+    //        return hitLayerID( l ) < hitLayerID( r ) ; 
     // sort outside to inside
-    //    return hitLayerID( r ) > hitLayerID( l ) ; 
+    return hitLayerID( r ) < hitLayerID( l ) ; 
   }
 } ;
 
@@ -124,19 +125,19 @@ struct ClusterSegment{
   double Phi0 ;
   double ZMin ;
   double ZMax ;
-//   double D0 ;
-//   double Z0 ;
-//   double Omega ;
-//   double TanLambda ;
-//   double tanPhi0 ;
+  //   double D0 ;
+  //   double Z0 ;
+  //   double Omega ;
+  //   double TanLambda ;
+  //   double tanPhi0 ;
   HitCluster* Cluster ;
   void dump(){
     std::cout << " ----- cluster segment: "
-// 	      << "\t" << " D0  " << this->D0
-// 	      << "\t" << " Z0  " << this->Z0
-// 	      << "\t" << " Omega  " << this->Omega
-// 	      << "\t" << " TanLambda  " << this->TanLambda
-// 	      << "\t" << " tanPhi0  " << this->tanPhi0
+      // 	      << "\t" << " D0  " << this->D0
+      // 	      << "\t" << " Z0  " << this->Z0
+      // 	      << "\t" << " Omega  " << this->Omega
+      // 	      << "\t" << " TanLambda  " << this->TanLambda
+      // 	      << "\t" << " tanPhi0  " << this->tanPhi0
 	      << "\t" << " R " << this->R 
 	      << "\t" << "X: " << this->X 
 	      << "\t" << "Y: " << this->Y
@@ -151,11 +152,11 @@ ClusterSegment* fitCircle(HitCluster* c) ;
 
 /** Helper class that does a 2d circle fit on cluster segemts */
 struct CircleFitter{
-    ClusterSegment* operator() (HitCluster* c) {  
-      ClusterSegment* s =  fitCircle( c ) ;
+  ClusterSegment* operator() (HitCluster* c) {  
+    ClusterSegment* s =  fitCircle( c ) ;
       
-      return s ;
-      //return fitCircle( c ) ;
+    return s ;
+    //return fitCircle( c ) ;
   }
 };
 
@@ -189,16 +190,16 @@ public:
     double y1 = h0->first->Y ;
     double y2 = h1->first->Y ;
 
-//     //------- don't merge hits from same layer !
-//     if( h0->first->ext<HitInfo>()->layerID == h1->first->ext<HitInfo>()->layerID )
-//       return false ;
+    //     //------- don't merge hits from same layer !
+    //     if( h0->first->ext<HitInfo>()->layerID == h1->first->ext<HitInfo>()->layerID )
+    //       return false ;
     double dr = 2. * std::abs( r1 -r2 ) / (r1 + r2 ) ; 
     
     double distMS = ( x1 - x2 ) * ( x1 - x2 ) + ( y1 - y2 ) * ( y1 - y2 ) ;
  
 
     return ( dr < 0.1 && distMS < _dCutSquared ) ;
- }
+  }
   
 protected:
   float _dCutSquared ;
@@ -260,12 +261,12 @@ public:
     
     if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
     
-//     int l0 =  h0->first->ext<HitInfo>()->layerID ;
-//     int l1 =  h1->first->ext<HitInfo>()->layerID ;
+    //     int l0 =  h0->first->ext<HitInfo>()->layerID ;
+    //     int l1 =  h1->first->ext<HitInfo>()->layerID ;
 
-//     //------- don't merge hits from same layer !
-//     if( l0 == l1 )
-//       return false ;
+    //     //------- don't merge hits from same layer !
+    //     if( l0 == l1 )
+    //       return false ;
 
     if( h0->first->ext<HitInfo>()->layerID == h1->first->ext<HitInfo>()->layerID )
       return false ;
@@ -395,19 +396,19 @@ struct LCIOTrackFromSegment{
     trk->setZ0( helix->getZ0() ) ;
     trk->setTanLambda( helix->getTanLambda() ) ;
     
-//   float x0 = par[0];
-//   float y0 = par[1];
-//   float r0 = par[2];
-//   float bz = par[3];
-//   float phi0 = par[4];
+    //   float x0 = par[0];
+    //   float y0 = par[1];
+    //   float r0 = par[2];
+    //   float bz = par[3];
+    //   float phi0 = par[4];
 
-  //   HelixClass * helix = new HelixClass();
-  //   helix->Initialize_BZ(x0, y0, r0, 
-  // 		       bz, phi0, _bField,signPz,
-  // 		       zBegin);
-  //   std::cout << "Track " << iclust << " ;  d0 = " << helix->getD0()
-  // 	    << " ; z0 = " << helix->getZ0() 
-  // 	    << " ; omega = " << helix->getOmega() 
+    //   HelixClass * helix = new HelixClass();
+    //   helix->Initialize_BZ(x0, y0, r0, 
+    // 		       bz, phi0, _bField,signPz,
+    // 		       zBegin);
+    //   std::cout << "Track " << iclust << " ;  d0 = " << helix->getD0()
+    // 	    << " ; z0 = " << helix->getZ0() 
+    // 	    << " ; omega = " << helix->getOmega() 
  
     
     return trk ;
@@ -430,10 +431,10 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
   colDefault.push_back("AllTPCTrackerHits" ) ;
 
   registerInputCollections( LCIO::TRACKERHIT,
-			   "HitCollections" , 
-			   "Name of the input collections"  ,
-			   _colNames ,
-			   colDefault ) ;
+			    "HitCollections" , 
+			    "Name of the input collections"  ,
+			    _colNames ,
+			    colDefault ) ;
   
   registerOutputCollection( LCIO::TRACK,
 			    "OutputCollection" , 
@@ -455,7 +456,7 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 
   registerProcessorParameter( "DuplicatePadRowFraction" , 
 			      "allowed fraction of hits in same pad row per track"  ,
-			       _duplicatePadRowFraction,
+			      _duplicatePadRowFraction,
 			      (float) 0.01 ) ;
 
   registerProcessorParameter( "RCut" , 
@@ -527,19 +528,19 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
       th->ext<HitInfo>()->layerID = padLayout.getRowNumber( padIndex ) ;
       
-//       //--- for fixed sized rows this would also work...
-//       float rMin = padLayout.getPlaneExtent()[0] ;
-//       float rMax = padLayout.getPlaneExtent()[1] ;
-//       float nRow  = padLayout.getNRows() ;
-//       int lCheck =  ( v.rho() - rMin ) / ((rMax - rMin ) /nRow ) ;
+      //       //--- for fixed sized rows this would also work...
+      //       float rMin = padLayout.getPlaneExtent()[0] ;
+      //       float rMax = padLayout.getPlaneExtent()[1] ;
+      //       float nRow  = padLayout.getNRows() ;
+      //       int lCheck =  ( v.rho() - rMin ) / ((rMax - rMin ) /nRow ) ;
 
-//       streamlog_out( DEBUG ) << " layerID : " << th->ext<HitInfo>()->layerID 
-// 			     << " r: " << v.rho() 
-// 			     << " lCheck : " << lCheck 
-// 			     << " phi : " << v.phi()
-// 			     << " rMin : " << rMin 
-// 			     << " rMax : " << rMax 
-// 			     << std::endl ;
+      //       streamlog_out( DEBUG ) << " layerID : " << th->ext<HitInfo>()->layerID 
+      // 			     << " r: " << v.rho() 
+      // 			     << " lCheck : " << lCheck 
+      // 			     << " phi : " << v.phi()
+      // 			     << " rMin : " << rMin 
+      // 			     << " rMax : " << rMax 
+      // 			     << std::endl ;
 
     } //-------------------- end assign layernumber ---------
     
@@ -570,29 +571,29 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   GenericClusterVec<TrackerHit> ocs ;
 
 
- //  typedef GenericClusterVec<TrackerHit>::iterator GCVI ;
+  //  typedef GenericClusterVec<TrackerHit>::iterator GCVI ;
 
-//   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
-//     std::cout << " *** cluster :" << (*it)->ID 
-// 	      << " size() :" << (*it)->size() 
-// 	      << " at : " << *it << std::endl ;
-//   }
+  //   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
+  //     std::cout << " *** cluster :" << (*it)->ID 
+  // 	      << " size() :" << (*it)->size() 
+  // 	      << " at : " << *it << std::endl ;
+  //   }
   //  GCVI remIt =
-//     std::remove_copy_if( cluList.begin(), cluList.end(), std::back_inserter( ocs ) ,  DuplicatePadRows() ) ;
+  //     std::remove_copy_if( cluList.begin(), cluList.end(), std::back_inserter( ocs ) ,  DuplicatePadRows() ) ;
 
   split_list( cluList, std::back_inserter(ocs),  DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
 
-//   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
-//     std::cout << " +++ cluster :" << (*it)->ID 
-// 	      << " size() :" << (*it)->size() 
-// 	      << " at : " << *it << std::endl ;
-//   }
+  //   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
+  //     std::cout << " +++ cluster :" << (*it)->ID 
+  // 	      << " size() :" << (*it)->size() 
+  // 	      << " at : " << *it << std::endl ;
+  //   }
 
-//   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
-//     if( (*it)->size() > 20 ){
-//       ocs.splice( ocs.begin() , cluList , it  );
-//     }
-//   }
+  //   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
+  //     if( (*it)->size() > 20 ){
+  //       ocs.splice( ocs.begin() , cluList , it  );
+  //     }
+  //   }
 
 
   LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
@@ -606,8 +607,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 
-//   //-------------------- split up cluster with duplicate rows 
-//   // NOTE: a 'simple' combinatorical Kalman filter could do the trick here ...
+  //   //-------------------- split up cluster with duplicate rows 
+  //   // NOTE: a 'simple' combinatorical Kalman filter could do the trick here ...
 
   GenericClusterVec<TrackerHit> sclu ; // new split clusters
 
@@ -643,7 +644,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
 			 << std::endl ; 
  
- //--------- remove pad row range clusters where merge occured 
+  //--------- remove pad row range clusters where merge occured 
   split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
 
 
@@ -661,7 +662,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   ocs.clear() ;
 
 
-//   //========================== second iteration in shifted pad row ranges ================================================
+  //   //========================== second iteration in shifted pad row ranges ================================================
 
 
   oddHits.clear() ;
@@ -693,7 +694,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
 			 << std::endl ; 
  
- //--------- remove pad row range clusters where merge occured 
+  //--------- remove pad row range clusters where merge occured 
   split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
 
 
@@ -779,7 +780,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCIOTrackFromSegment segToTrack ;
 
   streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
-			   << std::endl ;
+			 << std::endl ;
 
   LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
   evt->addCollection( kaltracks , "KalTestTracks" ) ;
@@ -799,7 +800,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     clu->sort( LayerSort() ) ;
     
-    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
+    //FIXME: <3> hack for now - need TPC layer offset from KalTest ...
+    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<3>  ) ; 
+    //    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
     
     TrackImpl* kttrk = new TrackImpl ;
     
@@ -882,7 +885,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   std::transform( segs.begin(), segs.end(), std::back_inserter( *lcioTracks ) , LCIOTrackFromSegment() ) ;
 
-   evt->addCollection( lcioTracks , _outColName ) ;
+  evt->addCollection( lcioTracks , _outColName ) ;
   
   
   _nEvt ++ ;
@@ -895,20 +898,20 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 
-//   // test ....
-//   char* name="clupatra" ;
-//   char* nevt="10" ;
-//   char * argv[2] ;
-//   argv[0] = name ;
-//   argv[1] = nevt ;
-//   EXKalTest ( 2 , argv ) ;
+  //   // test ....
+  //   char* name="clupatra" ;
+  //   char* nevt="10" ;
+  //   char * argv[2] ;
+  //   argv[0] = name ;
+  //   argv[1] = nevt ;
+  //   EXKalTest ( 2 , argv ) ;
 
 }
 
 
 /*************************************************************************************************/
-  void ClupatraProcessor::check( LCEvent * evt ) { 
-/*************************************************************************************************/
+void ClupatraProcessor::check( LCEvent * evt ) { 
+  /*************************************************************************************************/
 
   //  UTIL::LCTOOLS::dumpEventDetailed( evt ) ;
 
@@ -1087,7 +1090,7 @@ ClusterSegment* fitCircle(HitCluster* c){
   segment->ZMin = zmin ;
   segment->ZMax = zmax ;
   segment->Cluster = c ;
- 
+
   delete[] xh;
   delete[] yh;
   delete[] zh;

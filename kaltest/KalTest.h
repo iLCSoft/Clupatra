@@ -3,9 +3,12 @@
 
 #include "gear/GearMgr.h"
 
-#include "TObjArray.h"
+#include "streamlog/streamlog.h"
 
+#include "TObjArray.h"
 #include "TVector3.h"
+
+#include <cmath>
 
 
 class TKalDetCradle ;
@@ -29,6 +32,8 @@ public:
   //   /**Set the hits to be used for fitting - no ownership taken !*/
   //   void setHits( const TObjArray& hits) { _kalHits = hits ; }
   
+  void addIPHit() ;
+
   /** template for adding hits of any type from a container - user needs to provide functor classes for extracting 
       TVector3 position
       int layer.
@@ -36,17 +41,18 @@ public:
   template <class In, class Pos, class Layer > 
   void addHits( In first, In last, Pos position, Layer layer) {
     
+
     while( first != last ){
       
       int l = layer( *first ) ;
       TVector3 pos = position( *first ) ;
       
-      //      std::cout << " adding hit in layer " << l << " at " << pos(0) << ", "  << pos(1) << ", "  << pos(2) << std::endl ;
       addHit( pos ,  l ) ;
       
       ++first ;
     }
     
+    addIPHit() ;
   }
   
   void fitTrack(IMPL::TrackImpl* trk) ;

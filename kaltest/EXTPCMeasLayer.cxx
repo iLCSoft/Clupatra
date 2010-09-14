@@ -30,6 +30,8 @@
 
 #include "EXEventGen.h"
 
+#include "streamlog/streamlog.h"
+
 //ClassImp(EXTPCMeasLayer)
 
 EXTPCMeasLayer::EXTPCMeasLayer(TMaterial &min,
@@ -220,6 +222,9 @@ Double_t EXTPCMeasLayer::GetSortingPolicy() const
 void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
                                       TObjArray &hits)
 {
+
+  static const double epsilon = 0.0001 ; // 1 micron 
+
   Int_t      side = (xx.Z() < 0. ? -1 : 1);
   TKalMatrix h    = XvToMv(xx, side);
   Double_t   rphi = h(0, 0);
@@ -235,6 +240,15 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
 
   Double_t v = EXTPCKalDetector::GetVdrift();
 
+  if( streamlog_level( DEBUG ) && std::abs( xx.Perp() - GetR() ) > epsilon ) {
+    
+    streamlog_out( ERROR ) << " TPC hit at r = " << xx.Perp() 
+			   << " not on measurement layer R = " << GetR() << std::endl ; 
+    
+  }
+
+
+
 #if 0 // ?????
   d         += v * EXEventGen::GetT0();  // T0 shift
 #endif
@@ -247,5 +261,42 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
   dmeas[1] = dz;
 
   Double_t b = EXTPCKalDetector::GetBfield();
-  hits.Add(new EXTPCHit(*this, meas, dmeas, side, v, xx, b));
+  hits.Add(new EXTPCHit(*this, meas, dmeas, side, v , xx, b));
 }
+
+void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,
+			       TObjArray  &hits) {
+  
+  
+  static const double epsilon = 0.0001 ; // 1 micron 
+  
+  Int_t      side = (xx.Z() < 0. ? -1 : 1);
+  TKalMatrix h    = XvToMv(xx, side);
+  Double_t   rphi = h(0, 0);
+  Double_t   d    = h(1, 0);
+  
+  
+  streamlog_out( DEBUG ) << " adding faked TPC hit at r = " << xx.Perp()  << std::endl ;
+  
+  
+  if( streamlog_level( DEBUG ) && std::abs( xx.Perp() - GetR() ) > epsilon ) {
+    
+    streamlog_out( ERROR ) << " TPC hit at r = " << xx.Perp() 
+			   << " not on measurement layer R = " << GetR() << std::endl ; 
+    
+  }
+
+  Double_t meas [2];
+  Double_t dmeas[2];
+  meas [0] = rphi;
+  meas [1] = d;
+  dmeas[0] = 100. ; // large errors - should not change track state
+  dmeas[1] = 100. ; //    
+  
+  Double_t v = EXTPCKalDetector::GetVdrift();
+
+  Double_t b = EXTPCKalDetector::GetBfield();
+
+  hits.Add(new EXTPCHit(*this, meas, dmeas, side, v, xx, b));
+
+ }

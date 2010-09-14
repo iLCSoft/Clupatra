@@ -71,6 +71,9 @@ public:
   virtual void       ProcessHit(const TVector3   &xx,
                                       TObjArray  &hits);
 
+  virtual void  addIPHit(const TVector3   &xx,
+			 TObjArray  &hits) ;
+
   virtual Double_t   GetSortingPolicy() const;
 
   Double_t GetSigmaX(Double_t z) const;

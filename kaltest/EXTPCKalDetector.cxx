@@ -17,6 +17,8 @@
 #include "gear/TPCParameters.h"
 #include "gear/PadRowLayout2D.h"
 
+#include "streamlog/streamlog.h"
+
 Double_t EXTPCKalDetector::fgVdrift = 5.e-3;
 //ClassImp(EXTPCKalDetector)
 
@@ -122,10 +124,10 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   // assuming that this is the radius of the first measurment layer ....
   static const Double_t rmin      =  tpcParams.getPlaneExtent()[0] * cm  - rstep/2. ;  // 44.215;        // minimum radius
 
-  std::cout << " ***** TPC rmin  = " << rmin 
-	    << " tpcParams.getPlaneExtent()[0] " << tpcParams.getPlaneExtent()[0] 
-	    << "  pL.getRowHeight(0) "  <<  pL.getRowHeight(0)
-	    << std::endl ;
+  streamlog_out( DEBUG4 )  << " ***** TPC rmin  = " << rmin 
+			   << " tpcParams.getPlaneExtent()[0] " << tpcParams.getPlaneExtent()[0] 
+			   << "  pL.getRowHeight(0) "  <<  pL.getRowHeight(0)
+			   << std::endl ;
   
   static const Double_t rtub      = tpcParams.getDoubleVal("tpcInnerRadius") * cm  ; // 39.5; // inner r of support tube
   static const Double_t outerr    = tpcParams.getDoubleVal("tpcOuterRadius") * cm  ; //206.; // outer radius of TPC
@@ -156,19 +158,29 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   
   Bool_t active = EXTPCMeasLayer::kActive;
   Bool_t dummy  = EXTPCMeasLayer::kDummy;
+
+  //FIXME - test:  add a layer for the beam pipe 
+  Add(new EXTPCMeasLayer(air, air, 1.2 , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active )) ;  // ,ss.str().data()));
+
+
   Add(new EXTPCMeasLayer(air, cfrp, rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy));
   Add(new EXTPCMeasLayer(cfrp, gas, rtub+inthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,dummy));
   
-  // create measurement layers of central tracker
+  // create measurement layers
   Double_t r = rmin;
   for (Int_t layer = 0; layer < nlayers; layer++) {
-    std::stringstream ss;
-    //    ss << "TPC" << std::setw(3) << std::setfill('0') << layer << std::ends;
+
+    //    std::stringstream ss;
+      
     Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active )) ;  // ,ss.str().data()));
     r += rstep;
 
-    if( layer % 10 == 0 ){
-      std::cout << " ***** adding TPC layer : [" << layer <<  "] at R = " << r << std::endl ;
+    // safe offset of first measurment layer in TPC :
+    if( layer == 0 ) 
+      _layerOffset = GetLast()  ;
+    
+    if( streamlog_level( DEBUG0 ) ) { // && layer % 10 == 0 ){
+      streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer +_layerOffset <<  "] at R = " << r << std::endl ;
     }
   }
   Add(new EXTPCMeasLayer(gas, cfrp, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,  dummy));

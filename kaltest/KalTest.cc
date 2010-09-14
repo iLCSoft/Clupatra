@@ -59,6 +59,12 @@ void KalTest::init() {
   
   tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z() * 10 ) ; // 10 for Tesla -> kGauss
 
+
+  //TODO: make layer offset accessible to callers...
+  streamlog_out( DEBUG4 ) << " created TPC detector; layerOffset =  " << tpcdet->getLayerOffset() << std::endl ; 
+
+
+
   //_det->Install( *vtxdet ) ;  
   _det->Install( *tpcdet ) ;  
   
@@ -73,7 +79,14 @@ void KalTest::init() {
   
 }
 
+void KalTest::addIPHit(){
 
+  // add a faked Hit for the IP 
+    TObject* o =  _det->At( 0 ) ;
+  EXTPCMeasLayer* ml = dynamic_cast< EXTPCMeasLayer * >( o ) ;
+  
+  ml->addIPHit( TVector3( 1.2, 0., 0.) ,   *_kalHits ) ;
+}
 
 void KalTest::addHit( const TVector3& pos, int layer ) {
   
@@ -88,11 +101,10 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
     ml->ProcessHit( pos, *_kalHits ); // create hit point
     
 
-
-    
     if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
+      //    if(   layer % 10 == 0 ){
       double radius = pos.Perp() ;
-      streamlog::out()  << " ***** adding TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
+      streamlog_out( DEBUG )  << " ***** adding a TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
     }
     
 
@@ -103,15 +115,14 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
  			     << "  in  layer: " << layer
  			     << " ml : " << ml 
  			     << "  ml->IsActive() " <<  ml->IsActive()
- 			     << "dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn() " 
-      //<<   & ( ml->GetParent(kFALSE) )
+ 			     << "detector->IsPowerOn() " 
 			     << dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn()
  			     << std::endl ;
   } 
   
 } else {
   
-  streamlog_out( ERROR ) << " no measurment layer at : " 
+  streamlog_out( ERROR ) << " no measurement layer at : " 
 			 << pos(0) << "," << pos(1) << "," << pos(2)  
 			 << "  in  layer: " << layer 
 			 << " detector has  " << _det->GetEntriesFast() << " layers only "
@@ -122,8 +133,8 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
 
 void KalTest::fitTrack(IMPL::TrackImpl* trk) {
   
-  //  const Bool_t gkDir = kIterBackward;
-  const Bool_t gkDir = kIterForward;
+  const Bool_t gkDir = kIterBackward;
+  //  const Bool_t gkDir = kIterForward;
   
   using namespace std ;
   
@@ -140,11 +151,11 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
       
   Int_t i1, i2, i3; // (i1,i2,i3) = (1st,mid,last) hit to filter
   if (gkDir == kIterBackward) {
-    i3 = 0;
+    i3 = 1;
     i1 = _kalHits->GetEntries() - 1;
     i2 = i1 / 2;
   } else {
-    i1 = 0;
+    i1 = 1;
     i3 = _kalHits->GetEntries() - 1;
     i2 = i3 / 2;
   }
@@ -244,13 +255,14 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
   // ---------------------------
   //  Smooth the track
   // ---------------------------
-#define SAVE_RESIDUAL false
-#ifndef SAVE_RESIDUAL
-  TVKalSite &cursite = kaltrack.GetCurSite();
-#else
+#define SMOOTH_BACK 0
+#if SMOOTH_BACK
   Int_t isite = 1;
-  kaltrack.SmoothBackTo(isite);
+  //  kaltrack.SmoothBackTo(isite);
+  kaltrack.SmoothAll();
   TVKalSite &cursite = static_cast<TVKalSite &>(*kaltrack[isite]);
+#else
+  TVKalSite &cursite = kaltrack.GetCurSite();
 #endif
 
 
@@ -316,7 +328,8 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
 			 << "\t Omega " <<  omega
 			 << "\t Z0 " <<  z0
 			 << "\t tan(Lambda) " <<  tanLambda 
-			 << "\t pivot : [" << pivot[0] << ", "  << pivot[1] << ", "  << pivot[2] << "]" 
+			 << "\t pivot : [" << pivot[0] << ", " << pivot[1] << ", "  << pivot[2] 
+			 << " - r: " << std::sqrt( pivot[0]*pivot[0]+pivot[1]*pivot[1] ) << "]" 
 			 << std::endl ;
 
 
