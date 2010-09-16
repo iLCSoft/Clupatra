@@ -105,8 +105,8 @@
   <!-- Sorry, this parameter isn't a default parameter for this processor: description and type lost!!  -->
   <parameter name="DrawInLayer"> 
     KalTestTracks 0 3 1
-    TPCTracks 2 1 2
-  <--  AllTrackClusters 0 3 18
+    TPCTracks 0 3 2
+    <!-AllTrackClusters 0 3 18
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
     OddClu_3 0 3  3 
@@ -126,7 +126,6 @@
    -->
   </parameter>
 </processor>
-
  <processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
  <!--Writes the current event to the specified LCIO outputfile. Needs to be the last ActiveProcessor.-->
   <!--drops the named collections from the event-->

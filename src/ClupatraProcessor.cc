@@ -792,8 +792,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     if( clu->size() < 3 ) continue ;
     
-    streamlog_out( DEBUG ) << header( *segToTrack( *it ) )  << std::endl  ;
-    streamlog_out( DEBUG ) << lcshort( segToTrack( *it ) )  << std::endl  ;
+    // streamlog_out( DEBUG ) << header( *segToTrack( *it ) )  << std::endl  ;
+    // streamlog_out( DEBUG ) << lcshort( segToTrack( *it ) )  << std::endl  ;
     
     //     for( GenericClusterVec<TrackerHit>::iterator it =  cluList.begin() ; it != cluList.end() ; ++it) {
     //     HitCluster* clu = (*it) ;

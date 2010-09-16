@@ -29,6 +29,14 @@
 
 //using namespace lcio ;
 
+std::ostream& operator<<(std::ostream& o, const TKalTrack& trk){
+
+  o << " track: \t" <<  trk.GetEntriesFast() << std::endl ;
+
+}
+
+
+
 KalTest::KalTest( const gear::GearMgr& gearMgr) :  _gearMgr( &gearMgr ) {
   
   streamlog_out( DEBUG4 ) << "  KalTest - initializing the detector ..." << std::endl ;
@@ -289,7 +297,7 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
 
   //============== convert parameters to LCIO convention ====
   
-  //  ---- get parameters at origin   (FIXME: need proper transport ...)
+  //  ---- get parameters at origin 
 
   THelicalTrack helix = ( (TKalTrackState&) trkState ).GetHelix() ;
   double dPhi ;
@@ -331,6 +339,8 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
 			 << "\t pivot : [" << pivot[0] << ", " << pivot[1] << ", "  << pivot[2] 
 			 << " - r: " << std::sqrt( pivot[0]*pivot[0]+pivot[1]*pivot[1] ) << "]" 
 			 << std::endl ;
+
+  streamlog_out( DEBUG ) << kaltrack << std::endl ;
 
 
   streamlog_out( DEBUG ) << lcio::header( *trk ) << std::endl ;

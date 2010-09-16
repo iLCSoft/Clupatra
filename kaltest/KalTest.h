@@ -47,7 +47,8 @@ public:
       int l = layer( *first ) ;
       TVector3 pos = position( *first ) ;
       
-      addHit( pos ,  l ) ;
+      //      if( l > 50 ) 
+	addHit( pos ,  l ) ;
       
       ++first ;
     }
