@@ -10,6 +10,7 @@
 
 #include <cmath>
 
+#include "KalTrack.h"
 
 class TKalDetCradle ;
 
@@ -21,6 +22,8 @@ namespace IMPL{
  */
 class KalTest{
 
+  KalTest(){}
+  
 public:
   
   /** Default c'tor, initializes the geometry from GEAR. */
@@ -29,6 +32,9 @@ public:
   ~KalTest() ;
   
   
+
+  KalTrack* createKalTrack()  { return new KalTrack( _det ) ; }
+
   //   /**Set the hits to be used for fitting - no ownership taken !*/
   //   void setHits( const TObjArray& hits) { _kalHits = hits ; }
   

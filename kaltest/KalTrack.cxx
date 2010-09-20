@@ -1,16 +1,16 @@
-#include "KalTest.h"
-
+#include "KalTrack.h"
 #include "TKalTrackState.h"
 #include "TKalTrackSite.h"
 #include "TVTrackHit.h"
 #include "TKalDetCradle.h"
+#include "TKalTrack.h"         // from KalTrackLib
 
 #include "EXVMeasLayer.h"
 #include "EXVTXKalDetector.h"
 #include "EXTPCKalDetector.h"
 #include "EXVTXHit.h"
 #include "EXTPCHit.h"
-#include "EXHYBTrack.h"
+//#include "EXHYBTrack.h"
 
 #include "gear/GEAR.h"
 #include "gear/BField.h"
@@ -22,72 +22,35 @@
 #include "UTIL/Operators.h"
 #include "lcio.h"
 
+#include "TObjArray.h"
+
 #include <math.h>
 #include <cmath>
 
 #include "streamlog/streamlog.h"
 
-//using namespace lcio ;
 
-std::ostream& operator<<(std::ostream& o, const TKalTrack& trk){
 
-  o << " track: \t" <<  trk.GetEntriesFast() << std::endl ;
 
+std::ostream& operator<<(std::ostream& o, const KalTrack& trk){
+
+  o << " track: \t" <<  trk._trk->GetEntriesFast() << std::endl ;
+  // to be done ....
 }
 
 
-
-KalTest::KalTest( const gear::GearMgr& gearMgr) :  _gearMgr( &gearMgr ) {
-  
-  streamlog_out( DEBUG4 ) << "  KalTest - initializing the detector ..." << std::endl ;
-  
-  _det = new TKalDetCradle ;
-  _det->SetOwner( true ) ; // takes care of deleting subdetector in the end ...
-  
+KalTrack::KalTrack(TKalDetCradle* det) : _det( det) {
+  _trk = new TKalTrack ;
   _kalHits = new TObjArray ;
-  
-  // this could be made a public init() method taking options ....
-  init() ;
-  
 }
-
-KalTest::~KalTest(){
-  
-  delete _det ;
+KalTrack::~KalTrack(){
+  delete _trk ;
   delete _kalHits ;
 }
 
 
-void KalTest::init() {
-  
-  const gear::TPCParameters& tpcParams = _gearMgr->getTPCParameters();
-  
-  EXVTXKalDetector* vtxdet = new EXVTXKalDetector ;
-  EXTPCKalDetector* tpcdet = new EXTPCKalDetector( tpcParams )  ;
-  
-  tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z() * 10 ) ; // 10 for Tesla -> kGauss
 
-
-  //TODO: make layer offset accessible to callers...
-  streamlog_out( DEBUG4 ) << " created TPC detector; layerOffset =  " << tpcdet->getLayerOffset() << std::endl ; 
-
-
-
-  //_det->Install( *vtxdet ) ;  
-  _det->Install( *tpcdet ) ;  
-  
-  _det->Close() ;          // close the cradle
-  _det->Sort() ;           // sort meas. layers from inside to outside
-  
-  vtxdet->PowerOff();       // power off vtx not to process hit
-  
-  // --- possible options :
-  //_det->SwitchOffMS();    // switch off multiple scattering
-  //_det->SwitchOffDEDX();  // switch off enery loss
-  
-}
-
-void KalTest::addIPHit(){
+void KalTrack::addIPHit(){
 
   // add a faked Hit for the IP 
     TObject* o =  _det->At( 0 ) ;
@@ -96,7 +59,7 @@ void KalTest::addIPHit(){
   ml->addIPHit( TVector3( 1.2, 0., 0.) ,   *_kalHits ) ;
 }
 
-void KalTest::addHit( const TVector3& pos, int layer ) {
+void KalTrack::addHit( const TVector3& pos, int layer ) {
   
   if( layer >= 0 && ( _det->GetEntries() > layer ) ) {
 
@@ -118,7 +81,7 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
 
   } else {
     
-    streamlog_out( WARNING ) << " hit not added to KalTest at : " 
+    streamlog_out( WARNING ) << " hit not added to KalTrack at : " 
    			     << pos(0) << "," << pos(1) << "," << pos(2)  
  			     << "  in  layer: " << layer
  			     << " ml : " << ml 
@@ -139,34 +102,34 @@ void KalTest::addHit( const TVector3& pos, int layer ) {
 }
 
 
-void KalTest::fitTrack(IMPL::TrackImpl* trk) {
+void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
   
-  const Bool_t gkDir = kIterBackward;
-  //  const Bool_t gkDir = kIterForward;
+  //  const Bool_t gkDir = kIterBackward;
+  const Bool_t gkDir = kIterForward;
   
   using namespace std ;
   
   // ============================================================
-  //  Do Kalman Filter    - copied from EXVKalTest.cxx
+  //  Do Kalman Filter    - copied from EXVKalTrack.cxx
   // ============================================================
 
   if (_kalHits->GetEntries() < 3) {
 
-    streamlog_out( ERROR)  << "<<<<<< KalTest::fitTrack(): Shortage of Hits! nhits = " 
+    streamlog_out( ERROR)  << "<<<<<< KalTrack::fitTrack(): Shortage of Hits! nhits = " 
 			   << _kalHits->GetEntries() << " >>>>>>>" << endl;
     return ;
   }
       
   Int_t i1, i2, i3; // (i1,i2,i3) = (1st,mid,last) hit to filter
-  // if (gkDir == kIterBackward) {
-  //   i3 = 1;
-  //   i1 = _kalHits->GetEntries() - 1;
-  //   i2 = i1 / 2;
-  // } else {
+  if (gkDir == kIterBackward) {
+    i3 = 1;
+    i1 = _kalHits->GetEntries() - 1;
+    i2 = i1 / 2;
+  } else {
     i1 = 1;
     i3 = _kalHits->GetEntries() - 1;
     i2 = i3 / 2;
-  // }
+  }
       
   // ---------------------------
   //  Create a dummy site: sited
@@ -231,7 +194,9 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
   //  Add sited to the kaltrack
   // ---------------------------
 
-  EXHYBTrack kaltrack;   // a track is a kal system
+  //  EXHYBTrack kaltrack;   // a track is a kal system
+  TKalTrack& kaltrack = *_trk ;
+
   kaltrack.SetOwner();   // kaltrack owns sites
   kaltrack.Add(&sited);  // add the dummy site to this track
 
@@ -249,27 +214,18 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
   while ((hitp = dynamic_cast<TVTrackHit *>(next()))) {
     TKalTrackSite  &site = *new TKalTrackSite(*hitp); // new site
 
-    streamlog_out ( DEBUG ) <<  " TKalTrackSite pivot : " << site.GetPivot()[0] << ", "
-			    <<  site.GetPivot()[1]   << ", " << site.GetPivot()[2] << std::endl ;
+    if (!kaltrack.AddAndFilter(site)) {               // filter it
 
-
-    if ( !kaltrack.AddAndFilter(site) ) {               // filter it
-
-      cout << " site discarded!" << endl;
+      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << endl;
 
       delete &site;                        // delete it if failed
     }
   } // end of Kalman filter
 
-  //fg: set origin as reference point ...
-//    TKalTrackSite* origin = new TKalTrackSite ;
-//    origin->SetPivot( TVector3( 0., 0., 0. ) ) ;
-//    //   kaltrack.AddAndFilter( *origin );
-
   // ---------------------------
   //  Smooth the track
   // ---------------------------
-#define SMOOTH_BACK 0
+#define SMOOTH_BACK 1
 #if SMOOTH_BACK
   Int_t isite = 1;
   //  kaltrack.SmoothBackTo(isite);
@@ -295,12 +251,6 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
 //   Double_t cs   = tnl/TMath::Sqrt(1.+tnl*tnl);
 //   Double_t t0   = trkState(5, 0); 
   
-//  const double alpha =  2.99792458E-5 ; // r in cm !! 
-
-//   if( cl > 0.3 ) 
-//     streamlog_out( DEBUG ) << " GOOD FIT !? " <<  std::endl ;
-    
-
   //============== convert parameters to LCIO convention ====
   
   //  ---- get parameters at origin 
@@ -331,7 +281,8 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
   pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;
   pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) * 10. ;
   pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) * 10. ;
-  //  trk->setReferencePoint( pivot ) ;
+
+  trk->setReferencePoint( pivot ) ;
 
   streamlog_out( DEBUG ) << " kaltest track parameters: "
 			 << " chi2/ndf " << chi2 / ndf  
@@ -346,39 +297,43 @@ void KalTest::fitTrack(IMPL::TrackImpl* trk) {
 			 << " - r: " << std::sqrt( pivot[0]*pivot[0]+pivot[1]*pivot[1] ) << "]" 
 			 << std::endl ;
 
-  streamlog_out( DEBUG ) << kaltrack << std::endl ;
+  //  streamlog_out( DEBUG ) << kaltrack << std::endl ;
 
 
   streamlog_out( DEBUG ) << lcio::header( *trk ) << std::endl ;
   streamlog_out( DEBUG ) << lcio::lcshort( (lcio::Track*)trk ) << std::endl ;
 
 
-  //   //-------------- convert parameters to origin ---------------------
-  // L3 Note 1666 "Helicoidal Tracks" - formulas 33, 44, 52 
-  
-  
-  //   double xPr(0.),yPr(0.) ; // new reference point/pivot
-  //   double dx = xPr - pivot[0]  ;
-  //   double dy = yPr - pivot[1]  ;
-  
-  //   double phiPr = std::atan2(   std::sin( phi ) - ( dx / ( 1./omega - d0 ) ) ,
-  // 			       std::cos( phi ) + ( dy / ( 1./omega - d0 ) ) ) ;
-  
-  //   double d0Pr = d0 + dx * std::sin( phi ) - dy * std::cos( phi ) 
-  //     - omega/( 2.*( 1.- omega*d0) )  * ( dx*dx +dy*dy)  ;
-  
-  
-  
-  //   double dPhi = phiPr - phi ;
-  //   double s = dx  * std::cos( phi ) + dy * std::sin( phi ) / ( std::sin( dPhi ) / dPhi  ) ;
-  
-  //   double z0Pr = z0 + s * tanLambda ;
-  
-  // //-------------------------------------------------------------------
-  
 
+  //#define ADD_LCIO_HITS
+#ifdef ADD_LCIO_HITS
+  //==========================  add lcio hits to the track for visualization - debugging .... =========================
+  int nHit = kaltrack.GetEntriesFast() ;
+
+  for(int i=0 ; i < nHit ; ++i ){
+    
+    IMPL::TrackerHitImpl* h = new IMPL::TrackerHitImpl ;  //memory leak - only use for debugging ....
+    
+    TVector3 pv = dynamic_cast<TKalTrackSite &>(*kaltrack[i]).GetPivot() ;
+
+    double pos[3] ;
+    pos[0] = pv[0] *10. ;
+    pos[1] = pv[1] *10. ;
+    pos[2] = pv[2] *10. ;
+    
+    h->setPosition( pos ) ;
+
+    //    streamlog_out( DEBUG ) << " KalTrack adding hit at : " << pos[0] << ", "  << pos[1] << ", "  << pos[2] << std::endl ;
+    
+    trk->addHit( h ) ;
+    
+  }
+#endif 
+
+
+#define ADD_DEBUG_HITS
 #ifdef ADD_DEBUG_HITS
-  //==========================  add some hits to the track for visualization - debugging .... =========================
+  //==========================  add some hits along the helix to the track for visualization - debugging .... =========================
   
   int nHit = 200 ;
   

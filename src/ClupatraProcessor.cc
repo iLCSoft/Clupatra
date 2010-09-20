@@ -25,10 +25,8 @@
 
 #include "LCIterator.h"
 
-//test ...
-//#include "EXKalTest.h"
-
 #include "KalTest.h"
+
 
 using namespace lcio ;
 using namespace marlin ;
@@ -68,7 +66,7 @@ int hitLayerID( const Hit* h ) { return  hitLayerID<0>( h)   ; }
 struct LayerSort{
   bool operator()( const Hit* l, const Hit* r) {
     // sort inside to outside
-    //        return hitLayerID( l ) < hitLayerID( r ) ; 
+    //return hitLayerID( l ) < hitLayerID( r ) ; 
     // sort outside to inside
     return hitLayerID( r ) < hitLayerID( l ) ; 
   }
@@ -107,9 +105,11 @@ class RCut{
 public:
   RCut( double rcut ) : _rcut( rcut ) {}  
   
+  // bool operator() (T* hit) {  // DEBUG ....
+  //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
   bool operator() (T* hit) {  
     return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
+    			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
   }
 protected:
   RCut() {} ;
@@ -159,6 +159,32 @@ struct CircleFitter{
     //return fitCircle( c ) ;
   }
 };
+//-------------------------------------------------------------------------
+struct KalTestFitter{
+  KalTest* _kt ; 
+  KalTestFitter(KalTest* k) : _kt( k ) {}
+  
+  KalTrack* operator() (HitCluster* clu) {  
+
+    clu->sort( LayerSort() ) ;
+    
+    KalTrack* trk = _kt->createKalTrack() ;
+
+    //FIXME: <3> hack for now - need TPC layer offset from KalTest ...
+    trk->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<3>  ) ; 
+    return trk;
+  }
+};
+struct KalTrack2LCIO{
+  TrackImpl* operator() (KalTrack* trk) {  
+    TrackImpl* lTrk = new TrackImpl ;
+    trk->fitTrack( lTrk  ) ;
+    return lTrk ;
+  }
+};
+
+//-------------------------------------------------------------------------
+
 
 struct SortSegmentsWRTRadius {
   bool operator() (const ClusterSegment* c1, const ClusterSegment* c2) {
@@ -782,37 +808,42 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
 			 << std::endl ;
 
+
   LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
   evt->addCollection( kaltracks , "KalTestTracks" ) ;
 
-  
-  for( std::list< ClusterSegment* >::iterator it = segs.begin() ;
-       it != segs.end() ; ++it){
-    HitCluster* clu = (*it)->Cluster ;
-    
-    if( clu->size() < 3 ) continue ;
-    
-    // streamlog_out( DEBUG ) << header( *segToTrack( *it ) )  << std::endl  ;
-    // streamlog_out( DEBUG ) << lcshort( segToTrack( *it ) )  << std::endl  ;
-    
-    //     for( GenericClusterVec<TrackerHit>::iterator it =  cluList.begin() ; it != cluList.end() ; ++it) {
-    //     HitCluster* clu = (*it) ;
-    
-    clu->sort( LayerSort() ) ;
-    
-    //FIXME: <3> hack for now - need TPC layer offset from KalTest ...
-    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<3>  ) ; 
-    //    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
-    
-    TrackImpl* kttrk = new TrackImpl ;
-    
-    _kalTest->fitTrack( kttrk  ) ;
+  std::list< KalTrack* > ktracks ;
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , KalTestFitter(_kalTest) ) ;
 
-    kaltracks->addElement( kttrk ) ;
-
-    _kalTest->clear() ;
+  std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
+ 
+  // for( std::list< ClusterSegment* >::iterator it = segs.begin() ;
+  //      it != segs.end() ; ++it){
+  //   HitCluster* clu = (*it)->Cluster ;
     
-  }
+  //   if( clu->size() < 3 ) continue ;
+    
+  //   // streamlog_out( DEBUG ) << header( *segToTrack( *it ) )  << std::endl  ;
+  //   // streamlog_out( DEBUG ) << lcshort( segToTrack( *it ) )  << std::endl  ;
+    
+  //   //     for( GenericClusterVec<TrackerHit>::iterator it =  cluList.begin() ; it != cluList.end() ; ++it) {
+  //   //     HitCluster* clu = (*it) ;
+    
+  //   clu->sort( LayerSort() ) ;
+    
+  //   //FIXME: <3> hack for now - need TPC layer offset from KalTest ...
+  //   _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<3>  ) ; 
+  //   //    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
+    
+  //   TrackImpl* kttrk = new TrackImpl ;
+    
+  //   _kalTest->fitTrack( kttrk  ) ;
+
+  //   kaltracks->addElement( kttrk ) ;
+
+  //   _kalTest->clear() ;
+    
+  // }
   //*********************************************************
   //   end running KalTest on circle segments-------------------------------------------------------
   //*********************************************************

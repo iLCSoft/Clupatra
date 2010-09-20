@@ -262,6 +262,9 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
 
   Double_t b = EXTPCKalDetector::GetBfield();
   hits.Add(new EXTPCHit(*this, meas, dmeas, side, v , xx, b));
+
+  // TVector3 pv = dynamic_cast<EXTPCHit*>(  hits.Last() )->GetExactX() ; 
+  // streamlog_out( DEBUG ) << " EXTPCHit hit[" << hits.Last() << "]at : " << pv[0] << ", "  << pv[1] << ", "  << pv[2] << std::endl ;
 }
 
 void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,

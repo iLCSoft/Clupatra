@@ -47,7 +47,7 @@
   <!--fraction of hits in same pad row per track-->
   <parameter name="DuplicatePadRowFraction" type="float" value="0.0"/>
   <!--Minimum number of hits per cluster-->
-  <parameter name="MinimumClusterSize" type="int" value="3"/>
+  <parameter name="MinimumClusterSize" type="int" value="10"/>
   <!--Cut for r_min in mm-->
   <parameter name="RCut" type="float" value="0"/>
 </processor>
@@ -104,8 +104,9 @@
   <!--parameter name="DrawCollection" type="StringVec"> DrawCollection 0 3 </parameter-->
   <!-- Sorry, this parameter isn't a default parameter for this processor: description and type lost!!  -->
   <parameter name="DrawInLayer"> 
-    KalTestTracks 0 3 1
+    KalTestTracks 3 5 1
     TPCTracks 0 3 2
+    CluTracks 0 3 3 
     <!-AllTrackClusters 0 3 18
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
