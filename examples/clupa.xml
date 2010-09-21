@@ -31,12 +31,12 @@
       <parameter name="GearXMLFile" value="gear_ILD_00.xml"/>
       <parameter name="MaxRecordNumber" value="20"/>
       <parameter name="SkipNEvents" value="0"/>
-      <parameter name="SupressCheck" value="false true false"/>
+      <parameter name="SupressCheck" value="true false"/>
       <parameter name="Verbosity" value="MESSAGE"/>
    </global>
 
  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
-   <parameter name="Verbosity" value="DEBUG"/>
+   <parameter name="Verbosity" value="MESSAGE DEBUG"/>
  <!--ClupatraProcessor : simple nearest neighbour clustering-->
   <!--Name of the input collections-->
   <parameter name="HitCollections" type="string" lcioInType="TrackerHit"> AllTPCTrackerHits </parameter>
@@ -107,7 +107,7 @@
     KalTestTracks 5 1 1
     TPCTracks 5 2 2
     CluTracks 5 3 3 
-    <!-AllTrackClusters 0 3 18
+   <!-   AllTrackClusters 0 3 18
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
     OddClu_3 0 3  3 
@@ -124,7 +124,7 @@
     TrueTracks 0 3 16
     OddClu_2_1 0 3  12
     OddClu_3_1 0 3  13 
-   -->
+  -->
   </parameter>
 </processor>
  <processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">

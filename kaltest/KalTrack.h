@@ -5,6 +5,7 @@
 #include <ostream>
 #include <map>
 #include <list>
+#include <vector>
 
 #include <gearimpl/Vectors.h>
 
@@ -23,7 +24,8 @@ class KalTrack ;
 std::ostream& operator<<(std::ostream& o, const KalTrack& trk) ; 
 
 
-typedef std::list< std::pair< int, gear::Vector3D> > PointList ;
+//typedef std::list< std::pair< int, gear::Vector3D> > PointList ;
+typedef std::vector< gear::Vector3D* > PointList ;
 
 
 /** Track class for pat rec and track fitting with KalTest */
@@ -51,6 +53,8 @@ public:
 
   const PointList& getXingPoints() { return _xingPts ; }
  
+  gear::Vector3D* getXingPointForLayer(int l) { return _xingPts.at( l ) ; }
+  
   /** Add a faked hit to get track state at the IP */
   void addIPHit() ;
   

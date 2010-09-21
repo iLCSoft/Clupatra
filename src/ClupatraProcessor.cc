@@ -49,14 +49,14 @@ struct VecFromArray{
 } ;
 
 /** helper class to compute the chisquared of two points in rho and z coordinate */
-class Chi2_Rho_Z{
+class Chi2_RPhi_Z{
   double _sigsr, _sigsz ;
 public :
-  Chi2_Rho_Z(double sigr, double sigz) : _sigsr( sigr * sigr ) , _sigsz( sigz * sigz ){}
+  Chi2_RPhi_Z(double sigr, double sigz) : _sigsr( sigr * sigr ) , _sigsz( sigz * sigz ){}
   double operator()( const gear::Vector3D& v0, const gear::Vector3D& v1) {
-    double dRho = v0.rho() - v1.rho() ;
+    double dRPhi = v0.rho() * v0.phi() - v1.rho() * v1.phi() ;
     double dZ = v0.z() - v1.z() ;
-    return  dRho * dRho / _sigsr + dZ * dZ / _sigsz  ;
+    return  dRPhi * dRPhi / _sigsr + dZ * dZ / _sigsz  ;
   }
 };
 
@@ -808,34 +808,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //================================================================================
    
   // create vecor with left over hits in each layer
-  std::vector< std::list<Hit*> > leftOverHits ;
-  leftOverHits.resize(  padLayout.getNRows() + TPC_OFFSET + 2  ) ;  // FIXME # tracking layers 
+  std::vector< Hit* > leftOverHits ;
+  leftOverHits.reserve(  h.size() ) ;
 
-  // create collections of used and unused TPC hits:
-  LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
-  LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
-  usedHits->setSubset() ;
-  unUsedHits->setSubset() ;
-  usedHits->reserve( h.size() ) ;
-  unUsedHits->reserve( h.size() ) ;
-  typedef GenericHitVec<TrackerHit>::iterator GHVI ;
+  typedef GenericHitVec<TrackerHit>::const_iterator GHVI ;
+
   for( GHVI it = h.begin(); it != h.end() ;++it){
-    if( (*it)->second != 0 ){
 
-      usedHits->push_back( (*it)->first ) ;
+    if( (*it)->second == 0 ){
 
-    } else {
-
-      unUsedHits->push_back( (*it)->first ) ;          
-
-      if( ! *it )
-	exit(1) ;
-
-      leftOverHits.at(  hitLayerID<TPC_OFFSET>( *it ) ).push_back( *it ) ;
+      leftOverHits.push_back( *it ) ;
     }
   }
-  evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits" ) ;
-  evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
 
   //============ now try reclustering with circle segments ======================
   GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
@@ -868,114 +852,86 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   //=========== assign left over hits ... ==================================================================
   
-  Chi2_Rho_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
+  Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
 
-  for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+
+  for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
     
-    const PointList& xingPts  = (*it)->getXingPoints() ;
+    Hit* hit = *ih ;
+    VecFromArray hPos(  hit->first->getPosition() ) ;
+  
+    double ch2Min = 999999999999999. ;
+    KalTrack* bestTrk = 0 ;
     
-    HitCluster* clu = (*it)->getCluster< HitCluster >() ;
-    
-    for( PointList::const_iterator ip = xingPts.begin() ; ip != xingPts.end() ; ++ip ){
+    for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
-      const std::list<Hit*>& hits = leftOverHits.at( ip->first ) ;
-
-      if( hits.empty() ) continue ;
-
-      // streamlog_out( DEBUG ) << " --- hits.size()  : " <<  hits.size()  << std::endl ;
-
-      const gear::Vector3D& kPos = ip->second ; 
-
-      int dummy=0 ;
-      double ch2Min = 999999999999999. ;
-      Hit* bestHit = 0 ;
-
-      for( std::list<Hit*>::const_iterator ih = hits.begin() ; ih != hits.end() ; ++ih ){
+      const gear::Vector3D* kPos = (*it)->getXingPointForLayer( hitLayerID<TPC_OFFSET>( hit ) ) ;
+      
+      if( kPos != 0 ){
 	
-	//	streamlog_out( DEBUG ) << " --- hit  : " << dummy++ << " : " <<  (*ih)  << std::endl ;
-
-  	VecFromArray hPos(  (*ih)->first->getPosition() ) ;
-
-	double ch2 = ch2rz( hPos.v() , kPos )  ;
-
-	if( ch2 < ch2Min ) {
+  	double ch2 = ch2rz( hPos.v() , *kPos )  ;
+	
+	if( ch2 < ch2Min ){
+	  
 	  ch2Min = ch2 ;
-	  bestHit = *ih ;
+	  bestTrk = *it ;
 	}
-
       }
-
-      if( bestHit != 0  ){
-
-	VecFromArray hPos( bestHit->first->getPosition() ) ;
-	
-	if( std::abs( hPos.v().rho() - kPos.rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos.z() ) < 5. ) {
-	  
-	  streamlog_out( DEBUG ) << " ---- assigning leftover hit : " << hPos.v() << " <-> " << kPos << std::endl ;
-	  
-	  if( bestHit->second ){
-	    
-	    // // need to find assignment with smallest chi2 ...
-	    // if( ch2Min < bestHit ;
-	    
-	    if( ch2Min < bestHit->Dist ){
-	      
-	      streamlog_out( DEBUG ) << " ---- re-assigning left over hit : " 
-				     << hPos.v() << " <-> " << kPos 
-				     << " --- old chi2 :" <<  bestHit->Dist << " new chi2: " << ch2Min 
-				     << std::endl ;
-	      
-	      HitCluster* cl = bestHit->second ;
-	      
-	      cl->remove( bestHit ) ;
-
-	      bestHit->Dist = ch2Min ;
-
-	      clu->addHit( bestHit ) ;
-	    }
-
-	    // HitCluster::const_iterator ihl = std::find_if( cl->begin(), cl->end(),  HitLayerID<TPC_OFFSET>( ip->first ) ) ;
-	    // if( ihl !=  cl->end() ){
-	    //   Hit* otherHit = *ihl ;
-	    //   if( otherHit->Dest > ch2Min ) {
-	    // 	cl->rease( ihl ) ;
-	    // 	clu->addHit( bestHit ) ;
-	    //   }
-	    // }else{
-	    //   streamlog_out( ERROR ) << "  hit layer id not found in cluster : " << ip->first << std::endl ; 
- 	    // }
-
-	  } else { 
-	    
-	    bestHit->Dist = ch2Min ;
-
-	    clu->addHit( bestHit ) ;
-	  }
-	}
-	// else
-        // streamlog_out( DEBUG ) << " ---- NOT assigning leftover hit : " << hPos.v() << " <-> " << kPos << std::endl ;
-      }
-      
-      
     }
+
+    if( bestTrk ) {
+
+      const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( hitLayerID<TPC_OFFSET>( hit ) ) ;
+
+      if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
+	
+	HitCluster* clu = bestTrk->getCluster< HitCluster >() ;
+	
+	streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos << std::endl ;
+	
+	clu->addHit( hit ) ;
+      }	
+      else 
+	streamlog_out( DEBUG ) << " ---- NOT assigning left over hit : " << hPos.v() << " <-> " << *kPos << std::endl ;
+    }
+    else
+      streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
   }
 
-  //=====================================================================================================================
+  //================================================================================================================ 
 
+  //std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
-
-  std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
-
-  // std::list< KalTrack* > newKTracks ;
-  // std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , KalTestFitter(_kalTest) ) ;
-  // //fixme: fit is done in conversion ....
-  // std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
+  std::list< KalTrack* > newKTracks ;
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , KalTestFitter(_kalTest) ) ;
+  std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
 
 
   //*********************************************************
   //   end running KalTest on circle segments-------------------------------------------------------
   //*********************************************************
+
+
+  //========  create collections of used and unused TPC hits ===========================================
+  LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+  LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+  usedHits->setSubset() ;
+  unUsedHits->setSubset() ;
+  usedHits->reserve( h.size() ) ;
+  unUsedHits->reserve( h.size() ) ;
+  //  typedef GenericHitVec<TrackerHit>::iterator GHVI ;
+  for( GHVI it = h.begin(); it != h.end() ;++it){
+    if( (*it)->second != 0 ){
+      usedHits->push_back( (*it)->first ) ;
+    } else {
+      unUsedHits->push_back( (*it)->first ) ;          
+    }
+  }
+  evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits" ) ;
+  evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
+  
+  //========================================================================================================
 
 
   segs.sort( SortSegmentsWRTRadius() ) ;
@@ -1112,8 +1068,8 @@ void ClupatraProcessor::check( LCEvent * evt ) {
       }
       if( double(nDouble) / nHit > _duplicatePadRowFraction ){
 	//if( nDouble  > 0){
-	streamlog_out( MESSAGE ) << " oddTrackCluster found with "<< 100. * double(nDouble) / nHit 
-				 << "% of double hits " << std::endl ;
+	streamlog_out( DEBUG4 ) << " oddTrackCluster found with "<< 100. * double(nDouble) / nHit 
+				<< "% of double hits " << std::endl ;
 	oddCol->addElement( tr ) ;
       }
     }

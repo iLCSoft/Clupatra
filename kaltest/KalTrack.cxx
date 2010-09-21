@@ -38,7 +38,7 @@ std::ostream& operator<<(std::ostream& o, const KalTrack& trk) {
 
 
 /** C'tor - initiale with detector */
-KalTrack::KalTrack(TKalDetCradle* det) : _det( det) {
+KalTrack::KalTrack(TKalDetCradle* det) : _det( det) , _xingPts( _det->GetEntriesFast() ) {
   _trk = new TKalTrack ;
   _kalHits = new TObjArray ;
 }
@@ -46,6 +46,7 @@ KalTrack::KalTrack(TKalDetCradle* det) : _det( det) {
 KalTrack::~KalTrack(){
   delete _trk ;
   delete _kalHits ;
+  for( unsigned i=0 ; i< _xingPts.size() ; delete _xingPts[i++] ) ;
 }
 
 
@@ -67,7 +68,7 @@ void KalTrack::addHit( const TVector3& pos, int layer ) {
     EXVMeasLayer* ml = dynamic_cast< EXVMeasLayer * >( o ) ;
 
   if (ml != 0 && ml->IsActive() && dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn() ) {
-    
+
     ml->ProcessHit( pos, *_kalHits ); // create hit point
     
 
@@ -379,9 +380,12 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   for( PointList::const_iterator it = _xingPts.begin() ; it != _xingPts.end() ; ++it ){
     
+    if( ! *it ) continue ;
+
     IMPL::TrackerHitImpl* h = new IMPL::TrackerHitImpl ;  //memory leak - only use for debugging ....
     
-    const gear::Vector3D& pv = it->second ;
+    //    const gear::Vector3D& pv = it->second ;
+    const gear::Vector3D& pv = **it ;
 
     double pos[3] ;
     pos[0] = pv[0] ;
@@ -437,8 +441,8 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
 void KalTrack::findXingPoints() {
 
-  _xingPts.clear() ;
- 
+  //  _xingPts.clear() ;
+  
   if( _trk->GetEntriesFast() == 0 )
     return ; // no sites on this track
 
@@ -475,7 +479,8 @@ void KalTrack::findXingPoints() {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
+      //      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
+      _xingPts[ idx ] = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )   ;
 
       --idx ;
       
@@ -514,7 +519,8 @@ void KalTrack::findXingPoints() {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
+      //      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
+      _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )  ;
 
       ++idx ;
       
