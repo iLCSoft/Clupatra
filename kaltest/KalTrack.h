@@ -3,6 +3,10 @@
 
 
 #include <ostream>
+#include <map>
+#include <list>
+
+#include <gearimpl/Vectors.h>
 
 class TVector3 ;
 class TObjArray ;
@@ -16,6 +20,10 @@ namespace IMPL{
 class KalTrack ;
 
 std::ostream& operator<<(std::ostream& o, const KalTrack& trk) ;
+
+
+typedef std::list< std::pair< int, gear::Vector3D> > PointList ;
+
 
 
 /** Track class for track fitting with KalTest */
@@ -38,6 +46,8 @@ public:
   
   ~KalTrack() ;
 
+  /**Calculate crossing points with next layers at end of track segment */
+  void getCrossingPoints( PointList& points) ;
 
  
   /** Add a faked hit to get track state at the IP */

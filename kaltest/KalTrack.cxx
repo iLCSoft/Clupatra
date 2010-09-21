@@ -225,7 +225,7 @@ void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
   // ---------------------------
   //  Smooth the track
   // ---------------------------
-#define SMOOTH_BACK 1
+#define SMOOTH_BACK 0
 #if SMOOTH_BACK
   Int_t isite = 1;
   //  kaltrack.SmoothBackTo(isite);
@@ -234,6 +234,42 @@ void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
 #else
   TVKalSite &cursite = kaltrack.GetCurSite();
 #endif
+
+  // //============== compute crossing points with inner layers ======================
+
+  // TKalTrackSite& theSite =  dynamic_cast<TKalTrackSite&>(  kaltrack.GetCurSite() ) ;
+
+  // int  idx = theSite.GetHit().GetMeasLayer().GetIndex()  ; // index of site from
+  
+  // -- idx ;
+  // while( idx >= 0 ) {
+
+  //   std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( cursite.GetCurState()).CreateTrack() ); // tmp track
+
+  //   TVector3 xx ;                // expected hit position vector
+  //   double fid  = 0.;           // deflection angle from the last hit
+
+  //   if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help , xx, fid)  ){
+
+  //     //      streamlog_out( DEBUG )
+  // 	std::cout << " ---- crossing layer " << idx <<  " at: " 
+  // 	<< xx[0] << ", "  << xx[1] << ", " << xx[2] 
+  // 	<< " r: " << xx.Perp()  
+  // 	<< std::endl ;
+      
+  //     --idx ;
+
+  //   } else {
+
+  //     streamlog_out( DEBUG ) << " ---- no crossing point found with layer " << idx << std::endl ;
+
+  //     break ;
+  //   }
+  // }
+
+
+
+  // //===============================================================================
 
 
    TVKalState& trkState = cursite.GetCurState() ;
@@ -365,4 +401,99 @@ void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
 #endif
 
   // ============================================================================================================
+}
+
+
+void KalTrack::getCrossingPoints( PointList& points) {
+
+ 
+  if( _trk->GetEntriesFast() == 0 )
+    return ; // no sites on this track
+
+  // get first and last site used in track fit
+  TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ;
+  TKalTrackSite& site1 =  *dynamic_cast<TKalTrackSite*>( _trk->Last() ) ;
+  
+  int  idx0 = site0.GetHit().GetMeasLayer().GetIndex()  ; 
+  int  idx1 = site1.GetHit().GetMeasLayer().GetIndex()  ; 
+
+  streamlog_out( DEBUG ) << " KalTrack::getCrossingPoints : " 
+			 << " index at track site[0] : "  <<  idx0  
+			 << " index at last site :     "  <<  idx1 
+			 <<   std::endl ;
+  
+  // search inwards first 
+  int            idx  =  ( idx1 > idx0  ? idx0  : idx1  ) ; 
+  TKalTrackSite& site =  ( idx1 > idx0  ? site0 : site1 ) ; 
+
+  --idx ;  // next site 
+
+  std::auto_ptr<TVTrack> help0(& static_cast<TKalTrackState &>( site.GetCurState()).CreateTrack() ); // tmp track
+
+  while( idx >= 0 ) {
+
+    
+    TVector3 xx ;       // expected hit position vector
+    double  fid  = 0. ; // deflection angle from the last hit
+
+    if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help0 , xx, fid)  ){
+      
+      streamlog_out( DEBUG ) << " ---- crossing layer " << idx <<  " at: " 
+			     << xx[0] << ", "  << xx[1] << ", " << xx[2] 
+			     << " r: " << xx.Perp()  
+			     << std::endl ;
+
+      points.push_back( std::make_pair( idx , gear::Vector3D( xx ) ) )  ;
+
+      --idx ;
+      
+    } else {
+
+      streamlog_out( DEBUG ) << " ---- no crossing point found with layer " << idx << std::endl ;      
+
+      break ;
+    }
+  }
+
+  // now search outwards
+  idx  =  ( idx1 > idx0  ? idx1  : idx0  ) ; 
+  site =  ( idx1 > idx0  ? site1 : site0 ) ; 
+  
+  streamlog_out( DEBUG ) << " ---- creating track for site at layer : " << idx 
+			 << " state " << & site.GetCurState()
+			 << std::endl ;
+  
+  std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( site.GetCurState()).CreateTrack() ); // tmp track
+  
+  //++idx ;  // next site 
+
+  int lastIdx =  _det->GetEntriesFast() ;  // need # of tracking layers
+
+  while( idx < lastIdx ) { 
+
+
+    TVector3 xx ;       // expected hit position vector
+    double  fid  = 0. ; // deflection angle from the last hit
+
+    if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help , xx, fid)  ){
+      
+      streamlog_out( DEBUG ) << " ---- crossing layer " << idx <<  " at: " 
+			     << xx[0] << ", "  << xx[1] << ", " << xx[2] 
+			     << " r: " << xx.Perp()  
+			     << std::endl ;
+
+      points.push_back( std::make_pair( idx , gear::Vector3D( xx ) ) )  ;
+
+      ++idx ;
+      
+    } else {
+
+      streamlog_out( DEBUG ) << " ---- no crossing point found with layer " << idx << std::endl ;      
+
+      break ;
+    }
+  }
+
+
+
 }
