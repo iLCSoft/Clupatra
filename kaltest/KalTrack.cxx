@@ -30,24 +30,23 @@
 #include "streamlog/streamlog.h"
 
 
-
-
-std::ostream& operator<<(std::ostream& o, const KalTrack& trk){
+std::ostream& operator<<(std::ostream& o, const KalTrack& trk) {
 
   o << " track: \t" <<  trk._trk->GetEntriesFast() << std::endl ;
   // to be done ....
 }
 
 
+/** C'tor - initiale with detector */
 KalTrack::KalTrack(TKalDetCradle* det) : _det( det) {
   _trk = new TKalTrack ;
   _kalHits = new TObjArray ;
 }
+
 KalTrack::~KalTrack(){
   delete _trk ;
   delete _kalHits ;
 }
-
 
 
 void KalTrack::addIPHit(){
@@ -102,7 +101,7 @@ void KalTrack::addHit( const TVector3& pos, int layer ) {
 }
 
 
-void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
+void KalTrack::fitTrack() {
   
   //  const Bool_t gkDir = kIterBackward;
   const Bool_t gkDir = kIterForward;
@@ -222,6 +221,13 @@ void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
     }
   } // end of Kalman filter
 
+
+}
+
+void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
+
+  TKalTrack& kaltrack = *_trk ;
+  
   // ---------------------------
   //  Smooth the track
   // ---------------------------
@@ -366,8 +372,33 @@ void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
   }
 #endif 
 
+#define ADD_XING_HITS
+#ifdef ADD_XING_HITS
+  //==========================  add xing hits to the track for visualization - debugging .... =========================
 
-#define ADD_DEBUG_HITS
+
+  for( PointList::const_iterator it = _xingPts.begin() ; it != _xingPts.end() ; ++it ){
+    
+    IMPL::TrackerHitImpl* h = new IMPL::TrackerHitImpl ;  //memory leak - only use for debugging ....
+    
+    const gear::Vector3D& pv = it->second ;
+
+    double pos[3] ;
+    pos[0] = pv[0] ;
+    pos[1] = pv[1] ;
+    pos[2] = pv[2] ;
+    
+    h->setPosition( pos ) ;
+
+    //    streamlog_out( DEBUG ) << " KalTrack adding hit at : " << pos[0] << ", "  << pos[1] << ", "  << pos[2] << std::endl ;
+    
+    trk->addHit( h ) ;
+    
+  }
+#endif 
+
+
+  //#define ADD_DEBUG_HITS
 #ifdef ADD_DEBUG_HITS
   //==========================  add some hits along the helix to the track for visualization - debugging .... =========================
   
@@ -404,8 +435,9 @@ void KalTrack::fitTrack(IMPL::TrackImpl* trk) {
 }
 
 
-void KalTrack::getCrossingPoints( PointList& points) {
+void KalTrack::findXingPoints() {
 
+  _xingPts.clear() ;
  
   if( _trk->GetEntriesFast() == 0 )
     return ; // no sites on this track
@@ -426,7 +458,7 @@ void KalTrack::getCrossingPoints( PointList& points) {
   int            idx  =  ( idx1 > idx0  ? idx0  : idx1  ) ; 
   TKalTrackSite& site =  ( idx1 > idx0  ? site0 : site1 ) ; 
 
-  --idx ;  // next site 
+  --idx ;  // next site inwards
 
   std::auto_ptr<TVTrack> help0(& static_cast<TKalTrackState &>( site.GetCurState()).CreateTrack() ); // tmp track
 
@@ -443,7 +475,7 @@ void KalTrack::getCrossingPoints( PointList& points) {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      points.push_back( std::make_pair( idx , gear::Vector3D( xx ) ) )  ;
+      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
 
       --idx ;
       
@@ -482,7 +514,7 @@ void KalTrack::getCrossingPoints( PointList& points) {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      points.push_back( std::make_pair( idx , gear::Vector3D( xx ) ) )  ;
+      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
 
       ++idx ;
       
@@ -493,7 +525,4 @@ void KalTrack::getCrossingPoints( PointList& points) {
       break ;
     }
   }
-
-
-
 }

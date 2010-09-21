@@ -17,16 +17,16 @@ namespace IMPL{
   class TrackImpl ;
 }
 
+
 class KalTrack ;
 
-std::ostream& operator<<(std::ostream& o, const KalTrack& trk) ;
+std::ostream& operator<<(std::ostream& o, const KalTrack& trk) ; 
 
 
 typedef std::list< std::pair< int, gear::Vector3D> > PointList ;
 
 
-
-/** Track class for track fitting with KalTest */
+/** Track class for pat rec and track fitting with KalTest */
                                                                                 
 class KalTrack { // : public TKalTrack {
 
@@ -41,20 +41,28 @@ public:
   // KalTrack(Int_t n = 1) : TKalTrack(n) {}
   
   /** C'tor - initiale with detector */
-  KalTrack(TKalDetCradle* det) ; 
-  
-  
+  KalTrack(TKalDetCradle* det) ;
+
   ~KalTrack() ;
 
-  /**Calculate crossing points with next layers at end of track segment */
-  void getCrossingPoints( PointList& points) ;
 
+  /**Calculate crossing points with next layers at end of track segment */
+  void findXingPoints() ;
+
+  const PointList& getXingPoints() { return _xingPts ; }
  
   /** Add a faked hit to get track state at the IP */
   void addIPHit() ;
   
   
-  /** template for adding hits of any type from a container - user needs to provide functor classes for extracting 
+  template <class T>
+  void setCluster(T* cluster) {  _cluster = cluster ;  }
+
+  template <class T>
+  T* getCluster() { return static_cast<T*>( _cluster ) ; } 
+
+  /** template for adding hits of any type from a container - user needs to provide functor 
+      classes for extracting 
       TVector3 position
       int layer.
   */
@@ -74,7 +82,11 @@ public:
     //    addIPHit() ;
   }
   
-  void fitTrack(IMPL::TrackImpl* trk) ;
+  void fitTrack() ;
+
+  void toLCIOTrack( IMPL::TrackImpl* trk) ; 
+
+  //void fitTrack(IMPL::TrackImpl* trk) ;
   
   
 protected:
@@ -88,9 +100,11 @@ protected:
 protected:
   void init() ;
 
-  TKalDetCradle* _det ;            // the detector cradle
-  TObjArray* _kalHits;              // array to store hits
-  TKalTrack* _trk ;
+  TKalDetCradle* _det ;     // the detector cradle
+  TObjArray* _kalHits;      // array to store hits
+  TKalTrack* _trk ;         // the KalTest track
+  PointList  _xingPts ;     // crossing points with other layers (w/o) hits
+  void* _cluster ;          // generic pointer to a cluster of hits
 
 };
 

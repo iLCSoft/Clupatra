@@ -36,8 +36,29 @@ typedef GenericCluster<TrackerHit> HitCluster ;
 typedef GenericHit<TrackerHit> Hit ;
 
 
+//FIXME: TPC_OFFSET hack for now - need TPC layer offset from KalTest ...
+const static int TPC_OFFSET = 3 ; 
 
 
+/** helper class that maps array to gear::Vector3D */
+struct VecFromArray{
+  gear::Vector3D _v ;
+  VecFromArray( const double* v) : _v( v[0] , v[1] , v[2] ) {}
+  VecFromArray( const float* v) : _v( v[0] , v[1] , v[2] ) {}
+  const gear::Vector3D& v(){ return _v ; }
+} ;
+
+/** helper class to compute the chisquared of two points in rho and z coordinate */
+class Chi2_Rho_Z{
+  double _sigsr, _sigsz ;
+public :
+  Chi2_Rho_Z(double sigr, double sigz) : _sigsr( sigr * sigr ) , _sigsz( sigz * sigz ){}
+  double operator()( const gear::Vector3D& v0, const gear::Vector3D& v1) {
+    double dRho = v0.rho() - v1.rho() ;
+    double dZ = v0.z() - v1.z() ;
+    return  dRho * dRho / _sigsr + dZ * dZ / _sigsz  ;
+  }
+};
 
 // helper class to assign additional parameters to TrackerHits
 struct HitInfoStruct{
@@ -60,6 +81,14 @@ TVector3 hitPosition( Hit* h)  {
 template <int Offset>
 int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID + Offset  ; } 
 int hitLayerID( const Hit* h ) { return  hitLayerID<0>( h)   ; } 
+
+// find hit with given layerID
+template <int Offset>
+struct HitLayerID{
+  int _id ;
+  HitLayerID<Offset>(int id) : _id( id ) {}
+  bool operator()(const Hit* h){ return hitLayerID<Offset>(h) == _id ; } 
+} ;
 
 //---------------------------------------------------
 // helper for sorting cluster wrt layerID
@@ -170,15 +199,19 @@ struct KalTestFitter{
     
     KalTrack* trk = _kt->createKalTrack() ;
 
-    //FIXME: <3> hack for now - need TPC layer offset from KalTest ...
-    trk->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<3>  ) ; 
+    trk->setCluster<HitCluster>( clu ) ;
+
+    trk->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<TPC_OFFSET>  ) ; 
+
+    trk->fitTrack() ;
+
     return trk;
   }
 };
 struct KalTrack2LCIO{
   TrackImpl* operator() (KalTrack* trk) {  
     TrackImpl* lTrk = new TrackImpl ;
-    trk->fitTrack( lTrk  ) ;
+    trk->toLCIOTrack( lTrk  ) ;
     return lTrk ;
   }
 };
@@ -773,6 +806,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
   //================================================================================
+   
+  // create vecor with left over hits in each layer
+  std::vector< std::list<Hit*> > leftOverHits ;
+  leftOverHits.resize(  padLayout.getNRows() + TPC_OFFSET + 2  ) ;  // FIXME # tracking layers 
 
   // create collections of used and unused TPC hits:
   LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
@@ -783,10 +820,19 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   unUsedHits->reserve( h.size() ) ;
   typedef GenericHitVec<TrackerHit>::iterator GHVI ;
   for( GHVI it = h.begin(); it != h.end() ;++it){
-    if( (*it)->second != 0 )
+    if( (*it)->second != 0 ){
+
       usedHits->push_back( (*it)->first ) ;
-    else
+
+    } else {
+
       unUsedHits->push_back( (*it)->first ) ;          
+
+      if( ! *it )
+	exit(1) ;
+
+      leftOverHits.at(  hitLayerID<TPC_OFFSET>( *it ) ).push_back( *it ) ;
+    }
   }
   evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits" ) ;
   evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
@@ -815,35 +861,118 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::list< KalTrack* > ktracks ;
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , KalTestFitter(_kalTest) ) ;
 
+
+  std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
+
+
+
+  //=========== assign left over hits ... ==================================================================
+  
+  Chi2_Rho_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
+
+  for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+    
+    const PointList& xingPts  = (*it)->getXingPoints() ;
+    
+    HitCluster* clu = (*it)->getCluster< HitCluster >() ;
+    
+    for( PointList::const_iterator ip = xingPts.begin() ; ip != xingPts.end() ; ++ip ){
+      
+      const std::list<Hit*>& hits = leftOverHits.at( ip->first ) ;
+
+      if( hits.empty() ) continue ;
+
+      // streamlog_out( DEBUG ) << " --- hits.size()  : " <<  hits.size()  << std::endl ;
+
+      const gear::Vector3D& kPos = ip->second ; 
+
+      int dummy=0 ;
+      double ch2Min = 999999999999999. ;
+      Hit* bestHit = 0 ;
+
+      for( std::list<Hit*>::const_iterator ih = hits.begin() ; ih != hits.end() ; ++ih ){
+	
+	//	streamlog_out( DEBUG ) << " --- hit  : " << dummy++ << " : " <<  (*ih)  << std::endl ;
+
+  	VecFromArray hPos(  (*ih)->first->getPosition() ) ;
+
+	double ch2 = ch2rz( hPos.v() , kPos )  ;
+
+	if( ch2 < ch2Min ) {
+	  ch2Min = ch2 ;
+	  bestHit = *ih ;
+	}
+
+      }
+
+      if( bestHit != 0  ){
+
+	VecFromArray hPos( bestHit->first->getPosition() ) ;
+	
+	if( std::abs( hPos.v().rho() - kPos.rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos.z() ) < 5. ) {
+	  
+	  streamlog_out( DEBUG ) << " ---- assigning leftover hit : " << hPos.v() << " <-> " << kPos << std::endl ;
+	  
+	  if( bestHit->second ){
+	    
+	    // // need to find assignment with smallest chi2 ...
+	    // if( ch2Min < bestHit ;
+	    
+	    if( ch2Min < bestHit->Dist ){
+	      
+	      streamlog_out( DEBUG ) << " ---- re-assigning left over hit : " 
+				     << hPos.v() << " <-> " << kPos 
+				     << " --- old chi2 :" <<  bestHit->Dist << " new chi2: " << ch2Min 
+				     << std::endl ;
+	      
+	      HitCluster* cl = bestHit->second ;
+	      
+	      cl->remove( bestHit ) ;
+
+	      bestHit->Dist = ch2Min ;
+
+	      clu->addHit( bestHit ) ;
+	    }
+
+	    // HitCluster::const_iterator ihl = std::find_if( cl->begin(), cl->end(),  HitLayerID<TPC_OFFSET>( ip->first ) ) ;
+	    // if( ihl !=  cl->end() ){
+	    //   Hit* otherHit = *ihl ;
+	    //   if( otherHit->Dest > ch2Min ) {
+	    // 	cl->rease( ihl ) ;
+	    // 	clu->addHit( bestHit ) ;
+	    //   }
+	    // }else{
+	    //   streamlog_out( ERROR ) << "  hit layer id not found in cluster : " << ip->first << std::endl ; 
+ 	    // }
+
+	  } else { 
+	    
+	    bestHit->Dist = ch2Min ;
+
+	    clu->addHit( bestHit ) ;
+	  }
+	}
+	// else
+        // streamlog_out( DEBUG ) << " ---- NOT assigning leftover hit : " << hPos.v() << " <-> " << kPos << std::endl ;
+      }
+      
+      
+    }
+  }
+
+  //=====================================================================================================================
+
+
+
   std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
- 
-  // for( std::list< ClusterSegment* >::iterator it = segs.begin() ;
-  //      it != segs.end() ; ++it){
-  //   HitCluster* clu = (*it)->Cluster ;
-    
-  //   if( clu->size() < 3 ) continue ;
-    
-  //   // streamlog_out( DEBUG ) << header( *segToTrack( *it ) )  << std::endl  ;
-  //   // streamlog_out( DEBUG ) << lcshort( segToTrack( *it ) )  << std::endl  ;
-    
-  //   //     for( GenericClusterVec<TrackerHit>::iterator it =  cluList.begin() ; it != cluList.end() ; ++it) {
-  //   //     HitCluster* clu = (*it) ;
-    
-  //   clu->sort( LayerSort() ) ;
-    
-  //   //FIXME: <3> hack for now - need TPC layer offset from KalTest ...
-  //   _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<3>  ) ; 
-  //   //    _kalTest->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID ) ; 
-    
-  //   TrackImpl* kttrk = new TrackImpl ;
-    
-  //   _kalTest->fitTrack( kttrk  ) ;
 
-  //   kaltracks->addElement( kttrk ) ;
+  // std::list< KalTrack* > newKTracks ;
+  // std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , KalTestFitter(_kalTest) ) ;
+  // //fixme: fit is done in conversion ....
+  // std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
-  //   _kalTest->clear() ;
-    
-  // }
+
+
   //*********************************************************
   //   end running KalTest on circle segments-------------------------------------------------------
   //*********************************************************

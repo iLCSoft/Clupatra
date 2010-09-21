@@ -32,7 +32,6 @@ public:
   ~KalTest() ;
   
   
-
   KalTrack* createKalTrack()  { return new KalTrack( _det ) ; }
 
   //   /**Set the hits to be used for fitting - no ownership taken !*/
