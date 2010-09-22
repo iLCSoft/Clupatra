@@ -232,7 +232,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   // ---------------------------
   //  Smooth the track
   // ---------------------------
-#define SMOOTH_BACK 0
+#define SMOOTH_BACK 1
 #if SMOOTH_BACK
   Int_t isite = 1;
   //  kaltrack.SmoothBackTo(isite);
@@ -348,7 +348,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
 
 
-  //#define ADD_LCIO_HITS
+#define ADD_LCIO_HITS
 #ifdef ADD_LCIO_HITS
   //==========================  add lcio hits to the track for visualization - debugging .... =========================
   int nHit = kaltrack.GetEntriesFast() ;
@@ -373,7 +373,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   }
 #endif 
 
-#define ADD_XING_HITS
+  //#define ADD_XING_HITS
 #ifdef ADD_XING_HITS
   //==========================  add xing hits to the track for visualization - debugging .... =========================
 
@@ -404,7 +404,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   //#define ADD_DEBUG_HITS
 #ifdef ADD_DEBUG_HITS
-  //==========================  add some hits along the helix to the track for visualization - debugging .... =========================
+  //==========================  add some hits along the helix to the track for visualization - debugging .... ==============
   
   int nHit = 200 ;
   
