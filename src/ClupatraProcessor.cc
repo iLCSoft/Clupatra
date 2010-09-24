@@ -14,6 +14,7 @@
 #include "IMPL/TrackImpl.h"
 #include "IMPL/TrackerHitImpl.h"
 #include "EVENT/SimTrackerHit.h"
+#include "IMPL/LCFlagImpl.h"
 #include "UTIL/Operators.h"
 
 //---- GEAR ----
@@ -27,7 +28,6 @@
 
 #include "KalTest.h"
 
-
 using namespace lcio ;
 using namespace marlin ;
 
@@ -35,9 +35,6 @@ using namespace marlin ;
 typedef GenericCluster<TrackerHit> HitCluster ;
 typedef GenericHit<TrackerHit> Hit ;
 
-
-//FIXME: TPC_OFFSET hack for now - need TPC layer offset from KalTest ...
-const static int TPC_OFFSET = 3 ; 
 
 
 /** helper class that maps array to gear::Vector3D */
@@ -66,7 +63,7 @@ struct HitInfoStruct{
   int layerID ;
   bool usedInTrack ;
 } ;
-struct HitInfo : LCOwnedExtension<HitInfo,HitInfoStruct> {} ;
+struct HitInfo : LCOwnedExtension<HitInfo, HitInfoStruct> {} ;
 
 
 //------------------------------------------------------
@@ -77,26 +74,37 @@ TVector3 hitPosition( Hit* h)  {
 		   h->first->getPosition()[2] *.1 ) ; 
 }   
 
-// function to extract layerID from Hit:
-template <int Offset>
-int hitLayerID( const Hit* h ) { return  h->first->ext<HitInfo>()->layerID + Offset  ; } 
-int hitLayerID( const Hit* h ) { return  hitLayerID<0>( h)   ; } 
+// function to extract layerID from generic Hit:
+int hitLayerID( const Hit* h, int offset=0) { return  h->first->ext<HitInfo>()->layerID + offset  ; } 
 
-// find hit with given layerID
-template <int Offset>
-struct HitLayerID{
-  int _id ;
-  HitLayerID<Offset>(int id) : _id( id ) {}
-  bool operator()(const Hit* h){ return hitLayerID<Offset>(h) == _id ; } 
+// functor for layer ID
+class HitLayerID{
+  int _off ;
+  HitLayerID(){}
+public:
+  HitLayerID( int off) : _off(off) {}
+  int operator()(const Hit* h){ return hitLayerID( h, _off) ; } 
 } ;
+
+struct LCIOTrackerHit{ EVENT::TrackerHit* operator()( Hit* h) { return h->first ; }   } ;
+
+// class HitLayerID{
+//   int _id ;
+//   HitLayerID<Offset>(int id) : _id( id ) {}
+//   bool operator()(const Hit* h){ return hitLayerID<Offset>(h) == _id ; } 
+// } ;
 
 //---------------------------------------------------
 // helper for sorting cluster wrt layerID
+template <bool SortDirection>
 struct LayerSort{
   bool operator()( const Hit* l, const Hit* r) {
-    // sort inside to outside
-    //return hitLayerID( l ) < hitLayerID( r ) ; 
-    // sort outside to inside
+    return hitLayerID( l ) < hitLayerID( r ) ; 
+  }
+} ;
+template<>
+struct LayerSort<KalTest::OrderIncoming>{
+  bool operator()( const Hit* l, const Hit* r) {
     return hitLayerID( r ) < hitLayerID( l ) ; 
   }
 } ;
@@ -189,25 +197,44 @@ struct CircleFitter{
   }
 };
 //-------------------------------------------------------------------------
+template <bool HitOrder, bool FitOrder, bool PropagateIP=false>
+
 struct KalTestFitter{
+
   KalTest* _kt ; 
+  
   KalTestFitter(KalTest* k) : _kt( k ) {}
   
   KalTrack* operator() (HitCluster* clu) {  
-
-    clu->sort( LayerSort() ) ;
+    
+    static HitLayerID tpcLayerID( _kt->indexOfFirstLayer( KalTest::TPC )  )  ;
+    
+    clu->sort( LayerSort<HitOrder>() ) ;
     
     KalTrack* trk = _kt->createKalTrack() ;
-
+    
     trk->setCluster<HitCluster>( clu ) ;
+    
 
-    trk->addHits( clu->begin() , clu->end() , hitPosition, hitLayerID<TPC_OFFSET>  ) ; 
+    if( PropagateIP  && HitOrder == KalTest::OrderOutgoing ) {
+      
+      trk->addIPHit() ;
+    }  
+    
+    trk->addHits( clu->begin() , clu->end() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
+    
+    if( PropagateIP  && HitOrder == KalTest::OrderIncoming ) {
+      
+      trk->addIPHit() ;
+    }  
 
-    trk->fitTrack() ;
-
+    trk->fitTrack( FitOrder  ) ;
+    
     return trk;
   }
 };
+
+
 struct KalTrack2LCIO{
   TrackImpl* operator() (KalTrack* trk) {  
     TrackImpl* lTrk = new TrackImpl ;
@@ -667,7 +694,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
   //   //-------------------- split up cluster with duplicate rows 
-  //   // NOTE: a 'simple' combinatorical Kalman filter could do the trick here ...
 
   GenericClusterVec<TrackerHit> sclu ; // new split clusters
 
@@ -833,17 +859,24 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //*********************************************************
   //   try  to run KalTest on circle segments ------------------------------------------------------
   //*********************************************************
-  LCIOTrackFromSegment segToTrack ;
+  //  LCIOTrackFromSegment segToTrack ;
 
   streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
 			 << std::endl ;
 
 
   LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
+  LCFlagImpl trkFlag(0) ;
+  trkFlag.setBit( LCIO::TRBIT_HITS ) ;
+  kaltracks->setFlag( trkFlag.getFlag()  ) ;
+
   evt->addCollection( kaltracks , "KalTestTracks" ) ;
 
   std::list< KalTrack* > ktracks ;
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , KalTestFitter(_kalTest) ) ;
+
+  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
+    
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
 
 
   std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
@@ -854,6 +887,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
 
+  HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::TPC )  ) ;
 
   for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
     
@@ -865,7 +899,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
-      const gear::Vector3D* kPos = (*it)->getXingPointForLayer( hitLayerID<TPC_OFFSET>( hit ) ) ;
+      const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
       
       if( kPos != 0 ){
 	
@@ -881,7 +915,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
     if( bestTrk ) {
 
-      const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( hitLayerID<TPC_OFFSET>( hit ) ) ;
+      const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
 
       if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
 	
@@ -903,7 +937,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
   std::list< KalTrack* > newKTracks ;
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , KalTestFitter(_kalTest) ) ;
+
+  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
+  
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
+
   std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
 

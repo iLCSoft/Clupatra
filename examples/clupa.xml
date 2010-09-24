@@ -32,11 +32,11 @@
       <parameter name="MaxRecordNumber" value="20"/>
       <parameter name="SkipNEvents" value="0"/>
       <parameter name="SupressCheck" value="true false"/>
-      <parameter name="Verbosity" value="MESSAGE"/>
+      <parameter name="Verbosity" value="MESSAGE DEBUG MESSAGE"/>
    </global>
 
  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
-   <parameter name="Verbosity" value="MESSAGE DEBUG"/>
+   <parameter name="Verbosity" value=" DEBUG MESSAGE DEBUG"/>
  <!--ClupatraProcessor : simple nearest neighbour clustering-->
   <!--Name of the input collections-->
   <parameter name="HitCollections" type="string" lcioInType="TrackerHit"> AllTPCTrackerHits </parameter>
@@ -104,9 +104,11 @@
   <!--parameter name="DrawCollection" type="StringVec"> DrawCollection 0 3 </parameter-->
   <!-- Sorry, this parameter isn't a default parameter for this processor: description and type lost!!  -->
   <parameter name="DrawInLayer"> 
-    KalTestTracks 5 1 1
+    KalTestTracks 5 0 1
     TPCTracks 5 2 2
     CluTracks 5 3 3 
+    UnUsedTPCCluTrackerHits 0 3  13
+    TPCCollection 1 5  12
    <!-   AllTrackClusters 0 3 18
     OddClu_1 0 3  1 
     OddClu_2 0 3  2
@@ -116,7 +118,6 @@
     CluTrackSegments 0 3 7 
     OddCluTracks 0 3 11 
     UsedTPCCluTrackerHits 1 3  12
-    UnUsedTPCCluTrackerHits 0 3  13
     OddClu_3_1 0 3  13 
     OddMCPTracks 0 3 14 
     MergedTrackSegements 0 3 15

@@ -42,8 +42,9 @@ EXTPCMeasLayer::EXTPCMeasLayer(TMaterial &min,
                                Double_t   sigmax1,
                                Double_t   sigmaz0,
                                Double_t   sigmaz1,
-                               Bool_t     type)
-              : EXVMeasLayer(min, mout, type),
+                               Bool_t     type,
+			       int        layerID )
+  : EXVMeasLayer(min, mout, type, layerID),
                 TCylinder(r0, lhalf),
                 fPhiMin(-TMath::Pi()/2),
                 fPhiMax(+TMath::Pi()/2),
@@ -75,7 +76,7 @@ EXTPCMeasLayer::EXTPCMeasLayer(TMaterial &min,
                                Bool_t     type,
                                Int_t      module,
                                Int_t      layer)
-              : EXVMeasLayer(min, mout, type),
+  : EXVMeasLayer(min, mout, type , -1 ),
                 TCylinder(r0, lhalf, xc.X(), xc.Y(), xc.Z()),
                 fPhiMin(phimin),
                 fPhiMax(phimax),
@@ -220,7 +221,8 @@ Double_t EXTPCMeasLayer::GetSortingPolicy() const
 }
 
 void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
-                                      TObjArray &hits)
+                                      TObjArray &hits, 
+				EVENT::TrackerHit* hit)
 {
 
   static const double epsilon = 0.0001 ; // 1 micron 
@@ -261,7 +263,7 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
   dmeas[1] = dz;
 
   Double_t b = EXTPCKalDetector::GetBfield();
-  hits.Add(new EXTPCHit(*this, meas, dmeas, side, v , xx, b));
+  hits.Add(new EXTPCHit(*this, meas, dmeas, side, v , hit, b  ));
 
   // TVector3 pv = dynamic_cast<EXTPCHit*>(  hits.Last() )->GetExactX() ; 
   // streamlog_out( DEBUG ) << " EXTPCHit hit[" << hits.Last() << "]at : " << pv[0] << ", "  << pv[1] << ", "  << pv[2] << std::endl ;

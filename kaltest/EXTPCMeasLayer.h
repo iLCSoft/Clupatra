@@ -37,7 +37,9 @@ public:
                  Double_t   sigmax1,
                  Double_t   sigmaz0,
                  Double_t   sigmaz1,
-                 Bool_t     type = EXVMeasLayer::kActive);
+                 Bool_t     type,
+		 int        layerID ) ;
+
   EXTPCMeasLayer(TMaterial &min,
                  TMaterial &mout,
                  Double_t   r0,
@@ -69,7 +71,8 @@ public:
                                 const TKalMatrix &dxphiada,
                                       TKalMatrix &H)    const;
   virtual void       ProcessHit(const TVector3   &xx,
-                                      TObjArray  &hits);
+				TObjArray  &hits, 
+				EVENT::TrackerHit* hit=0);
 
   virtual void  addIPHit(const TVector3   &xx,
 			 TObjArray  &hits) ;

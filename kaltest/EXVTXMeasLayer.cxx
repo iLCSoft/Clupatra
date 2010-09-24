@@ -35,7 +35,7 @@ EXVTXMeasLayer::EXVTXMeasLayer(TMaterial &min,
                                Double_t   sigmaz,
                                Bool_t     type,
                          const Char_t    *name)
-              : EXVMeasLayer(min, mout, type, name),
+  : EXVMeasLayer(min, mout, type, -1, name),
                 TCylinder(r0, lhalf),
                 fSigmaX(sigmax),
                 fSigmaZ(sigmaz)
@@ -110,7 +110,8 @@ void EXVTXMeasLayer::CalcDhDa(const TVTrackHit &vht,
 }
 
 void EXVTXMeasLayer::ProcessHit(const TVector3  &xx,
-                                      TObjArray &hits)
+				TObjArray &hits, 
+				EVENT::TrackerHit* hit)
 {
    TKalMatrix h    = XvToMv(xx);
    Double_t   rphi = h(0, 0);

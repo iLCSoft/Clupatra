@@ -49,7 +49,8 @@ public:
                                        TKalMatrix &H)  const;
 
    virtual void       ProcessHit(const TVector3   &xx,
-                                       TObjArray  &hits);
+                                       TObjArray  &hits, 
+				 EVENT::TrackerHit* hit=0);
 
 
    Double_t GetSigmaX() const { return fSigmaX; }

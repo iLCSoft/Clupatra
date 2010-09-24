@@ -7,7 +7,10 @@
 #include <list>
 #include <vector>
 
+//#include "TVector3.h"
+
 #include <gearimpl/Vectors.h>
+
 
 class TVector3 ;
 class TObjArray ;
@@ -17,7 +20,9 @@ class TKalDetCradle ;
 namespace IMPL{
   class TrackImpl ;
 }
-
+namespace EVENT{
+  class TrackerHit ;
+}
 
 class KalTrack ;
 
@@ -70,15 +75,18 @@ public:
       TVector3 position
       int layer.
   */
-  template <class In, class Pos, class Layer > 
-  void addHits( In first, In last, Pos position, Layer layer) {
+  template <class In, class Pos, class Layer, class LCIOHit> 
+  void addHits( In first, In last, Pos position, Layer layer, LCIOHit lcioHit) {
     
+
     while( first != last ){
       
       int l = layer( *first ) ;
       TVector3 pos = position( *first ) ;
       
-      addHit( pos ,  l ) ;
+      addHit( pos ,  l , lcioHit( *first ) ) ;
+
+      //      std::cout << " addHit at layer " <<  l << " r: " << pos.Perp() << std::endl ;
       
       ++first ;
     }
@@ -86,7 +94,8 @@ public:
     //    addIPHit() ;
   }
   
-  void fitTrack() ;
+  /** Fit the hits added with addHits in the specified order (KalTest::FitForward/KalTestFitBackward) */
+  void fitTrack( bool fitOrder ) ;
 
   void toLCIOTrack( IMPL::TrackImpl* trk) ; 
 
@@ -96,7 +105,7 @@ public:
 protected:
 
   /** add a hit at position in layer */
-  void addHit( const TVector3& pos, int layer ) ;
+  void addHit( const TVector3& pos, int layer, EVENT::TrackerHit* hit ) ;
   
   /** clear all hits */
   //  void clear() ; { _kalHits->Clear() ; }

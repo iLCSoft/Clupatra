@@ -24,8 +24,10 @@ Bool_t   EXVMeasLayer::kDummy = kFALSE;
 EXVMeasLayer::EXVMeasLayer(TMaterial &min,
                            TMaterial &mout,
                            Bool_t     isactive,
-                     const Char_t    *name)  
+			   int layerID ,
+			   const Char_t    *name)  
             : TVMeasLayer(min, mout, isactive),
+	      _layerID( layerID ) ,
 	      fName(name),
 	      fNodePtr(0)
 {

@@ -50,7 +50,7 @@ EXTPCHit::EXTPCHit(const EXTPCMeasLayer &ms,
                          Int_t           side,
                          Double_t        v,
                    const TVector3       &xx,
-                         Double_t        b,
+                         Double_t        b,   
                          Int_t           m)
         : TVTrackHit(ms, x, dx, b, m),
           fSide(side),

@@ -1,13 +1,14 @@
-
 #include "EXTPCKalDetector.h"
 #include "EXTPCMeasLayer.h"
 #include "EXTPCHit.h"
+
 #include "TRandom.h"
 #include "TMath.h"
-
 #include "TTUBE.h"
 #include "TNode.h"
 #include "TVirtualPad.h"
+
+#include "KalTest.h"
 
 #include <sstream>
 #include <iomanip>
@@ -103,7 +104,7 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   
   A       = 39.948*0.9+(12.011*0.2+1.00794*0.8)*0.1;
   Z       = 16.4;
-  density = 0.749e-3;
+  density = 0.749e-3 ;
   radlen  =  1.196e4*2;
   TMaterial &gas = *new TMaterial("TPCGas", "", A, Z, density, radlen, 0.);
   
@@ -147,11 +148,11 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   Bool_t dummy  = EXTPCMeasLayer::kDummy;
   
   //FIXME - test:  add a layer for the beam pipe 
-  Add(new EXTPCMeasLayer(air, air, 1.2 , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active )) ;  // ,ss.str().data()));
+  Add(new EXTPCMeasLayer(air, air, 1.2 , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , -1 )) ;  // ,ss.str().data()));
 
 
-  Add(new EXTPCMeasLayer(air, cfrp, rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy));
-  Add(new EXTPCMeasLayer(cfrp, gas, rtub+inthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,dummy));
+  Add(new EXTPCMeasLayer(air, cfrp, rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
+  Add(new EXTPCMeasLayer(cfrp, gas, rtub+inthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,dummy, -1 ));
   
   // create measurement layers
   Double_t r = rmin;
@@ -161,8 +162,8 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
 
   for (Int_t layer = 0; layer < nlayers; layer++) {
 
-   //    std::stringstream ss;
-    Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active )) ;  // ,ss.str().data()));
+    int layerID = KalTest::TPC * + KalTest::DetectorID_Factor  + layer ;
+    Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID)) ;  // ,ss.str().data()));
 
     if( streamlog_level( DEBUG0 ) ) { // && layer % 10 == 0 ){
       streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer +_layerOffset <<  "] at R = " << r << std::endl ;
@@ -170,8 +171,8 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
 
     r += rstep;
   }
-  Add(new EXTPCMeasLayer(gas, cfrp, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,  dummy));
-  Add(new EXTPCMeasLayer(cfrp, air, outerr, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy));
+  Add(new EXTPCMeasLayer(gas, cfrp, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,  dummy, -1 ));
+  Add(new EXTPCMeasLayer(cfrp, air, outerr, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
   
   SetOwner();
 }

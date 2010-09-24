@@ -77,12 +77,25 @@ ENDIF()
 ### INCLUDES #################################################################
 
 
+#------ ROOT stuff ----------
+INCLUDE( ${PROJECT_SOURCE_DIR}/FindROOT.cmake )
+SET( ENV{ROOTSYS} "${ROOT_HOME}" )
+SET( ENV{PATH} $ENV{ROOTSYS}/bin:$ENV{PATH} )
+SET( ENV{DYLD_LIBRARY_PATH} $ENV{ROOTSYS}/lib:$ENV{DYLD_LIBRARY_PATH} )
+#-----------------------------
+
+INCLUDE_DIRECTORIES( ${ROOT_INCLUDE_DIRS} )
+
+IF( NOT DEFINED KalTest_HOME )
+MESSAGE( FATAL_ERROR "KalTest_HOME not set : please set it with cmake -D KalTest_HOME=...")
+ENDIF()
+INCLUDE_DIRECTORIES( "${KalTest_HOME}/include" )
 
 
 
 #################################################################
 
-ADD_SUBDIRECTORY( kaltest )
+#ADD_SUBDIRECTORY( kaltest )
 
 #################################################################
 
@@ -106,6 +119,7 @@ ADD_DEFINITIONS( "-Wno-long-long" )
 
 # get list of all source files
 AUX_SOURCE_DIRECTORY( src library_sources )
+AUX_SOURCE_DIRECTORY( kaltest library_sources )
 
 ### DOCUMENTATION ############################################################
 IF( EXISTS "${PROJECT_SOURCE_DIR}/doc/Doxyfile" )
@@ -200,8 +214,13 @@ SET_TARGET_PROPERTIES( lib_${PROJECT_NAME} PROPERTIES
 
 
 #FIXME: need proper way of adding the kaltest library ...
-TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} kaltest )
+#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} kaltest )
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Kalman.dylib)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Kaltrack.dylib)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4KalGeom.dylib)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Utils.dylib)
 
+#TARGET_LINK_LIBRARIES( ${LIBNAME} ${ROOT_LIBRARIES})
 
 # install library
 INSTALL( TARGETS lib_${PROJECT_NAME} DESTINATION lib PERMISSIONS

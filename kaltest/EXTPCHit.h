@@ -26,6 +26,10 @@
 #include "TVTrackHit.h"
 #include "EXTPCMeasLayer.h"
 
+namespace EVENT{
+  class  TrackerHit ;
+}
+
 class EXTPCHit : public TVTrackHit {
 
 public:
@@ -67,6 +71,7 @@ private:
   Double_t        fVdrift;  // drift veclocity
   const TVector3 *fXXPtr;   // pointer to exact hit
   const void     *fHitPtr;  // pointer to raw Hit object
+  //  EVENT::TrackerHit*    hit ; // lcio hit
 
   //  ClassDef(EXTPCHit, 1)  // EXTPC hit class
 };

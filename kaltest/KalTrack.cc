@@ -53,13 +53,13 @@ KalTrack::~KalTrack(){
 void KalTrack::addIPHit(){
 
   // add a faked Hit for the IP 
-    TObject* o =  _det->At( 0 ) ;
+  TObject* o =  _det->At( 0 ) ;
   EXTPCMeasLayer* ml = dynamic_cast< EXTPCMeasLayer * >( o ) ;
   
   ml->addIPHit( TVector3( 1.2, 0., 0.) ,   *_kalHits ) ;
 }
 
-void KalTrack::addHit( const TVector3& pos, int layer ) {
+void KalTrack::addHit( const TVector3& pos, int layer , EVENT::TrackerHit* hit) {
   
   if( layer >= 0 && ( _det->GetEntries() > layer ) ) {
 
@@ -67,59 +67,56 @@ void KalTrack::addHit( const TVector3& pos, int layer ) {
 
     EXVMeasLayer* ml = dynamic_cast< EXVMeasLayer * >( o ) ;
 
-  if (ml != 0 && ml->IsActive() && dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn() ) {
+    if (ml != 0 && ml->IsActive() && dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn() ) {
 
-    ml->ProcessHit( pos, *_kalHits ); // create hit point
+      ml->ProcessHit( pos, *_kalHits , hit ); // create hit point
     
 
-    if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
-      //    if(   layer % 10 == 0 ){
-      double radius = pos.Perp() ;
-      streamlog_out( DEBUG )  << " ***** adding a TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
-    }
+      if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
+	//    if(   layer % 10 == 0 ){
+	double radius = pos.Perp() ;
+	streamlog_out( DEBUG )  << " ***** adding a TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
+      }
     
 
+    } else {
+    
+      streamlog_out( WARNING ) << " hit not added to KalTrack at : " 
+			       << pos(0) << "," << pos(1) << "," << pos(2)  
+			       << "  in  layer: " << layer
+			       << " ml : " << ml 
+			       << "  ml->IsActive() " <<  ml->IsActive()
+			       << "detector->IsPowerOn() " 
+			       << dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn()
+			       << std::endl ;
+    } 
+  
   } else {
-    
-    streamlog_out( WARNING ) << " hit not added to KalTrack at : " 
-   			     << pos(0) << "," << pos(1) << "," << pos(2)  
- 			     << "  in  layer: " << layer
- 			     << " ml : " << ml 
- 			     << "  ml->IsActive() " <<  ml->IsActive()
- 			     << "detector->IsPowerOn() " 
-			     << dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn()
- 			     << std::endl ;
-  } 
   
-} else {
-  
-  streamlog_out( ERROR ) << " no measurement layer at : " 
-			 << pos(0) << "," << pos(1) << "," << pos(2)  
-			 << "  in  layer: " << layer 
-			 << " detector has  " << _det->GetEntriesFast() << " layers only "
- 			 << " - object at given layer : " <<  _det->At( layer )  << std::endl ;
- }
+    streamlog_out( ERROR ) << " no measurement layer at : " 
+			   << pos(0) << "," << pos(1) << "," << pos(2)  
+			   << "  in  layer: " << layer 
+			   << " detector has  " << _det->GetEntriesFast() << " layers only "
+			   << " - object at given layer : " <<  _det->At( layer )  << std::endl ;
+  }
 }
 
 
-void KalTrack::fitTrack() {
+void KalTrack::fitTrack( bool fitDirection ) {
   
-  //  const Bool_t gkDir = kIterBackward;
-  const Bool_t gkDir = kIterForward;
-  
-  using namespace std ;
+  const Bool_t gkDir = fitDirection ; 
   
   // ============================================================
   //  Do Kalman Filter    - copied from EXVKalTrack.cxx
   // ============================================================
-
+  
   if (_kalHits->GetEntries() < 3) {
-
-    streamlog_out( ERROR)  << "<<<<<< KalTrack::fitTrack(): Shortage of Hits! nhits = " 
-			   << _kalHits->GetEntries() << " >>>>>>>" << endl;
+    
+    streamlog_out( ERROR) << "<<<<<< KalTrack::fitTrack(): Shortage of Hits! nhits = "  
+			  << _kalHits->GetEntries() << " >>>>>>>" << std::endl;
     return ;
   }
-      
+  
   Int_t i1, i2, i3; // (i1,i2,i3) = (1st,mid,last) hit to filter
   if (gkDir == kIterBackward) {
     i3 = 1;
@@ -216,7 +213,7 @@ void KalTrack::fitTrack() {
 
     if (!kaltrack.AddAndFilter(site)) {               // filter it
 
-      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << endl;
+      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << std::endl;
 
       delete &site;                        // delete it if failed
     }
@@ -242,57 +239,21 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   TVKalSite &cursite = kaltrack.GetCurSite();
 #endif
 
-  // //============== compute crossing points with inner layers ======================
 
-  // TKalTrackSite& theSite =  dynamic_cast<TKalTrackSite&>(  kaltrack.GetCurSite() ) ;
-
-  // int  idx = theSite.GetHit().GetMeasLayer().GetIndex()  ; // index of site from
-  
-  // -- idx ;
-  // while( idx >= 0 ) {
-
-  //   std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( cursite.GetCurState()).CreateTrack() ); // tmp track
-
-  //   TVector3 xx ;                // expected hit position vector
-  //   double fid  = 0.;           // deflection angle from the last hit
-
-  //   if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help , xx, fid)  ){
-
-  //     //      streamlog_out( DEBUG )
-  // 	std::cout << " ---- crossing layer " << idx <<  " at: " 
-  // 	<< xx[0] << ", "  << xx[1] << ", " << xx[2] 
-  // 	<< " r: " << xx.Perp()  
-  // 	<< std::endl ;
-      
-  //     --idx ;
-
-  //   } else {
-
-  //     streamlog_out( DEBUG ) << " ---- no crossing point found with layer " << idx << std::endl ;
-
-  //     break ;
-  //   }
-  // }
-
-
-
-  // //===============================================================================
-
-
-   TVKalState& trkState = cursite.GetCurState() ;
+  TVKalState& trkState = cursite.GetCurState() ;
 
   // dump fit result for now:
   Int_t    ndf  = kaltrack.GetNDF();
   Double_t chi2 = kaltrack.GetChi2();
   Double_t cl   = TMath::Prob(chi2, ndf);
 
-//   Double_t dr   = trkState(0, 0); 
-//   Double_t fi0  = trkState(1, 0); 
-//   Double_t cpa  = trkState(2, 0);
-//   Double_t dz   = trkState(3, 0);
-//   Double_t tnl  = trkState(4, 0); 
-//   Double_t cs   = tnl/TMath::Sqrt(1.+tnl*tnl);
-//   Double_t t0   = trkState(5, 0); 
+  //   Double_t dr   = trkState(0, 0); 
+  //   Double_t fi0  = trkState(1, 0); 
+  //   Double_t cpa  = trkState(2, 0);
+  //   Double_t dz   = trkState(3, 0);
+  //   Double_t tnl  = trkState(4, 0); 
+  //   Double_t cs   = tnl/TMath::Sqrt(1.+tnl*tnl);
+  //   Double_t t0   = trkState(5, 0); 
   
   //============== convert parameters to LCIO convention ====
   
@@ -302,11 +263,17 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   double dPhi ;
   helix.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , 0 ) ;
 
-  double phi       =          helix.GetPhi0()  - M_PI/2. ;
-  double omega     =  - .1  / helix.GetRho()  ;              
-  double d0        =    10. * helix.GetDrho() ;
+  double phi       =          helix.GetPhi0()  + M_PI/2. ;
+  double omega     =    .1  / helix.GetRho()  ;              
+  double d0        =  - 10. * helix.GetDrho() ;
   double z0        =    10. * helix.GetDz()   ;
-  double tanLambda =  - helix.GetTanLambda()  ;
+  double tanLambda =    helix.GetTanLambda()  ;
+
+  // double phi       =          helix.GetPhi0()  - M_PI/2. ;
+  // double omega     =  - .1  / helix.GetRho()  ;              
+  // double d0        =    10. * helix.GetDrho() ;
+  // double z0        =    10. * helix.GetDz()   ;
+  // double tanLambda =  - helix.GetTanLambda()  ;
 
   //=========================================================
 
@@ -350,26 +317,22 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
 #define ADD_LCIO_HITS
 #ifdef ADD_LCIO_HITS
-  //==========================  add lcio hits to the track for visualization - debugging .... =========================
+
+  //==========================  add lcio hits to the track =========================
+
   int nHit = kaltrack.GetEntriesFast() ;
 
   for(int i=0 ; i < nHit ; ++i ){
     
-    IMPL::TrackerHitImpl* h = new IMPL::TrackerHitImpl ;  //memory leak - only use for debugging ....
-    
-    TVector3 pv = dynamic_cast<TKalTrackSite &>(*kaltrack[i]).GetPivot() ;
+    EVENT::TrackerHit* h = const_cast<EVENT::TrackerHit*> 
+      (static_cast<const EVENT::TrackerHit*>
+       (  static_cast<const EXTPCHit&>
+	  (dynamic_cast<TKalTrackSite &> ( *kaltrack[i] ).GetHit() ).GetHitPtr() ) ) ;
+    // what a casting show ....    
 
-    double pos[3] ;
-    pos[0] = pv[0] *10. ;
-    pos[1] = pv[1] *10. ;
-    pos[2] = pv[2] *10. ;
-    
-    h->setPosition( pos ) ;
+    if( h ) 
+      trk->addHit( h ) ;
 
-    //    streamlog_out( DEBUG ) << " KalTrack adding hit at : " << pos[0] << ", "  << pos[1] << ", "  << pos[2] << std::endl ;
-    
-    trk->addHit( h ) ;
-    
   }
 #endif 
 

@@ -3,13 +3,17 @@
 
 #include "gear/GearMgr.h"
 
+//LCIO:
+#include "UTIL/BitField64.h" 
+
+
 #include "streamlog/streamlog.h"
 
 #include "TObjArray.h"
 #include "TVector3.h"
 
 #include <cmath>
-
+#include <vector>
 #include "KalTrack.h"
 
 class TKalDetCradle ;
@@ -18,7 +22,8 @@ namespace IMPL{
   class TrackImpl ;
 }
 
-/** Simple wrapper class that encapsulates the KaltTest Kalman fitter.
+
+/** Interface to KaltTest Kalman fitter - instantiates and holds the detector geometry.
  */
 class KalTest{
 
@@ -26,58 +31,46 @@ class KalTest{
   
 public:
   
+  // define some configuration constants
+  static const bool FitBackward   = kIterBackward ;
+  static const bool FitForward    = kIterForward ;
+  static const bool OrderOutgoing  = true ;
+  static const bool OrderIncoming  = false ;
+  static const bool PropagateToIP  = true ;
+  
+/** Enums for identifying detectors
+ */
+  typedef enum {
+    unknown = 0 ,
+    VXD =  1 ,
+    SIT =  2 ,
+    TPC =  3 ,
+    SET =  4 ,
+    ETD =  5 ,
+    FTD =  6 , // add new detecors here
+    DetectorID_Size ,
+    DetectorID_Factor = 10000 
+  } DetectorID ;
+
+
+
   /** Default c'tor, initializes the geometry from GEAR. */
   KalTest( const gear::GearMgr& gearMgr) ;
   
   ~KalTest() ;
   
-  
   KalTrack* createKalTrack()  { return new KalTrack( _det ) ; }
 
-  //   /**Set the hits to be used for fitting - no ownership taken !*/
-  //   void setHits( const TObjArray& hits) { _kalHits = hits ; }
-  
-  void addIPHit() ;
-
-  /** template for adding hits of any type from a container - user needs to provide functor classes for extracting 
-      TVector3 position
-      int layer.
-  */
-  template <class In, class Pos, class Layer > 
-  void addHits( In first, In last, Pos position, Layer layer) {
-    
-
-    while( first != last ){
-      
-      int l = layer( *first ) ;
-      TVector3 pos = position( *first ) ;
-      
-      //      if( l > 50 ) 
-	addHit( pos ,  l ) ;
-      
-      ++first ;
-    }
-    
-    addIPHit() ;
-  }
-  
-  void fitTrack(IMPL::TrackImpl* trk) ;
-  
-  
-  
-  /** add a hit at position in layer */
-  void addHit( const TVector3& pos, int layer ) ;
-  
-  /** clear all hits */
-  void clear() { _kalHits->Clear() ; }
-
+  int indexOfFirstLayer( DetectorID det) ;
 
 protected:
   void init() ;
 
   const gear::GearMgr* _gearMgr ;
+
   TKalDetCradle* _det ;            // the detector cradle
-  TObjArray* _kalHits;              // array to store hits
+
+  std::vector<int> _idOffsets ;
 
 } ;
 
