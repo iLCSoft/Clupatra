@@ -242,7 +242,8 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
 
   Double_t v = EXTPCKalDetector::GetVdrift();
 
-  if( streamlog_level( DEBUG ) && std::abs( xx.Perp() - GetR() ) > epsilon ) {
+  //if( streamlog_level( DEBUG ) && std::abs( xx.Perp() - GetR() ) > epsilon ) {
+  if( std::abs( xx.Perp() - GetR() ) > epsilon ) {
     
     streamlog_out( ERROR ) << " TPC hit at r = " << xx.Perp() 
 			   << " not on measurement layer R = " << GetR() << std::endl ; 
@@ -284,7 +285,8 @@ void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,
   streamlog_out( DEBUG ) << " adding faked TPC hit at r = " << xx.Perp()  << std::endl ;
   
   
-  if( streamlog_level( DEBUG ) && std::abs( xx.Perp() - GetR() ) > epsilon ) {
+  if( std::abs( xx.Perp() - GetR() ) > epsilon ) {
+  //if( streamlog_level( DEBUG ) && std::abs( xx.Perp() - GetR() ) > epsilon ) {
     
     streamlog_out( ERROR ) << " TPC hit at r = " << xx.Perp() 
 			   << " not on measurement layer R = " << GetR() << std::endl ; 

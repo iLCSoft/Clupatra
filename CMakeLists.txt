@@ -38,7 +38,7 @@ OPTION( INSTALL_DOC "Set to OFF to skip build/install Documentation" ON )
 
 # project dependencies
 # e.g. SET( ${PROJECT_NAME}_DEPENDS "Marlin MarlinUtil LCIO GEAR CLHEP GSL RAIDA ROOT" )
-SET( ${PROJECT_NAME}_DEPENDS "Marlin LCIO GEAR" )
+SET( ${PROJECT_NAME}_DEPENDS "Marlin LCIO GEAR MarlinUtil CLHEP GSL RAIDA ROOT streamlog")
 
 # set default cmake build type to RelWithDebInfo
 # possible options are: None Debug Release RelWithDebInfo MinSizeRel
@@ -78,10 +78,10 @@ ENDIF()
 
 
 #------ ROOT stuff ----------
-INCLUDE( ${PROJECT_SOURCE_DIR}/FindROOT.cmake )
-SET( ENV{ROOTSYS} "${ROOT_HOME}" )
-SET( ENV{PATH} $ENV{ROOTSYS}/bin:$ENV{PATH} )
-SET( ENV{DYLD_LIBRARY_PATH} $ENV{ROOTSYS}/lib:$ENV{DYLD_LIBRARY_PATH} )
+#INCLUDE( ${PROJECT_SOURCE_DIR}/FindROOT.cmake )
+#SET( ENV{ROOTSYS} "${ROOT_HOME}" )
+#SET( ENV{PATH} $ENV{ROOTSYS}/bin:$ENV{PATH} )
+#SET( ENV{DYLD_LIBRARY_PATH} $ENV{ROOTSYS}/lib:$ENV{DYLD_LIBRARY_PATH} )
 #-----------------------------
 
 INCLUDE_DIRECTORIES( ${ROOT_INCLUDE_DIRS} )
@@ -215,10 +215,10 @@ SET_TARGET_PROPERTIES( lib_${PROJECT_NAME} PROPERTIES
 
 #FIXME: need proper way of adding the kaltest library ...
 #TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} kaltest )
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Kalman.dylib)
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Kaltrack.dylib)
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4KalGeom.dylib)
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Utils.dylib)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Kalman.so)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4KalTrack.so)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4KalGeom.so)
+TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Utils.so)
 
 #TARGET_LINK_LIBRARIES( ${LIBNAME} ${ROOT_LIBRARIES})
 

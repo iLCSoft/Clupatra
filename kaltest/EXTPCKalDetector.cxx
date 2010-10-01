@@ -165,9 +165,9 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
     int layerID = KalTest::TPC * + KalTest::DetectorID_Factor  + layer ;
     Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID)) ;  // ,ss.str().data()));
 
-    if( streamlog_level( DEBUG0 ) ) { // && layer % 10 == 0 ){
+    //if( streamlog_level( DEBUG0 ) ) { // && layer % 10 == 0 ){
       streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer +_layerOffset <<  "] at R = " << r << std::endl ;
-    }
+    //}
 
     r += rstep;
   }
@@ -208,7 +208,7 @@ void EXTPCKalDetector::Draw(Int_t color, const Char_t *opt)
       tubep->SetBit(kCanDelete);
       fNodePtr = new TNode(nname,nname,name);
       fNodePtr->SetLineColor(color);
-      fNodePtr->SetLineWidth(0.01);
+      fNodePtr->SetLineWidth((Width_t)0.01);
    }
    EXVKalDetector::Draw(color,opt);
 }

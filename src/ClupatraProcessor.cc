@@ -36,6 +36,8 @@ typedef GenericCluster<TrackerHit> HitCluster ;
 typedef GenericHit<TrackerHit> Hit ;
 
 
+// delete helper
+template<class P>  void delete_ptr(P* p) { delete p;}
 
 /** helper class that maps array to gear::Vector3D */
 struct VecFromArray{
@@ -496,7 +498,7 @@ struct LCIOTrackFromSegment{
     // 	    << " ; z0 = " << helix->getZ0() 
     // 	    << " ; omega = " << helix->getOmega() 
  
-    
+    delete helix ;    
     return trk ;
   }
 
@@ -946,6 +948,14 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 
+
+  //========== cleanup KalTracks ========
+  std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
+  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
+
+  //=====================================
+
+
   //*********************************************************
   //   end running KalTest on circle segments-------------------------------------------------------
   //*********************************************************
@@ -1175,7 +1185,8 @@ void ClupatraProcessor::end(){
   //   std::cout << "ClupatraProcessor::end()  " << name() 
   // 	    << " processed " << _nEvt << " events in " << _nRun << " runs "
   // 	    << std::endl ;
-
+  
+  delete _kalTest ;
 }
 
 
@@ -1184,6 +1195,7 @@ void ClupatraProcessor::end(){
 //====================================================================================================
 
 ClusterSegment* fitCircle(HitCluster* c){
+
 
   // code copied from GenericViewer
   // should be replaced by a more efficient circle fit...

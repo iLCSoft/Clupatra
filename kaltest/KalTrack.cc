@@ -29,6 +29,8 @@
 
 #include "streamlog/streamlog.h"
 
+//#define  streamlog_level( MLEVEL ) ( streamlog::out.would_write< streamlog::MLEVEL >() )
+
 
 std::ostream& operator<<(std::ostream& o, const KalTrack& trk) {
 
@@ -40,7 +42,11 @@ std::ostream& operator<<(std::ostream& o, const KalTrack& trk) {
 /** C'tor - initiale with detector */
 KalTrack::KalTrack(TKalDetCradle* det) : _det( det) , _xingPts( _det->GetEntriesFast() ) {
   _trk = new TKalTrack ;
+  _trk->SetOwner();
+
   _kalHits = new TObjArray ;
+  _kalHits->SetOwner() ;
+
 }
 
 KalTrack::~KalTrack(){
@@ -72,8 +78,8 @@ void KalTrack::addHit( const TVector3& pos, int layer , EVENT::TrackerHit* hit) 
       ml->ProcessHit( pos, *_kalHits , hit ); // create hit point
     
 
-      if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
-	//    if(   layer % 10 == 0 ){
+      //if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
+      if(   layer % 10 == 0 ){
 	double radius = pos.Perp() ;
 	streamlog_out( DEBUG )  << " ***** adding a TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
       }
