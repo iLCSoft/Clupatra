@@ -35,6 +35,7 @@ using namespace marlin ;
 typedef GenericCluster<TrackerHit> HitCluster ;
 typedef GenericHit<TrackerHit> Hit ;
 
+void  doBLA() ;
 
 // delete helper
 template<class P>  void delete_ptr(P* p) { delete p;}
@@ -209,7 +210,7 @@ struct KalTestFitter{
   
   KalTrack* operator() (HitCluster* clu) {  
     
-    static HitLayerID tpcLayerID( _kt->indexOfFirstLayer( KalTest::TPC )  )  ;
+    static HitLayerID tpcLayerID( _kt->indexOfFirstLayer( KalTest::DetID::TPC )  )  ;
     
     clu->sort( LayerSort<HitOrder>() ) ;
     
@@ -574,6 +575,8 @@ void ClupatraProcessor::processRunHeader( LCRunHeader* run) {
 
 void ClupatraProcessor::processEvent( LCEvent * evt ) { 
 
+  doBLA() ;
+
   clock_t start =  clock() ; 
 
   LCCollectionVec* lcioTracks = new LCCollectionVec( LCIO::TRACK )  ;
@@ -889,7 +892,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
 
-  HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::TPC )  ) ;
+  HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
 
   for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
     
@@ -1263,4 +1266,9 @@ ClusterSegment* fitCircle(HitCluster* c){
   delete[] ah;
 
   return segment ;
+}
+
+
+void  doBLA() {
+  streamlog_out( DEBUG ) << " doBla() called  " << std::endl ;
 }

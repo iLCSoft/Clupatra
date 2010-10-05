@@ -17,10 +17,6 @@ public:
   /** Initialize the TPC from GEAR */
   EXTPCKalDetector(const gear::TPCParameters& tpcParam );
   
-  /**layer offset of first measurement layer*/ 
-  int getLayerOffset() { return _layerOffset ; } 
-  
-
   ~EXTPCKalDetector();
   
   static Double_t GetVdrift() { return fgVdrift; }
@@ -31,8 +27,6 @@ public:
 private:
   TNode *fNodePtr;            // node pointer
    static Double_t fgVdrift;   // drift velocity
-
-  int _layerOffset ;
 
    //ClassDef(EXTPCKalDetector,1)   // Sample hit class
 };

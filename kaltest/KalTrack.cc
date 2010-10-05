@@ -1,9 +1,10 @@
 #include "KalTrack.h"
-#include "TKalTrackState.h"
-#include "TKalTrackSite.h"
-#include "TVTrackHit.h"
-#include "TKalDetCradle.h"
-#include "TKalTrack.h"         // from KalTrackLib
+
+#include "kaltest/TKalTrackState.h"
+#include "kaltest/TKalTrackSite.h"
+#include "kaltest/TVTrackHit.h"
+#include "kaltest/TKalDetCradle.h"
+#include "kaltest/TKalTrack.h"         // from KalTrackLib
 
 #include "EXVMeasLayer.h"
 #include "EXVTXKalDetector.h"
@@ -292,6 +293,49 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
 
   trk->setChi2( chi2 ) ;
+
+
+  //covariance matrix in LCIO - stored as lower triangle matrix where the order of parameters is: 
+  // d0, phi, omega, z0, tan(lambda). So we have cov(d0,d0), cov( phi, d0 ), cov( phi, phi), ...
+
+  //   Double_t dr   = trkState(0, 0);   
+  //   Double_t fi0  = trkState(1, 0); 
+  Double_t cpa  = trkState(2, 0);
+  //   Double_t dz   = trkState(3, 0);
+  //   Double_t tnl  = trkState(4, 0); 
+
+
+  double alpha = omega / cpa  ;
+
+
+  const TKalMatrix& covK = trkState.GetCovMat() ; 
+  
+  EVENT::FloatVec cov( 15 )  ; 
+  cov[ 0] = covK( 0 , 0 )   ; //   d0,   d0
+
+  cov[ 1] = covK( 1 , 0 )   ; //   phi0, d0
+  cov[ 2] = covK( 1 , 1 )   ; //   phi0, phi
+
+  // FIXME: comvert kappa to omega ....
+  cov[ 3] = covK( 2 , 0 ) * alpha   ; //   omega, d0
+  cov[ 4] = covK( 2 , 1 ) * alpha   ; //   omega, phi
+  cov[ 5] = covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
+
+  cov[ 6] = covK( 3 , 0 )   ; //   z0  , d0
+  cov[ 7] = covK( 3 , 1 )   ; //   z0  , phi
+  cov[ 8] = covK( 3 , 2 )   ; //   z0  , omega
+  cov[ 9] = covK( 3 , 3 )   ; //   z0  , z0
+
+  cov[10] = covK( 4 , 0 )   ; //   tanl, d0
+  cov[11] = covK( 4 , 1 )   ; //   tanl, phi
+  cov[12] = covK( 4 , 2 )   ; //   tanl, omega
+  cov[13] = covK( 4 , 3 )   ; //   tanl, z0
+  cov[14] = covK( 4 , 4 )   ; //   tanl, tanl
+
+
+  trk->setCovMatrix( cov ) ;
+
+
 
   float pivot[3] ;
   pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;

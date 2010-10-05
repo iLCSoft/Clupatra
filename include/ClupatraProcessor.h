@@ -35,7 +35,9 @@ class ClupatraProcessor : public Processor {
   
   /** Called for every event - the working horse.
    */
-  virtual void processEvent( LCEvent * evt ) ; 
+  virtual void processEvent( LCEvent * evt ) ;
+
+  //  void doBLA() ;
   
   
   virtual void check( LCEvent * evt ) ; 

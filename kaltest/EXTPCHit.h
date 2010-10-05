@@ -22,8 +22,8 @@
 //* $Id: EXTPCHit.h,v 1.1.1.1 2009/11/24 00:13:59 ikematsu Exp $
 //*************************************************************************
 //
-#include "KalTrackDim.h"
-#include "TVTrackHit.h"
+#include "kaltest/KalTrackDim.h"
+#include "kaltest/TVTrackHit.h"
 #include "EXTPCMeasLayer.h"
 
 namespace EVENT{

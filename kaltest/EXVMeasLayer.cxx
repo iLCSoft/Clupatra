@@ -27,9 +27,9 @@ EXVMeasLayer::EXVMeasLayer(TMaterial &min,
 			   int layerID ,
 			   const Char_t    *name)  
             : TVMeasLayer(min, mout, isactive),
-	      _layerID( layerID ) ,
 	      fName(name),
-	      fNodePtr(0)
+	      fNodePtr(0),
+	      _layerID( layerID ) 
 {
 }
 

@@ -157,18 +157,18 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   // create measurement layers
   Double_t r = rmin;
 
-  // safe offset of first measurment layer in TPC :
-    _layerOffset = GetLast() + 1  ;
 
   for (Int_t layer = 0; layer < nlayers; layer++) {
-
-    int layerID = KalTest::TPC * + KalTest::DetectorID_Factor  + layer ;
-    Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID)) ;  // ,ss.str().data()));
-
-    //if( streamlog_level( DEBUG0 ) ) { // && layer % 10 == 0 ){
-      streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer +_layerOffset <<  "] at R = " << r << std::endl ;
-    //}
-
+    
+    int layerID = KalTest::DetID::TPC * KalTest::DetID::Factor  + layer ;
+    
+    Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID ) ) ;  
+    
+    if( streamlog_level( DEBUG0 ) && layer % 10 == 0 ){
+      
+      streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer + layerID  <<  "] at R = " << r << std::endl ;
+    }
+    
     r += rstep;
   }
   Add(new EXTPCMeasLayer(gas, cfrp, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,  dummy, -1 ));

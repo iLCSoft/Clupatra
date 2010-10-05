@@ -38,7 +38,10 @@ OPTION( INSTALL_DOC "Set to OFF to skip build/install Documentation" ON )
 
 # project dependencies
 # e.g. SET( ${PROJECT_NAME}_DEPENDS "Marlin MarlinUtil LCIO GEAR CLHEP GSL RAIDA ROOT" )
-SET( ${PROJECT_NAME}_DEPENDS "Marlin LCIO GEAR MarlinUtil CLHEP GSL RAIDA ROOT streamlog")
+SET( ${PROJECT_NAME}_DEPENDS "Marlin LCIO GEAR MarlinUtil CLHEP GSL RAIDA ROOT KalTest")
+IF(APPLE)
+   SET( ${PROJECT_NAME}_DEPENDS "${${PROJECT_NAME}_DEPENDS} streamlog" )
+ENDIF(APPLE)
 
 # set default cmake build type to RelWithDebInfo
 # possible options are: None Debug Release RelWithDebInfo MinSizeRel
@@ -75,22 +78,6 @@ ENDIF()
 
 
 ### INCLUDES #################################################################
-
-
-#------ ROOT stuff ----------
-#INCLUDE( ${PROJECT_SOURCE_DIR}/FindROOT.cmake )
-#SET( ENV{ROOTSYS} "${ROOT_HOME}" )
-#SET( ENV{PATH} $ENV{ROOTSYS}/bin:$ENV{PATH} )
-#SET( ENV{DYLD_LIBRARY_PATH} $ENV{ROOTSYS}/lib:$ENV{DYLD_LIBRARY_PATH} )
-#-----------------------------
-
-INCLUDE_DIRECTORIES( ${ROOT_INCLUDE_DIRS} )
-
-IF( NOT DEFINED KalTest_HOME )
-MESSAGE( FATAL_ERROR "KalTest_HOME not set : please set it with cmake -D KalTest_HOME=...")
-ENDIF()
-INCLUDE_DIRECTORIES( "${KalTest_HOME}/include" )
-
 
 
 #################################################################
@@ -187,13 +174,13 @@ MARK_AS_ADVANCED( EXECUTABLE_OUTPUT_PATH LIBRARY_OUTPUT_PATH )
 # DEPENDENCIES: this code has to be placed before adding any library or
 # executable so that these are linked properly against the dependencies
 IF( DEFINED ${PROJECT_NAME}_DEPENDS OR DEFINED BUILD_WITH OR DEFINED LINK_WITH )
-    IF( NOT DEFINED CMAKE_MODULE_PATH )
-        MESSAGE( FATAL_ERROR "CMAKE_MODULE_PATH not set! Set it with: "
-            "-DCMAKE_MODULE_PATH=\"/path_to_ilcsoft/CMakeModules\"" )
-    ENDIF()
-    # load macro
-    INCLUDE( "MacroCheckDeps" )
-    CHECK_DEPS()
+  IF( NOT DEFINED CMAKE_MODULE_PATH )
+    MESSAGE( FATAL_ERROR "CMAKE_MODULE_PATH not set! Set it with: "
+      "-DCMAKE_MODULE_PATH=\"/path_to_ilcsoft/CMakeModules\"" )
+  ENDIF()
+  # load macro
+  INCLUDE( "MacroCheckDeps" )
+  CHECK_DEPS()
 ENDIF()
 
 # LIBRARY
@@ -211,16 +198,6 @@ SET_TARGET_PROPERTIES( lib_${PROJECT_NAME} PROPERTIES
     CLEAN_DIRECT_OUTPUT 1
     # avoid conflicts between library and binary target names
     OUTPUT_NAME ${PROJECT_NAME} )
-
-
-#FIXME: need proper way of adding the kaltest library ...
-#TARGET_LINK_LIBRARIES( lib_${PROJECT_NAME} kaltest )
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Kalman.so)
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4KalTrack.so)
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4KalGeom.so)
-TARGET_LINK_LIBRARIES(  lib_${PROJECT_NAME} ${KalTest_HOME}/lib/libS4Utils.so)
-
-#TARGET_LINK_LIBRARIES( ${LIBNAME} ${ROOT_LIBRARIES})
 
 # install library
 INSTALL( TARGETS lib_${PROJECT_NAME} DESTINATION lib PERMISSIONS

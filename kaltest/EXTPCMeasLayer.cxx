@@ -28,7 +28,6 @@
 #include "TMath.h"
 #include <cmath>
 
-#include "EXEventGen.h"
 
 #include "streamlog/streamlog.h"
 
@@ -250,11 +249,6 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
     
   }
 
-
-
-#if 0 // ?????
-  d         += v * EXEventGen::GetT0();  // T0 shift
-#endif
 
   Double_t meas [2];
   Double_t dmeas[2];

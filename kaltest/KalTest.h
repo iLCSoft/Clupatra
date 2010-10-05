@@ -40,17 +40,29 @@ public:
   
 /** Enums for identifying detectors
  */
-  typedef enum {
-    unknown = 0 ,
-    VXD =  1 ,
-    SIT =  2 ,
-    TPC =  3 ,
-    SET =  4 ,
-    ETD =  5 ,
-    FTD =  6 , // add new detecors here
-    DetectorID_Size ,
-    DetectorID_Factor = 10000 
-  } DetectorID ;
+  struct DetID {
+    static const int unknown = 0 ;
+    static const int VXD =  1 ;
+    static const int SIT =  2 ;
+    static const int TPC =  3 ;
+    static const int SET =  4 ;
+    static const int ETD =  5 ;
+    static const int FTD =  6 ; // add new detecors here
+    static const int Size = 7 ;
+    static const int Factor = 10000 ; 
+  } ;
+
+  // typedef enum {
+  //   unknown = 0 ,
+  //   VXD =  1 ,
+  //   SIT =  2 ,
+  //   TPC =  3 ,
+  //   SET =  4 ,
+  //   ETD =  5 ,
+  //   FTD =  6 , // add new detecors here
+  //   DetectorID_Size ,
+  //   DetectorID_Factor = 10000 
+  // } DetectorID ;
 
 
 
@@ -61,7 +73,7 @@ public:
   
   KalTrack* createKalTrack()  { return new KalTrack( _det ) ; }
 
-  int indexOfFirstLayer( DetectorID det) ;
+  int indexOfFirstLayer( int detectorID ) ;
 
 protected:
   void init() ;

@@ -1,6 +1,6 @@
 #include "KalTest.h"
 
- #include "TKalDetCradle.h"
+ #include "kaltest/TKalDetCradle.h"
 
 #include "EXVMeasLayer.h"
 #include "EXVTXKalDetector.h"
@@ -20,7 +20,7 @@
 
 KalTest::KalTest( const gear::GearMgr& gearMgr) :  
   _gearMgr( &gearMgr ) , 
-  _idOffsets(  DetectorID_Size , -1 ) {
+  _idOffsets(  DetID::Size , -1 ) {
   
   streamlog_out( DEBUG4 ) << "  KalTest - initializing the detector ..." << std::endl ;
   
@@ -58,7 +58,7 @@ void KalTest::init() {
   
 
   streamlog_out( DEBUG3 ) << " created TPC detector; layerOffset =  " 
-			  << indexOfFirstLayer( TPC ) 
+			  << indexOfFirstLayer( DetID::TPC ) 
 			  << std::endl ; 
 
 
@@ -71,24 +71,23 @@ void KalTest::init() {
   
 }
 
-int KalTest::indexOfFirstLayer( DetectorID det) { 
-
-  if( _idOffsets.at( det ) == -1 ){
-
+int KalTest::indexOfFirstLayer(int detID) { 
+  
+  if( _idOffsets.at( detID ) == -1 ){
+    
     int nDet = _det->GetEntriesFast() ;
-
-    int firstID = det * DetectorID_Factor ;
-
+    
+    int firstID = detID * DetID::Factor ;
+    
     for( int i=0  ; i < nDet ; ++i ){
-
-      if( dynamic_cast<EXVMeasLayer*>(_det->At( i ) )->getLayerID() == firstID  ){
+      
+      if( dynamic_cast<EXVMeasLayer*>( _det->At( i ) )->getLayerID() == firstID  ){
 	
-
-	_idOffsets[ det ] = i ;
+	_idOffsets[ detID ] = i ;
 	break ;
       }
     }
 
   }
-  return _idOffsets[ det] ; 
+  return _idOffsets[ detID ] ; 
  }
