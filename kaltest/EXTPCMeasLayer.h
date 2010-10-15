@@ -61,6 +61,8 @@ public:
 
   // Parent's pure virtuals that must be implemented
 
+  void setdEdx_GeV_cm( double dEdx ) { _dEdx = dEdx ; }
+
   virtual TKalMatrix XvToMv    (const TVTrackHit &ht,
                                 const TVector3   &xv)   const;
   virtual TKalMatrix XvToMv    (const TVector3   &xv,
@@ -82,6 +84,9 @@ public:
   Double_t GetSigmaX(Double_t z) const;
   Double_t GetSigmaZ(Double_t z) const;
 
+  /** Overwrite method from TVMeasLayer to use dEdx and from GEAR */
+  Double_t GetEnergyLoss( Bool_t isoutgoing, const TVTrack  &hel, Double_t  df) const ;
+
 private:
   Double_t fPhiMin;   // minimum phi
   Double_t fPhiMax;   // maximum phi
@@ -91,6 +96,8 @@ private:
   Double_t fSigmaZ1;  // z  resolution
   Int_t    fModule;   // module number
   Int_t    fLayer;    // layer  number
+  
+  double _dEdx ; // dEdx in GeV/cm 
 
   //  ClassDef(EXTPCMeasLayer, 1)  // User defined measurement layer class
 };

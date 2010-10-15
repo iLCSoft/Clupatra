@@ -23,6 +23,7 @@
 #include "UTIL/Operators.h"
 #include "lcio.h"
 
+
 #include "TObjArray.h"
 
 #include <math.h>
@@ -32,11 +33,20 @@
 
 //#define  streamlog_level( MLEVEL ) ( streamlog::out.would_write< streamlog::MLEVEL >() )
 
+/** helper function to restrict the range of the azimuthal angle to ]-pi,pi]*/
+inline double toBaseRange( double phi){
+  while( phi <= -M_PI ){  phi += 2. * M_PI ; }
+  while( phi >   M_PI ){  phi -= 2. * M_PI ; }
+  return phi ;
+}
+
+
 
 std::ostream& operator<<(std::ostream& o, const KalTrack& trk) {
 
   o << " track: \t" <<  trk._trk->GetEntriesFast() << std::endl ;
   // to be done ....
+  return o ;
 }
 
 
@@ -170,7 +180,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
   TVector3    x2 = h2.GetMeasLayer().HitToXv(h2);
   TVector3    x3 = h3.GetMeasLayer().HitToXv(h3);
 
-  double Bfield =   h1.GetBfield() ;
+  //  double Bfield =   h1.GetBfield() ;
 
   THelicalTrack helstart(x1, x2, x3, h1.GetBfield(), gkDir); // initial helix 
 
@@ -226,8 +236,56 @@ void KalTrack::fitTrack( bool fitDirection ) {
     }
   } // end of Kalman filter
 
+#define SMOOTH_BACK 1
+#if SMOOTH_BACK
+  //  Int_t isite = 1;
+  //  kaltrack.SmoothBackTo(isite);
+  kaltrack.SmoothAll();
+#endif
+  
+
+  double bla = chi2( *this , *this ) ;
 
 }
+
+
+double KalTrack::chi2( const KalTrack& t0 , const KalTrack& t1) {
+
+ const TKalTrackState& ts0 = t0.getTrackState() ; 
+ const TKalTrackState& ts1 = t1.getTrackState() ; 
+ 
+  TKalMatrix cov( ts0.GetCovMat().GetSub(0,4,0,4) ) ; 
+
+  TKalMatrix covInv( TKalMatrix::kInverted , cov ) ;
+
+  TKalMatrix s0( ts0.GetSub(0,4,0,0) );
+  TKalMatrix s1( ts1.GetSub(0,4,0,0) );
+
+  s0.DebugPrint() ;
+  s1.DebugPrint() ;
+
+  s1 -= s0 ;
+
+  TKalMatrix d0( covInv , TKalMatrix::kMult , s1 ) ;
+
+  TKalMatrix d1( s1 , TKalMatrix::kTransposeMult , d0 ) ;
+
+  covInv.DebugPrint() ;
+  d0.DebugPrint() ;
+  d1.DebugPrint() ;
+
+
+  return  d1(0,0)  ; 
+}
+ 
+
+TKalTrackState& KalTrack::getTrackState() const {
+  
+  TVKalSite& cursite = _trk->GetCurSite();
+  
+  return (TKalTrackState&) cursite.GetCurState() ;
+}
+
 
 void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
@@ -236,24 +294,25 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   // ---------------------------
   //  Smooth the track
   // ---------------------------
-#define SMOOTH_BACK 1
-#if SMOOTH_BACK
-  Int_t isite = 1;
-  //  kaltrack.SmoothBackTo(isite);
-  kaltrack.SmoothAll();
-  TVKalSite &cursite = static_cast<TVKalSite &>(*kaltrack[isite]);
-#else
+// #define SMOOTH_BACK 1
+// #if SMOOTH_BACK
+//   Int_t isite = 1;
+//   //  kaltrack.SmoothBackTo(isite);
+//   kaltrack.SmoothAll();
+//   TVKalSite &cursite = static_cast<TVKalSite &>(*kaltrack[isite]);
+// #else
+//   TVKalSite &cursite = kaltrack.GetCurSite();
+// #endif
+//   TVKalState& trkState = cursite.GetCurState() ;
+
+  TKalTrackState& trkState = getTrackState() ;
+
   TVKalSite &cursite = kaltrack.GetCurSite();
-#endif
 
-
-  TVKalState& trkState = cursite.GetCurState() ;
-
-  // dump fit result for now:
   Int_t    ndf  = kaltrack.GetNDF();
   Double_t chi2 = kaltrack.GetChi2();
   Double_t cl   = TMath::Prob(chi2, ndf);
-
+  
   //   Double_t dr   = trkState(0, 0); 
   //   Double_t fi0  = trkState(1, 0); 
   //   Double_t cpa  = trkState(2, 0);
@@ -265,12 +324,12 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   //============== convert parameters to LCIO convention ====
   
   //  ---- get parameters at origin 
-
-  THelicalTrack helix = ( (TKalTrackState&) trkState ).GetHelix() ;
+  
+  THelicalTrack helix = trkState.GetHelix() ;
   double dPhi ;
   helix.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , 0 ) ;
 
-  double phi       =          helix.GetPhi0()  + M_PI/2. ;
+  double phi       =    toBaseRange( helix.GetPhi0()  + M_PI/2. ) ;
   double omega     =    .1  / helix.GetRho()  ;              
   double d0        =  - 10. * helix.GetDrho() ;
   double z0        =    10. * helix.GetDz()   ;
@@ -294,7 +353,6 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   trk->setChi2( chi2 ) ;
 
-
   //covariance matrix in LCIO - stored as lower triangle matrix where the order of parameters is: 
   // d0, phi, omega, z0, tan(lambda). So we have cov(d0,d0), cov( phi, d0 ), cov( phi, phi), ...
 
@@ -304,38 +362,36 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   //   Double_t dz   = trkState(3, 0);
   //   Double_t tnl  = trkState(4, 0); 
 
-
   double alpha = omega / cpa  ;
-
 
   const TKalMatrix& covK = trkState.GetCovMat() ; 
   
+  // streamlog_out( DEBUG ) << " KalTrack::toLCIOTrack : returning covariance matrix : " << std::endl ;
+  // covK.DebugPrint() ;
+  
   EVENT::FloatVec cov( 15 )  ; 
-  cov[ 0] = covK( 0 , 0 )   ; //   d0,   d0
+  cov[ 0] = 100.*  covK( 0 , 0 )   ; //   d0,   d0
 
-  cov[ 1] = covK( 1 , 0 )   ; //   phi0, d0
-  cov[ 2] = covK( 1 , 1 )   ; //   phi0, phi
+  cov[ 1] =  -10.* covK( 1 , 0 )   ; //   phi0, d0
+  cov[ 2] =        covK( 1 , 1 )   ; //   phi0, phi
 
-  // FIXME: comvert kappa to omega ....
-  cov[ 3] = covK( 2 , 0 ) * alpha   ; //   omega, d0
-  cov[ 4] = covK( 2 , 1 ) * alpha   ; //   omega, phi
-  cov[ 5] = covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
+  cov[ 3] =  -10.* covK( 2 , 0 ) * alpha   ; //   omega, d0
+  cov[ 4] =        covK( 2 , 1 ) * alpha   ; //   omega, phi
+  cov[ 5] =        covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
 
-  cov[ 6] = covK( 3 , 0 )   ; //   z0  , d0
-  cov[ 7] = covK( 3 , 1 )   ; //   z0  , phi
-  cov[ 8] = covK( 3 , 2 )   ; //   z0  , omega
-  cov[ 9] = covK( 3 , 3 )   ; //   z0  , z0
+  cov[ 6] = -100.* covK( 3 , 0 )   ; //   z0  , d0
+  cov[ 7] =   10.* covK( 3 , 1 )   ; //   z0  , phi
+  cov[ 8] =   10.* covK( 3 , 2 ) * alpha   ; //   z0  , omega
+  cov[ 9] =  100.* covK( 3 , 3 )   ; //   z0  , z0
 
-  cov[10] = covK( 4 , 0 )   ; //   tanl, d0
-  cov[11] = covK( 4 , 1 )   ; //   tanl, phi
-  cov[12] = covK( 4 , 2 )   ; //   tanl, omega
-  cov[13] = covK( 4 , 3 )   ; //   tanl, z0
-  cov[14] = covK( 4 , 4 )   ; //   tanl, tanl
+  cov[10] = -10.* covK( 4 , 0 )   ; //   tanl, d0
+  cov[11] =       covK( 4 , 1 )   ; //   tanl, phi
+  cov[12] =       covK( 4 , 2 ) * alpha  ; //   tanl, omega
+  cov[13] =  10.* covK( 4 , 3 )   ; //   tanl, z0
+  cov[14] =       covK( 4 , 4 )   ; //   tanl, tanl
 
 
   trk->setCovMatrix( cov ) ;
-
-
 
   float pivot[3] ;
   pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;
@@ -348,11 +404,13 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 			 << " chi2/ndf " << chi2 / ndf  
     			 << " chi2 " <<  chi2 << std::endl 
 			 << " conv. level " << cl  
-    			 << "\t D0 " <<  d0 
-			 << "\t Phi :" << phi
-			 << "\t Omega " <<  omega
-			 << "\t Z0 " <<  z0
-			 << "\t tan(Lambda) " <<  tanLambda 
+
+    			 << "\t D0 "          <<  d0         <<  "[+/-" << sqrt( cov[0] ) << "] " 
+			 << "\t Phi :"        <<  phi        <<  "[+/-" << sqrt( cov[2] ) << "] " 
+			 << "\t Omega "       <<  omega      <<  "[+/-" << sqrt( cov[5] ) << "] " 
+			 << "\t Z0 "          <<  z0         <<  "[+/-" << sqrt( cov[9] ) << "] " 
+			 << "\t tan(Lambda) " <<  tanLambda  <<  "[+/-" << sqrt( cov[14]) << "] " 
+
 			 << "\t pivot : [" << pivot[0] << ", " << pivot[1] << ", "  << pivot[2] 
 			 << " - r: " << std::sqrt( pivot[0]*pivot[0]+pivot[1]*pivot[1] ) << "]" 
 			 << std::endl ;

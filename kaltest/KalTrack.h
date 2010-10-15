@@ -16,6 +16,7 @@ class TVector3 ;
 class TObjArray ;
 class TKalTrack ;
 class TKalDetCradle ;
+class TKalTrackState ;
 
 namespace IMPL{
   class TrackImpl ;
@@ -62,7 +63,15 @@ public:
   
   /** Add a faked hit to get track state at the IP */
   void addIPHit() ;
-  
+
+
+  /** Compute the chi2 ( (a0-a1)^t * cov0^-1 * (a0-a1) ) between two track states - using the covariance matrix of the first */ 
+  static double chi2( const KalTrack& t0 , const KalTrack& t1) ;
+
+
+  /** current track state */
+  TKalTrackState& getTrackState() const ;
+ 
   
   template <class T>
   void setCluster(T* cluster) {  _cluster = cluster ;  }

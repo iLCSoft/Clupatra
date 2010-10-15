@@ -20,6 +20,7 @@
 
 //#define USE_ZDRIFT 
 
+#include "kaltest/TKalTrack.h"    // from KalTrackLib
 
 #include "EXTPCMeasLayer.h"
 #include "EXTPCHit.h"
@@ -44,15 +45,16 @@ EXTPCMeasLayer::EXTPCMeasLayer(TMaterial &min,
                                Bool_t     type,
 			       int        layerID )
   : EXVMeasLayer(min, mout, type, layerID),
-                TCylinder(r0, lhalf),
-                fPhiMin(-TMath::Pi()/2),
-                fPhiMax(+TMath::Pi()/2),
-                fSigmaX0(sigmax0),
-                fSigmaX1(sigmax1),
-                fSigmaZ0(sigmaz0),
-                fSigmaZ1(sigmaz1),
-                fModule(-1),
-                fLayer(-1)
+    TCylinder(r0, lhalf),
+    fPhiMin(-TMath::Pi()/2),
+    fPhiMax(+TMath::Pi()/2),
+    fSigmaX0(sigmax0),
+    fSigmaX1(sigmax1),
+    fSigmaZ0(sigmaz0),
+    fSigmaZ1(sigmaz1),
+    fModule(-1),
+    fLayer(-1), 
+    _dEdx(0.0) 
 {
 
   //fg: don't think we need phiMin/Max:
@@ -76,15 +78,16 @@ EXTPCMeasLayer::EXTPCMeasLayer(TMaterial &min,
                                Int_t      module,
                                Int_t      layer)
   : EXVMeasLayer(min, mout, type , -1 ),
-                TCylinder(r0, lhalf, xc.X(), xc.Y(), xc.Z()),
-                fPhiMin(phimin),
-                fPhiMax(phimax),
-                fSigmaX0(sigmax0),
-                fSigmaX1(sigmax1),
-                fSigmaZ0(sigmaz0),
-                fSigmaZ1(sigmaz1),
-                fModule(module),
-                fLayer(layer)
+    TCylinder(r0, lhalf, xc.X(), xc.Y(), xc.Z()),
+    fPhiMin(phimin),
+    fPhiMax(phimax),
+    fSigmaX0(sigmax0),
+    fSigmaX1(sigmax1),
+    fSigmaZ0(sigmaz0),
+    fSigmaZ1(sigmaz1),
+    fModule(module),
+    fLayer(layer),
+    _dEdx(0.0) 
 {
 }
 
@@ -301,3 +304,68 @@ void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,
   hits.Add(new EXTPCHit(*this, meas, dmeas, side, v, xx, b));
 
  }
+
+
+Double_t EXTPCMeasLayer::GetEnergyLoss( Bool_t    isoutgoing,
+					const TVTrack  &hel,
+					Double_t  df) const
+{
+   Double_t cpa    = hel.GetKappa();
+   Double_t tnl    = hel.GetTanLambda(); 
+   Double_t tnl2   = tnl * tnl;
+   Double_t tnl21  = 1. + tnl2;
+   Double_t cslinv = TMath::Sqrt(tnl21);
+   Double_t mom2   = tnl21 / (cpa * cpa);
+
+   // // -----------------------------------------
+   // // Bethe-Bloch eq. (Physical Review D P195.)
+   // // -----------------------------------------
+   // static const Double_t kK   = 0.307075e-3;     // [GeV*cm^2]
+   //static const Double_t kMe  = 0.510998902e-3;  // electron mass [GeV]
+   static const Double_t kMpi = 0.13957018;      // pion mass [GeV]
+
+   TKalTrack *ktp  = static_cast<TKalTrack *>(TVKalSystem::GetCurInstancePtr());
+   Double_t   mass = ktp ? ktp->GetMass() : kMpi;
+
+   // const TMaterial &mat = GetMaterial(isoutgoing);
+   // Double_t dnsty = mat.GetDensity();		// density
+   // Double_t A     = mat.GetA();                 // atomic mass
+   // Double_t Z     = mat.GetZ();                 // atomic number
+   // //Double_t I    = Z * 1.e-8;			// mean excitation energy [GeV]
+   // //Double_t I    = (2.4 +Z) * 1.e-8;		// mean excitation energy [GeV]
+   // Double_t I    = (9.76 * Z + 58.8 * TMath::Power(Z, -0.19)) * 1.e-9;
+   // Double_t hwp  = 28.816 * TMath::Sqrt(dnsty * Z/A) * 1.e-9;
+   // Double_t bg2  = mom2 / (mass * mass);
+   // Double_t gm2  = 1. + bg2;
+   // Double_t meM  = kMe / mass;
+   // Double_t x    = log10(TMath::Sqrt(bg2));
+   // Double_t C0   = - (2. * log(I/hwp) + 1.);
+   // Double_t a    = -C0/27.;
+   // Double_t del;
+   // if (x >= 3.)            del = 4.606 * x + C0;
+   // else if (0.<=x && x<3.) del = 4.606 * x + C0 + a * TMath::Power(3.-x, 3.);
+   // else                    del = 0.;
+   // Double_t tmax = 2.*kMe*bg2 / (1. + meM*(2.*TMath::Sqrt(gm2) + meM)); 
+   // Double_t dedx = kK * Z/A * gm2/bg2 * (0.5*log(2.*kMe*bg2*tmax / (I*I))
+   //               - bg2/gm2 - del);
+
+   Double_t path = hel.IsInB()
+                 ? TMath::Abs(hel.GetRho()*df)*cslinv
+                 : TMath::Abs(df)*cslinv;
+   
+   //Double_t edep = dedx * dnsty * path;
+
+   Double_t edep = _dEdx * path;
+
+   streamlog_out( DEBUG ) << " dEdx - energy loss " <<  edep << " path lengths: " << path << " dEdx: " << _dEdx << std::endl ;
+
+
+   Double_t cpaa = TMath::Sqrt(tnl21 / (mom2 + edep
+                 * (edep + 2. * TMath::Sqrt(mom2 + mass * mass))));
+   Double_t dcpa = TMath::Abs(cpa) - cpaa;
+
+   static const Bool_t kForward  = kTRUE;
+   static const Bool_t kBackward = kFALSE;
+   Bool_t isfwd = ((cpa > 0 && df < 0) || (cpa <= 0 && df > 0)) ? kForward : kBackward;
+   return isfwd ? (cpa > 0 ? dcpa : -dcpa) : (cpa > 0 ? -dcpa : dcpa);
+}

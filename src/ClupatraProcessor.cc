@@ -874,8 +874,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCFlagImpl trkFlag(0) ;
   trkFlag.setBit( LCIO::TRBIT_HITS ) ;
   kaltracks->setFlag( trkFlag.getFlag()  ) ;
-
   evt->addCollection( kaltracks , "KalTestTracks" ) ;
+
 
   std::list< KalTrack* > ktracks ;
 
@@ -883,9 +883,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
 
-
   std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
-
 
 
   //=========== assign left over hits ... ==================================================================
@@ -962,7 +960,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //*********************************************************
   //   end running KalTest on circle segments-------------------------------------------------------
   //*********************************************************
-
 
   //========  create collections of used and unused TPC hits ===========================================
   LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
@@ -1059,19 +1056,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   clock_t end = clock () ; 
   
+
   streamlog_out( DEBUG )  << "---  clustering time: " 
  			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
-
-
-
-
-  //   // test ....
-  //   char* name="clupatra" ;
-  //   char* nevt="10" ;
-  //   char * argv[2] ;
-  //   argv[0] = name ;
-  //   argv[1] = nevt ;
-  //   EXKalTest ( 2 , argv ) ;
 
 }
 

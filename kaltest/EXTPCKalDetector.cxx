@@ -147,7 +147,7 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   Bool_t active = EXTPCMeasLayer::kActive;
   Bool_t dummy  = EXTPCMeasLayer::kDummy;
   
-  //FIXME - test:  add a layer for the beam pipe 
+  //FIXME - test:  add a layer inside the beam pipe 
   Add(new EXTPCMeasLayer(air, air, 1.2 , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , -1 )) ;  // ,ss.str().data()));
 
 
@@ -157,14 +157,23 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   // create measurement layers
   Double_t r = rmin;
 
+  static const double gasdEdx  =  tpcParams.getDoubleVal("TPCGasProperties_dEdx") / cm  ; 
+  
+  streamlog_out( DEBUG ) << " using dEdx for TPC gas : " << gasdEdx << " Gev/cm " << std::endl ;
+
 
   for (Int_t layer = 0; layer < nlayers; layer++) {
     
     int layerID = KalTest::DetID::TPC * KalTest::DetID::Factor  + layer ;
     
-    Add(new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID ) ) ;  
+    EXTPCMeasLayer* tpcL =  new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID ) ;
+
+    tpcL->setdEdx_GeV_cm(  gasdEdx  ) ;
+
+    Add( tpcL ) ;  
     
-    if( streamlog_level( DEBUG0 ) && layer % 10 == 0 ){
+    //    if( streamlog_level( DEBUG0 ) &&
+    if( layer % 10 == 0 ){
       
       streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer + layerID  <<  "] at R = " << r << std::endl ;
     }
