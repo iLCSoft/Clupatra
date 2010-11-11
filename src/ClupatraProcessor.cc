@@ -35,7 +35,6 @@ using namespace marlin ;
 typedef GenericCluster<TrackerHit> HitCluster ;
 typedef GenericHit<TrackerHit> Hit ;
 
-void  doBLA() ;
 
 // delete helper
 template<class P>  void delete_ptr(P* p) { delete p;}
@@ -72,9 +71,12 @@ struct HitInfo : LCOwnedExtension<HitInfo, HitInfoStruct> {} ;
 //------------------------------------------------------
 // function to extract position for Kaltest (in cm):
 TVector3 hitPosition( Hit* h)  { 
-  return TVector3( h->first->getPosition()[0] *.1 ,   // convert to cm ...
-		   h->first->getPosition()[1] *.1 ,
-		   h->first->getPosition()[2] *.1 ) ; 
+  return TVector3( h->first->getPosition()[0],   
+  		   h->first->getPosition()[1],
+  		   h->first->getPosition()[2]  ) ; 
+  // return TVector3( h->first->getPosition()[0] *.1 ,   // convert to cm ...
+  // 		   h->first->getPosition()[1] *.1 ,
+  // 		   h->first->getPosition()[2] *.1 ) ; 
 }   
 
 // function to extract layerID from generic Hit:
@@ -575,7 +577,6 @@ void ClupatraProcessor::processRunHeader( LCRunHeader* run) {
 
 void ClupatraProcessor::processEvent( LCEvent * evt ) { 
 
-  doBLA() ;
 
   clock_t start =  clock() ; 
 
@@ -619,6 +620,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
       th->ext<HitInfo>()->layerID = padLayout.getRowNumber( padIndex ) ;
       
+
+      //      std::cout << " layer ID " <<  th->ext<HitInfo>()->layerID << " ..... " << th->getType() << std::endl ;
+
       //       //--- for fixed sized rows this would also work...
       //       float rMin = padLayout.getPlaneExtent()[0] ;
       //       float rMax = padLayout.getPlaneExtent()[1] ;
@@ -871,14 +875,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
   LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
-  LCFlagImpl trkFlag(0) ;
-  trkFlag.setBit( LCIO::TRBIT_HITS ) ;
-  kaltracks->setFlag( trkFlag.getFlag()  ) ;
+  // LCFlagImpl trkFlag(0) ;
+  // trkFlag.setBit( LCIO::TRBIT_HITS ) ;
+  // kaltracks->setFlag( trkFlag.getFlag()  ) ;
   evt->addCollection( kaltracks , "KalTestTracks" ) ;
 
 
   std::list< KalTrack* > ktracks ;
 
+  //  KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward > fitter( _kalTest ) ;
   KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
     
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
@@ -941,6 +946,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   std::list< KalTrack* > newKTracks ;
 
+  //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
   KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
@@ -960,6 +966,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //*********************************************************
   //   end running KalTest on circle segments-------------------------------------------------------
   //*********************************************************
+
 
   //========  create collections of used and unused TPC hits ===========================================
   LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
@@ -1123,17 +1130,28 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
     oddCol->setSubset( true ) ;
 
-    LCIterator<Track> trIt( evt, "CluTrackSegments" ) ;
+    LCCollectionVec* splitCol = new LCCollectionVec( LCIO::TRACK ) ;
+    splitCol->setSubset( true ) ;
+    
+    typedef std::map<Track* , unsigned > TRKMAP ; 
+    
+    typedef std::map< MCParticle* , TRKMAP > MCPTRKMAP ;
+    MCPTRKMAP mcpTrkMap ;
+    
+    typedef std::map< MCParticle* , unsigned > MCPMAP ;
+    MCPMAP hitMap ;
+    
+    LCIterator<Track> trIt( evt, "KalTestTracks" ) ;
     //    LCIterator<Track> trIt( evt, _outColName ) ;
     //    LCIterator<Track> trIt( evt, "TPCTracks" ) ;
     while( Track* tr = trIt.next()  ){
-
-      typedef std::map< MCParticle* , unsigned > MCPMAP ;
+      
       MCPMAP mcpMap ;
 
       const TrackerHitVec& thv = tr->getTrackerHits() ;
       typedef TrackerHitVec::const_iterator THI ;
 
+      // get relation between mcparticles and tracks
       for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
 
 	TrackerHit* th = *it ;
@@ -1142,10 +1160,17 @@ void ClupatraProcessor::check( LCEvent * evt ) {
 	// but of course the proper way is to go through the LCRelation ...
 	SimTrackerHit* sh = (SimTrackerHit*) th->getRawHits()[0] ;
 	MCParticle* mcp = sh->getMCParticle() ;
-	mcpMap[ mcp ]++ ;
 
+	
+	hitMap[ mcp ] ++ ;   // count all hits from this mcp
+	
+	mcpMap[ mcp ]++ ;    // count hits from this mcp for this track
+	
+	mcpTrkMap[ mcp ][ tr ]++ ;  // map between mcp, tracks and hits
+	
       } 
 
+      // check for tracks with hits from several mcparticles
       unsigned nHit = thv.size() ;
       unsigned maxHit = 0 ; 
       for( MCPMAP::iterator it= mcpMap.begin() ;
@@ -1164,6 +1189,87 @@ void ClupatraProcessor::check( LCEvent * evt ) {
       }
     }
     evt->addCollection( oddCol , "OddMCPTracks" ) ;
+
+    streamlog_out( DEBUG ) << " checking for split tracks - mcptrkmap size : " <<  mcpTrkMap.size() << std::endl ;
+
+    // check for split tracks 
+    for( MCPTRKMAP::iterator it0 = mcpTrkMap.begin() ; it0 != mcpTrkMap.end() ; ++it0){
+      
+      streamlog_out( DEBUG ) << " checking for split tracks - map size : " <<  it0->second.size() << std::endl ;
+
+
+      if( it0->second.size() > 1 ) {
+
+
+	typedef std::list< EVENT::Track* > TL ;
+	TL trkList ;
+
+	for( TRKMAP::iterator it1 = it0->second.begin() ; it1 != it0->second.end() ; ++it1){
+	    
+	  double totalHits = hitMap[ it0->first ]  ; // total hits for this track 
+
+	  double thisMCPHits = it1->second ;     //  hits from this mcp
+
+	  double ratio =  thisMCPHits / totalHits  ;
+
+	  streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
+				 << totalHits << " / " << thisMCPHits << " = " << ratio << std::endl ;
+
+	  if( ratio > 0.03 && ratio < 0.95 ){
+	    // split track
+
+	    splitCol->addElement( it1->first ) ; 
+
+	    trkList.push_back( it1->first ) ;
+	  } 
+	}
+
+	streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
+
+	for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
+	  
+
+	  KalTrack* trk0 = (*it0)->ext<KalTrackLink>() ; 
+	  
+	  HelixClass hel ;
+	  hel.Initialize_Canonical( (*it0)->getPhi(),
+				    (*it0)->getD0(),
+				    (*it0)->getZ0(),
+				    (*it0)->getOmega(),
+				    (*it0)->getTanLambda(),
+				    3.50 ) ;
+
+	  streamlog_out( DEBUG1 ) << hel.getXC() << "\t"
+				  << hel.getYC() << "\t"
+				  << hel.getRadius() << "\t" 
+				  << hel.getTanLambda() << std::endl ; 
+	  
+
+	  // streamlog_out( DEBUG1 ) << (*it0)->getPhi() << "\t"
+	  // 			  << (*it0)->getD0()  << "\t"
+	  // 			  << (*it0)->getOmega()  << "\t"
+	  // 			  << (*it0)->getZ0()  << "\t"
+	  // 			  << (*it0)->getTanLambda()  << "\t"
+	  // 			  << std::endl ;
+
+	  for( TL::iterator it1 =  trkList.begin() ; it1 != trkList.end() ; ++it1 ){
+	    
+	    KalTrack* trk1 = (*it1)->ext<KalTrackLink>() ; 
+	    
+	    double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
+
+	    // streamlog_out( DEBUG1 ) << "  chi2 between split tracks : " 
+	    // 			    << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
+
+	    
+	  }
+	}
+
+      }
+    }
+    evt->addCollection( splitCol , "SplitTracks" ) ;
+    
+
   }
   //====================================================================================
 
@@ -1256,6 +1362,3 @@ ClusterSegment* fitCircle(HitCluster* c){
 }
 
 
-void  doBLA() {
-  streamlog_out( DEBUG ) << " doBla() called  " << std::endl ;
-}

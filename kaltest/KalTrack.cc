@@ -1,5 +1,7 @@
 #include "KalTrack.h"
 
+//#include "LCIOTTree.h" 
+
 #include "kaltest/TKalTrackState.h"
 #include "kaltest/TKalTrackSite.h"
 #include "kaltest/TVTrackHit.h"
@@ -198,7 +200,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
   static TKalMatrix C(kSdim,kSdim);
   for (Int_t i=0; i<kSdim; i++) {
-    C(i,i) = 1.e4;   // dummy error matrix
+    C(i,i) = 1.e6;   // dummy error matrix
   }
 
   sited.Add(new TKalTrackState(svd,C,sited,TVKalSite::kPredicted));
@@ -236,7 +238,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
     }
   } // end of Kalman filter
 
-#define SMOOTH_BACK 1
+#define SMOOTH_BACK 0
 #if SMOOTH_BACK
   //  Int_t isite = 1;
   //  kaltrack.SmoothBackTo(isite);
@@ -244,7 +246,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
 #endif
   
 
-  double bla = chi2( *this , *this ) ;
+  //  double bla = chi2( *this , *this ) ;
 
 }
 
@@ -253,29 +255,40 @@ double KalTrack::chi2( const KalTrack& t0 , const KalTrack& t1) {
 
  const TKalTrackState& ts0 = t0.getTrackState() ; 
  const TKalTrackState& ts1 = t1.getTrackState() ; 
- 
-  TKalMatrix cov( ts0.GetCovMat().GetSub(0,4,0,4) ) ; 
 
-  TKalMatrix covInv( TKalMatrix::kInverted , cov ) ;
+ TKalMatrix cov  = ts0.GetCovMat() ;
 
-  TKalMatrix s0( ts0.GetSub(0,4,0,0) );
-  TKalMatrix s1( ts1.GetSub(0,4,0,0) );
+ double chi2( 0.0 ) ;
 
-  s0.DebugPrint() ;
-  s1.DebugPrint() ;
+ for(int i=0; i<5 ; ++i ) {
 
-  s1 -= s0 ;
+   double diff2 = ( ts0(i,0) - ts1(i,0 ) ) ; 
 
-  TKalMatrix d0( covInv , TKalMatrix::kMult , s1 ) ;
+   //   std::cout << " diff : " << i <<  " : " <<  diff2  << " - cov() " << cov(i,i)  << std::endl ;
 
-  TKalMatrix d1( s1 , TKalMatrix::kTransposeMult , d0 ) ;
+   diff2 *= diff2 ;
 
-  covInv.DebugPrint() ;
-  d0.DebugPrint() ;
-  d1.DebugPrint() ;
+   chi2 +=  diff2 / cov( i , i ) ;
+
+ } 
+
+ return chi2 ;
 
 
-  return  d1(0,0)  ; 
+ // ===== compute 'proper' chi2  ===== DOESN'T WORK :(
+  // TKalMatrix cov( ts0.GetCovMat().GetSub(0,4,0,4) ) ; 
+  // TKalMatrix covInv( TKalMatrix::kInverted , cov ) ;
+  // TKalMatrix s0( ts0.GetSub(0,4,0,0) );
+  // TKalMatrix s1( ts1.GetSub(0,4,0,0) );
+  // // s0.DebugPrint() ;
+  // // s1.DebugPrint() ;
+  // s1 -= s0 ;
+  // TKalMatrix d0( covInv , TKalMatrix::kMult , s1 ) ;
+  // TKalMatrix d1( s1 , TKalMatrix::kTransposeMult , d0 ) ;
+  // // covInv.DebugPrint() ;
+  // // d0.DebugPrint() ;
+  // // d1.DebugPrint() ;
+  // return  d1(0,0)  ; 
 }
  
 
@@ -291,19 +304,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   TKalTrack& kaltrack = *_trk ;
   
-  // ---------------------------
-  //  Smooth the track
-  // ---------------------------
-// #define SMOOTH_BACK 1
-// #if SMOOTH_BACK
-//   Int_t isite = 1;
-//   //  kaltrack.SmoothBackTo(isite);
-//   kaltrack.SmoothAll();
-//   TVKalSite &cursite = static_cast<TVKalSite &>(*kaltrack[isite]);
-// #else
-//   TVKalSite &cursite = kaltrack.GetCurSite();
-// #endif
-//   TVKalState& trkState = cursite.GetCurState() ;
+  trk->ext< KalTrackLink >() = this ; // link this KalTrack to LCIO track 
 
   TKalTrackState& trkState = getTrackState() ;
 
@@ -329,17 +330,18 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   double dPhi ;
   helix.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , 0 ) ;
 
-  double phi       =    toBaseRange( helix.GetPhi0()  + M_PI/2. ) ;
-  double omega     =    .1  / helix.GetRho()  ;              
-  double d0        =  - 10. * helix.GetDrho() ;
-  double z0        =    10. * helix.GetDz()   ;
-  double tanLambda =    helix.GetTanLambda()  ;
+  // double phi       =    toBaseRange( helix.GetPhi0()  - M_PI/2. ) ;
+  // double omega     =   -1. /helix.GetRho()  ;              
+  // double d0        =    helix.GetDrho() ; 
+  // double z0        =    helix.GetDz()   ;
+  // double tanLambda =   -helix.GetTanLambda()  ;
 
-  // double phi       =          helix.GetPhi0()  - M_PI/2. ;
-  // double omega     =  - .1  / helix.GetRho()  ;              
-  // double d0        =    10. * helix.GetDrho() ;
-  // double z0        =    10. * helix.GetDz()   ;
-  // double tanLambda =  - helix.GetTanLambda()  ;
+  //  this is for incomming tracks ...
+  double phi       =    toBaseRange( helix.GetPhi0() + M_PI/2. ) ;
+  double omega     =    1. /helix.GetRho()  ;              
+  double d0        =  - helix.GetDrho() ; 
+  double z0        =    helix.GetDz()   ;
+  double tanLambda =    helix.GetTanLambda()  ;
 
   //=========================================================
 
@@ -366,37 +368,62 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   const TKalMatrix& covK = trkState.GetCovMat() ; 
   
-  // streamlog_out( DEBUG ) << " KalTrack::toLCIOTrack : returning covariance matrix : " << std::endl ;
-  // covK.DebugPrint() ;
-  
+  if( streamlog_level( DEBUG ) ) {
+    streamlog_out( DEBUG ) << " KalTrack::toLCIOTrack : returning covariance matrix :  - alpha : " << alpha << std::endl ;
+    covK.DebugPrint() ;
+  }
+
   EVENT::FloatVec cov( 15 )  ; 
-  cov[ 0] = 100.*  covK( 0 , 0 )   ; //   d0,   d0
+  cov[ 0] =   covK( 0 , 0 )   ; //   d0,   d0
 
-  cov[ 1] =  -10.* covK( 1 , 0 )   ; //   phi0, d0
-  cov[ 2] =        covK( 1 , 1 )   ; //   phi0, phi
+  cov[ 1] = - covK( 1 , 0 )   ; //   phi0, d0
+  cov[ 2] =   covK( 1 , 1 )   ; //   phi0, phi
 
-  cov[ 3] =  -10.* covK( 2 , 0 ) * alpha   ; //   omega, d0
-  cov[ 4] =        covK( 2 , 1 ) * alpha   ; //   omega, phi
-  cov[ 5] =        covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
+  cov[ 3] = - covK( 2 , 0 ) * alpha   ; //   omega, d0
+  cov[ 4] =   covK( 2 , 1 ) * alpha   ; //   omega, phi
+  cov[ 5] =   covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
 
-  cov[ 6] = -100.* covK( 3 , 0 )   ; //   z0  , d0
-  cov[ 7] =   10.* covK( 3 , 1 )   ; //   z0  , phi
-  cov[ 8] =   10.* covK( 3 , 2 ) * alpha   ; //   z0  , omega
-  cov[ 9] =  100.* covK( 3 , 3 )   ; //   z0  , z0
+  cov[ 6] = - covK( 3 , 0 )   ; //   z0  , d0
+  cov[ 7] =   covK( 3 , 1 )   ; //   z0  , phi
+  cov[ 8] =   covK( 3 , 2 ) * alpha   ; //   z0  , omega
+  cov[ 9] =   covK( 3 , 3 )   ; //   z0  , z0
 
-  cov[10] = -10.* covK( 4 , 0 )   ; //   tanl, d0
-  cov[11] =       covK( 4 , 1 )   ; //   tanl, phi
-  cov[12] =       covK( 4 , 2 ) * alpha  ; //   tanl, omega
-  cov[13] =  10.* covK( 4 , 3 )   ; //   tanl, z0
-  cov[14] =       covK( 4 , 4 )   ; //   tanl, tanl
+  cov[10] = - covK( 4 , 0 )   ; //   tanl, d0
+  cov[11] =   covK( 4 , 1 )   ; //   tanl, phi
+  cov[12] =   covK( 4 , 2 ) * alpha  ; //   tanl, omega
+  cov[13] =   covK( 4 , 3 )   ; //   tanl, z0
+  cov[14] =   covK( 4 , 4 )   ; //   tanl, tanl
+
+  // cov[ 0] = 100.*  covK( 0 , 0 )   ; //   d0,   d0
+  // cov[ 1] =  -10.* covK( 1 , 0 )   ; //   phi0, d0
+  // cov[ 2] =        covK( 1 , 1 )   ; //   phi0, phi
+
+  // cov[ 3] =  -10.* covK( 2 , 0 ) * alpha   ; //   omega, d0
+  // cov[ 4] =        covK( 2 , 1 ) * alpha   ; //   omega, phi
+  // cov[ 5] =        covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
+
+  // cov[ 6] = -100.* covK( 3 , 0 )   ; //   z0  , d0
+  // cov[ 7] =   10.* covK( 3 , 1 )   ; //   z0  , phi
+  // cov[ 8] =   10.* covK( 3 , 2 ) * alpha   ; //   z0  , omega
+  // cov[ 9] =  100.* covK( 3 , 3 )   ; //   z0  , z0
+
+  // cov[10] = -10.* covK( 4 , 0 )   ; //   tanl, d0
+  // cov[11] =       covK( 4 , 1 )   ; //   tanl, phi
+  // cov[12] =       covK( 4 , 2 ) * alpha  ; //   tanl, omega
+  // cov[13] =  10.* covK( 4 , 3 )   ; //   tanl, z0
+  // cov[14] =       covK( 4 , 4 )   ; //   tanl, tanl
 
 
   trk->setCovMatrix( cov ) ;
 
   float pivot[3] ;
-  pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;
-  pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) * 10. ;
-  pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) * 10. ;
+  pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) ;
+  pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) ;
+  pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) ;
+
+  // pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;
+  // pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) * 10. ;
+  // pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) * 10. ;
 
   trk->setReferencePoint( pivot ) ;
 
@@ -416,6 +443,8 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 			 << std::endl ;
 
   //  streamlog_out( DEBUG ) << kaltrack << std::endl ;
+
+  trk->setNdf( ndf ) ;
 
 
   streamlog_out( DEBUG ) << lcio::header( *trk ) << std::endl ;
@@ -492,9 +521,12 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
     
     TVector3 pv = helix.CalcXAt( phiStart ) ; 
     double pos[3] ;
-    pos[0] = pv[0] *10. ;
-    pos[1] = pv[1] *10. ;
-    pos[2] = pv[2] *10. ;
+    pos[0] = pv[0] ;
+    pos[1] = pv[1] ;
+    pos[2] = pv[2] ;
+    // pos[0] = pv[0] *10. ;
+    // pos[1] = pv[1] *10. ;
+    // pos[2] = pv[2] *10. ;
     
     phiStart += deltaPhi ;
     
@@ -550,8 +582,8 @@ void KalTrack::findXingPoints() {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      //      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
-      _xingPts[ idx ] = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )   ;
+      //      _xingPts[ idx ] = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )   ;
+      _xingPts[ idx ] = new  gear::Vector3D( xx[0] , xx[1] , xx[2] )   ;
 
       --idx ;
       
@@ -590,8 +622,8 @@ void KalTrack::findXingPoints() {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      //      _xingPts.push_back( std::make_pair( idx , gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 ) ) )  ;
-      _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )  ;
+      _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1], xx[2] )  ;
+      // _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )  ;
 
       ++idx ;
       

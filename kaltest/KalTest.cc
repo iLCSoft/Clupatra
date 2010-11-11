@@ -46,7 +46,8 @@ void KalTest::init() {
   EXVTXKalDetector* vtxdet = new EXVTXKalDetector ;
   EXTPCKalDetector* tpcdet = new EXTPCKalDetector( tpcParams )  ;
   
-  tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z() * 10 ) ; // 10 for Tesla -> kGauss
+  tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z()  ) ; //  Tesla 
+  //  tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z() * 10 ) ; // 10 for Tesla -> kGauss
 
  
  
@@ -66,8 +67,8 @@ void KalTest::init() {
   vtxdet->PowerOff();       // power off vtx not to process hit
   
   // --- possible options :
-  //_det->SwitchOffMS();    // switch off multiple scattering
-  //_det->SwitchOffDEDX();  // switch off enery loss
+  // _det->SwitchOffMS();    // switch off multiple scattering
+  // _det->SwitchOffDEDX();  // switch off enery loss
   
 }
 

@@ -90,11 +90,6 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   //fg: get as many parameters from GEAR as possible ...
   const gear::PadRowLayout2D& pL = tpcParams.getPadLayout() ; 
 
-  static const double cm = 0.1 ; // conversion from mm to cm
-  //  fgVdrift = tpcParam.getDriftVelocity() * cm //fg: this is not set in current gear files ! ???  
-
-
-
   Double_t A, Z, density, radlen;
   A       = 14.00674 * 0.7 + 15.9994 * 0.3;
   Z       = 7.3;
@@ -119,20 +114,20 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
 
   
   static const Int_t    nlayers   =  pL.getNRows() ;   // n rows
-  static const Double_t lhalf     =  tpcParams.getMaxDriftLength() * cm  ;    // 255. // half length
+  static const Double_t lhalf     =  tpcParams.getMaxDriftLength() ;    // 255. // half length
 
-  static const Double_t rstep     =  pL.getRowHeight(0) * cm    ;   // 0.76775;       // step length of radius
+  static const Double_t rstep     =  pL.getRowHeight(0) ;   // 0.76775;       // step length of radius
 
   // assuming that this is the radius of the first measurment layer ....
-  static const Double_t rmin      =  tpcParams.getPlaneExtent()[0] * cm  + rstep/2. ;  // 44.215;        // minimum radius
+  static const Double_t rmin      =  tpcParams.getPlaneExtent()[0]   + rstep/2. ;  // 44.215;        // minimum radius
 
   streamlog_out( DEBUG4 ) << tpcParams << std::endl ;
   
-  static const Double_t rtub      = tpcParams.getDoubleVal("tpcInnerRadius") * cm  ; // 39.5; // inner r of support tube
-  static const Double_t outerr    = tpcParams.getDoubleVal("tpcOuterRadius") * cm  ; //206.; // outer radius of TPC
+  static const Double_t rtub      = tpcParams.getDoubleVal("tpcInnerRadius")  ; // 39.5; // inner r of support tube
+  static const Double_t outerr    = tpcParams.getDoubleVal("tpcOuterRadius")  ; //206.; // outer radius of TPC
 
-  static const Double_t inthick   =  tpcParams.getDoubleVal("tpcInnerWallThickness") * cm  ; //2.1075 * 2.;   // thick of inner shell
-  static const Double_t outthick  =  tpcParams.getDoubleVal("tpcOuterWallThickness") * cm  ; //4.1175 * 2.;   // thick of outer shell
+  static const Double_t inthick   =  tpcParams.getDoubleVal("tpcInnerWallThickness")  ; //2.1075 * 2.;   // thick of inner shell
+  static const Double_t outthick  =  tpcParams.getDoubleVal("tpcOuterWallThickness")  ; //4.1175 * 2.;   // thick of outer shell
   
 
   static const Double_t sigmax0   = .02 ; // 55.e-4;
@@ -157,9 +152,9 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   // create measurement layers
   Double_t r = rmin;
 
-  static const double gasdEdx  =  tpcParams.getDoubleVal("TPCGasProperties_dEdx") / cm  ; 
+  static const double gasdEdx  =  tpcParams.getDoubleVal("TPCGasProperties_dEdx")  ; 
   
-  streamlog_out( DEBUG ) << " using dEdx for TPC gas : " << gasdEdx << " Gev/cm " << std::endl ;
+  streamlog_out( DEBUG ) << " using dEdx for TPC gas : " << gasdEdx << " Gev/mm " << std::endl ;
 
 
   for (Int_t layer = 0; layer < nlayers; layer++) {
@@ -168,7 +163,7 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
     
     EXTPCMeasLayer* tpcL =  new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID ) ;
 
-    tpcL->setdEdx_GeV_cm(  gasdEdx  ) ;
+    tpcL->setdEdx_GeV_mm(  gasdEdx  ) ;
 
     Add( tpcL ) ;  
     

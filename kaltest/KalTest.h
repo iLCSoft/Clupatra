@@ -53,19 +53,6 @@ public:
     static const int Factor = 10000 ; 
   } ;
 
-  // typedef enum {
-  //   unknown = 0 ,
-  //   VXD =  1 ,
-  //   SIT =  2 ,
-  //   TPC =  3 ,
-  //   SET =  4 ,
-  //   ETD =  5 ,
-  //   FTD =  6 , // add new detecors here
-  //   DetectorID_Size ,
-  //   DetectorID_Factor = 10000 
-  // } DetectorID ;
-
-
 
   /** Default c'tor, initializes the geometry from GEAR. */
   KalTest( const gear::GearMgr& gearMgr) ;

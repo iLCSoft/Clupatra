@@ -61,7 +61,7 @@ public:
 
   // Parent's pure virtuals that must be implemented
 
-  void setdEdx_GeV_cm( double dEdx ) { _dEdx = dEdx ; }
+  void setdEdx_GeV_mm( double dEdx ) { _dEdx = dEdx ; }
 
   virtual TKalMatrix XvToMv    (const TVTrackHit &ht,
                                 const TVector3   &xv)   const;
@@ -97,7 +97,7 @@ private:
   Int_t    fModule;   // module number
   Int_t    fLayer;    // layer  number
   
-  double _dEdx ; // dEdx in GeV/cm 
+  double _dEdx ; // dEdx in GeV/mm 
 
   //  ClassDef(EXTPCMeasLayer, 1)  // User defined measurement layer class
 };

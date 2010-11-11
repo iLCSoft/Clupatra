@@ -10,7 +10,8 @@
 //#include "TVector3.h"
 
 #include <gearimpl/Vectors.h>
-
+//#include "LCRTRelations.h"
+#include "EVENT/LCObject.h"
 
 class TVector3 ;
 class TObjArray ;
@@ -32,6 +33,11 @@ std::ostream& operator<<(std::ostream& o, const KalTrack& trk) ;
 
 //typedef std::list< std::pair< int, gear::Vector3D> > PointList ;
 typedef std::vector< gear::Vector3D* > PointList ;
+
+
+
+struct KalTrackLink : EVENT::LCExtension< KalTrackLink, KalTrack> {} ;
+
 
 
 /** Track class for pat rec and track fitting with KalTest */

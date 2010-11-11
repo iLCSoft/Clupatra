@@ -29,6 +29,7 @@
 #include "TMath.h"
 #include <cmath>
 
+#include "EVENT/TrackerHit.h"
 
 #include "streamlog/streamlog.h"
 
@@ -237,10 +238,16 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
   //fg: we need zdrift here ! 
   Double_t zDrift   =  GetLength() * 0.5 - std::abs( d )  ;
 
-  Double_t dx = GetSigmaX( zDrift );
-  Double_t dz = GetSigmaZ( zDrift );
-//   Double_t dx = GetSigmaX(d);
-//   Double_t dz = GetSigmaZ(d);
+
+  // Double_t dx = GetSigmaX( zDrift );
+  // Double_t dz = GetSigmaZ( zDrift );
+
+  //   Double_t dx = GetSigmaX(d);
+  //   Double_t dz = GetSigmaZ(d);
+
+  // use errors stored in LCIO hit
+  double dx = sqrt( hit->getCovMatrix()[0] + hit->getCovMatrix()[2] );
+  double dz = sqrt( hit->getCovMatrix()[5] );
 
   Double_t v = EXTPCKalDetector::GetVdrift();
 
@@ -260,6 +267,7 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
   dmeas[0] = dx;
   dmeas[1] = dz;
 
+
   Double_t b = EXTPCKalDetector::GetBfield();
   hits.Add(new EXTPCHit(*this, meas, dmeas, side, v , hit, b  ));
 
@@ -271,7 +279,8 @@ void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,
 			       TObjArray  &hits) {
   
   
-  static const double epsilon = 0.0001 ; // 1 micron 
+  //  static const double epsilon = 0.0001 ; // 1 micron 
+  static const double epsilon = 0.001 ; // 1 micron 
   
   Int_t      side = (xx.Z() < 0. ? -1 : 1);
   TKalMatrix h    = XvToMv(xx, side);
