@@ -101,7 +101,8 @@ TKalMatrix EXTPCHit::XvToMv(const TVector3 &xv, Double_t t0) const
   while (dphi >  kPi) dphi -= kTwoPi;
 
   h(0, 0)  = r * (phim + dphi);
-  h(1, 0) += fVdrift * t0;
+  //  h(1, 0) += fVdrift * t0;
+  // h(1,0)   += 0. ;
 
   return h;
 }

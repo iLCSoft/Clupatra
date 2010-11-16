@@ -103,6 +103,15 @@ AnaTrack::AnaTrack() : Processor("AnaTrack") {
 			   _relColName ,
 			   std::string("TrackRelation" ) ) ;
   
+  FloatVec ptRange ;
+  ptRange.push_back( 45. ) ;
+  ptRange.push_back( 55. ) ;
+
+  registerProcessorParameter( "PtRange" , 
+			      "Min and max value of pt range [GeV]"  ,
+			      _ptRange ,
+			      ptRange ) ;
+  
 }
 
 
@@ -110,6 +119,13 @@ void AnaTrack::init() {
 
   // usually a good idea to
   printParameters() ;
+
+
+  if( _ptRange.size() != 2 ) {
+
+    throw Exception("AnaTrack::init()  processor parameter 'ptRange' needs to have two values (min and max pt in GeV)" ) ;
+  }
+
 
   _nRun = 0 ;
   _nEvt = 0 ;
@@ -130,6 +146,11 @@ void AnaTrack::processEvent( LCEvent * evt ) {
   static const double alpha =  2.99792458e-4 * bField ;  ;
   // p_t[GeV] = alpha / omega[mm] ;
 
+  static const double ptMin = _ptRange[0] ;
+  static const double ptMax = _ptRange[1] ;
+
+  static double ptMean = ( ptMax + ptMin ) / 2. ;
+
 
   //----------------------------------------------------------------------
   Histograms h(_h1) ;
@@ -141,19 +162,28 @@ void AnaTrack::processEvent( LCEvent * evt ) {
     
     _h1.resize( AnaTrackHistos::Size ) ;
     
+    static const int nBin = 50 ;
+
+    //  define binning for pt and omega
+    double ptBinL  = ptMin - ( ptMax - ptMin ) / 10.  ;
+    double ptBinH  = ptMax + ( ptMax - ptMin ) / 10.  ;
+    double omBinL  = alpha / ptBinH ;
+    double omBinH  = alpha / ptBinL ;
+    
+
     h.create( hd0,    "hd0"    ) ; 
     h.create( hphi,   "hphi"   ) ; 
-    h.create( homega, "homega" , "omega*mm" , 50, 0.0003 , 0.0004 ) ; 
-    h.create( hz0,    "hz0" , " z0 /mm  " , 50 , -3. , 3. ) ; 
+    h.create( homega, "homega" ,"omega*mm" , nBin ,omBinL ,  omBinH ) ;
+    h.create( hz0,    "hz0" , " z0 /mm  " , nBin , -3. , 3. ) ; 
     h.create( htanL,  "htanL"  ) ; 
-    h.create( hpt,    "hpt"  ) ; 
+    h.create( hpt,    "hpt"  , "pt/GeV" , nBin , ptBinL , ptBinH ) ; 
 
     h.create( hd0mcp,    "hd0mcp"    ) ; 
     h.create( hphimcp,   "hphimcp"   ) ; 
-    h.create( homegamcp, "homegamcp" , "omega*mm" , 50, 0.0003 , 0.0004 ) ; 
+    h.create( homegamcp, "homegamcp" ,"omega*mm" , nBin ,omBinL ,  omBinH ) ;  //, "omega*mm" , 50, 0.0003 , 0.0004 ) ; 
     h.create( hz0mcp,    "hz0mcp" ) ; //, " z0 /mm  " , 50 , -3. , 3. ) ; 
     h.create( htanLmcp,  "htanLmcp"  ) ; 
-    h.create( hptmcp,    "hptmcp"  ) ; 
+    h.create( hptmcp,    "hptmcp" , "pt/GeV" , nBin , ptBinL , ptBinH ) ;
     
     h.create( hed0,    "hed0"    ) ; 
     h.create( hephi,   "hephi"   ) ; 
@@ -162,12 +192,12 @@ void AnaTrack::processEvent( LCEvent * evt ) {
     h.create( hetanL,  "hetanL"  ) ; 
     h.create( hept,    "hept"  ) ; 
 
-    h.create( hpd0,    "hpd0"    ) ; 
-    h.create( hpphi,   "hpphi"   ) ; 
-    h.create( hpomega, "hpomega" ) ;
-    h.create( hpz0,    "hpz0"    ) ;
-    h.create( hptanL,  "hptanL"  ) ; 
-    h.create( hppt,    "hppt"  ) ; 
+    h.create( hpd0,    "hpd0"    , "d0 pull   ", 50 , -5. , 5. ) ; 
+    h.create( hpphi,   "hpphi"   , "phi pull  ", 50 , -5. , 5. ) ; 
+    h.create( hpomega, "hpomega" , "omega pull", 50 , -5. , 5. ) ;
+    h.create( hpz0,    "hpz0"    , "z0 pull   ", 50 , -5. , 5. ) ;
+    h.create( hptanL,  "hptanL"  , "tanL pull ", 50 , -5. , 5. ) ; 
+    h.create( hppt,    "hppt"    , "pt pull   ", 50 , -5. , 5. ) ; 
 
     h.create( hdd0,    "hdd0"    ) ; 
     h.create( hdphi,   "hdphi"   ) ; 
@@ -243,8 +273,10 @@ void AnaTrack::processEvent( LCEvent * evt ) {
 
     APPLY_CUT( cut,  tr->getChi2() / tr->getNdf() < 3. ) ;
 
-    if( cut == true ){
+    APPLY_CUT( cut, (ptMin < ptmcp && ptmcp < ptMax ) ) ;
 
+
+    if( cut == true ){
 
       double dd0 = d0 - d0mcp ;
       double dph = ph - phmcp ; 
@@ -272,7 +304,9 @@ void AnaTrack::processEvent( LCEvent * evt ) {
       h.fill( homegamcp, ommcp ) ;
       h.fill( hz0mcp,    z0mcp ) ;
       h.fill( htanLmcp,  tLmcp ) ;
+      h.fill( hptmcp,    ptmcp ) ;
 
+   
       h.fill( hdd0,    dd0 ) ;
       h.fill( hdphi,   dph ) ;
       h.fill( hdomega, dom ) ;

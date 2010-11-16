@@ -23,30 +23,40 @@ EXVTXKalDetector::EXVTXKalDetector(Int_t m)
    radlen  = 9.36;
    TMaterial &si = *new TMaterial("VTXSi", "", A, Z, density, radlen, 0.);
 
-   static const Int_t    nlayers   = 4;
-   static const Double_t lhalf     = 5.;
-   static const Double_t lhalfstep = 2.5;
-   static const Double_t rmin      = 2.4;
-   static const Double_t rstep     = 1.2;
-   static const Double_t thick     = 0.033;
-                                                                                
-   static const Double_t sigmax    = 4.e-4;
-   static const Double_t sigmaz    = 4.e-4;
 
+   //fg: create a toy model that reflects ILD_00 parameters  for VXD and SIT
+   static const Int_t nLayers   = 8 ;
+   static float radius[nLayers] = {  16.  ,  18.  ,  37.  ,  39. ,  58. ,  60. ,  165.    , 309.    } ;
+   static float length[nLayers] = {  62.5 ,  62.5 , 125.  , 125. , 125. , 125. ,  371.3   , 644.9   } ;
+   static float thick[nLayers] =  {    .1 ,    .1 ,    .1 ,    .1,    .1,    .1,     .275 ,    .275 } ;
+   
+   
+   // static const Double_t lhalf     = 5. ;
+   // static const Double_t lhalfstep = 2.5 ;
+   
+   // static const Double_t rmin      = 2.4 ;
+   // static const Double_t rstep     = 1.2 ;
+   //   static const Double_t thick     =  0.100 ;  //fg: take 100 mu Si to include support    0.033 ;
+   
+   static const Double_t sigmax    = 4.e-4 ;
+   static const Double_t sigmaz    = 4.e-4 ;
+   
    Bool_t active = EXVTXMeasLayer::kActive;
    Bool_t dummy  = EXVTXMeasLayer::kDummy;
-
+   
    // create measurement layers of central tracker
-   Double_t r   = rmin;
-   Double_t len = lhalf;
-   for (Int_t layer=0; layer < nlayers; layer++) {
-      std::stringstream ss;
-      ss << "VTX" << layer << std::ends;
-      Add(new EXVTXMeasLayer(air, si, r, len, sigmax, sigmaz, active, ss.str().data()));
-      Add(new EXVTXMeasLayer(si, air, r + thick, len, sigmax, sigmaz, dummy));
-      len += lhalfstep;
-      r += rstep;
+   // Double_t r   = rmin;
+   // Double_t len = lhalf;
+   
+   for (Int_t layer=0; layer < nLayers; layer++) {
+     std::stringstream ss;
+     ss << "VTX" << layer << std::ends;
+     
+     Add(new EXVTXMeasLayer(air, si, radius[layer]               ,  length[layer] , sigmax, sigmaz, active, ss.str().data()));
+     Add(new EXVTXMeasLayer(si, air, radius[layer] + thick[layer],  length[layer] , sigmax, sigmaz, dummy));
+     
    }
+   
    SetOwner();
 }
 

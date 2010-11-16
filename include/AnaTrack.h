@@ -54,6 +54,8 @@ class AnaTrack : public Processor {
   std::string _relColName ;
 
   std::vector< TH1* > _h1 ;
+  
+  FloatVec _ptRange ;
 
   int _nRun ;
   int _nEvt ;

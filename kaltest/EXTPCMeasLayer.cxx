@@ -184,7 +184,7 @@ void EXTPCMeasLayer::CalcDhDa(const TVTrackHit &vht,
     H(0, i) *= GetR();
 
 #ifdef USE_ZDRIFT
-    H(1, i)  = - ht.GetSide() * dxphiada(2, i);
+    H(1, i)  = - ht.GetSide() * dxphiada(2, i); 
 #else
     H(1, i)  = dxphiada(2, i);
 #endif
@@ -192,11 +192,11 @@ void EXTPCMeasLayer::CalcDhDa(const TVTrackHit &vht,
   if (sdim == 6) {
     H(0, sdim - 1) = 0.;
 
-#if 0
-    H(1, sdim - 1) = ht.GetVdrift();
-#else
-    H(1, sdim - 1) = - ht.GetVdrift();
-#endif
+// #if 0
+//     H(1, sdim - 1) = ht.GetVdrift();
+// #else
+//     H(1, sdim - 1) = - ht.GetVdrift();
+// #endif
   }
 }
 

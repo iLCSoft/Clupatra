@@ -103,12 +103,17 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   radlen  =  1.196e4*2;
   TMaterial &gas = *new TMaterial("TPCGas", "", A, Z, density, radlen, 0.);
   
-  A       = 12.0107;
-  Z       =  6.;
-  density = 0.1317;
-  radlen  =  tpcParams.getDoubleVal("TPCWallProperties_RadLen")  ; // 42.7/density;
-  TMaterial &cfrp = *new TMaterial("TPCCFRP", "", A, Z, density, radlen, 0.);
+  // A       = 12.0107;
+  // Z       =  6.;
+  // density = 0.1317;
+  // radlen  =  tpcParams.getDoubleVal("TPCWallProperties_RadLen")  ; // 42.7/density;
+  // TMaterial &cfrp = *new TMaterial("TPCCFRP", "", A, Z, density, radlen, 0.);
   
+  A       = 26.9815386 ;
+  Z       =  13. ;
+  density =  2.699 ;
+  radlen  =  tpcParams.getDoubleVal("TPCWallProperties_RadLen")  / 10.  ; 
+  TMaterial &al = *new TMaterial("TPCAl", "", A, Z, density, radlen, 0.);
 
   // FIXME: need to adjust the dEDx through A and density ....
 
@@ -146,8 +151,8 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   Add(new EXTPCMeasLayer(air, air, 1.2 , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , -1 )) ;  // ,ss.str().data()));
 
 
-  Add(new EXTPCMeasLayer(air, cfrp, rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
-  Add(new EXTPCMeasLayer(cfrp, gas, rtub+inthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,dummy, -1 ));
+  Add(new EXTPCMeasLayer(air, al , rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
+  Add(new EXTPCMeasLayer(al , gas, rtub+inthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,dummy, -1 ));
   
   // create measurement layers
   Double_t r = rmin;
@@ -175,8 +180,8 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
     
     r += rstep;
   }
-  Add(new EXTPCMeasLayer(gas, cfrp, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,  dummy, -1 ));
-  Add(new EXTPCMeasLayer(cfrp, air, outerr, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
+  Add(new EXTPCMeasLayer(gas, al, outerr-outthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,  dummy, -1 ));
+  Add(new EXTPCMeasLayer(al, air, outerr, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
   
   SetOwner();
 }
