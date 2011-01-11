@@ -16,6 +16,8 @@
 #include "EVENT/SimTrackerHit.h"
 #include "IMPL/LCFlagImpl.h"
 #include "UTIL/Operators.h"
+#include "UTIL/LCTOOLS.h"
+
 
 //---- GEAR ----
 #include "marlin/Global.h"
@@ -33,7 +35,23 @@ using namespace marlin ;
 
 
 typedef GenericCluster<TrackerHit> HitCluster ;
-typedef GenericHit<TrackerHit> Hit ;
+typedef GenericHit<TrackerHit>     Hit ;
+typedef GenericHitVec<TrackerHit>  HitVec ;
+
+
+// copy_if (missing from STL)
+template <class In, class Out, class Pred> Out copy_if(In first, In last, Out res, Pred p){
+  
+  while( first != last ){
+
+    if( p( *first) ){
+
+      *res++ = first ;
+      ++first ;
+    }
+  }
+  return res ;
+}
 
 
 // delete helper
@@ -69,14 +87,11 @@ struct HitInfo : LCOwnedExtension<HitInfo, HitInfoStruct> {} ;
 
 
 //------------------------------------------------------
-// function to extract position for Kaltest (in cm):
+// function to extract position for Kaltest:
 TVector3 hitPosition( Hit* h)  { 
   return TVector3( h->first->getPosition()[0],   
   		   h->first->getPosition()[1],
   		   h->first->getPosition()[2]  ) ; 
-  // return TVector3( h->first->getPosition()[0] *.1 ,   // convert to cm ...
-  // 		   h->first->getPosition()[1] *.1 ,
-  // 		   h->first->getPosition()[2] *.1 ) ; 
 }   
 
 // function to extract layerID from generic Hit:
@@ -93,11 +108,6 @@ public:
 
 struct LCIOTrackerHit{ EVENT::TrackerHit* operator()( Hit* h) { return h->first ; }   } ;
 
-// class HitLayerID{
-//   int _id ;
-//   HitLayerID<Offset>(int id) : _id( id ) {}
-//   bool operator()(const Hit* h){ return hitLayerID<Offset>(h) == _id ; } 
-// } ;
 
 //---------------------------------------------------
 // helper for sorting cluster wrt layerID
@@ -139,68 +149,6 @@ void delete_elements(T* t) { delete t ; }
 
 //-------------------------------
 
-/** Simple predicate class for applying an r cut to the objects of type T.
- *  Requires float T::getR().
- */
-template <class T>
-class RCut{
-public:
-  RCut( double rcut ) : _rcut( rcut ) {}  
-  
-  // bool operator() (T* hit) {  // DEBUG ....
-  //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
-  bool operator() (T* hit) {  
-    return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-    			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
-  }
-protected:
-  RCut() {} ;
-  double _rcut ;
-} ;
-//---------------------------------------------------------------------------------
-struct ClusterSegment{
-  double X ;
-  double Y ;
-  double R ;
-  double ChiS ;
-  double Bz ;
-  double Phi0 ;
-  double ZMin ;
-  double ZMax ;
-  //   double D0 ;
-  //   double Z0 ;
-  //   double Omega ;
-  //   double TanLambda ;
-  //   double tanPhi0 ;
-  HitCluster* Cluster ;
-  void dump(){
-    std::cout << " ----- cluster segment: "
-      // 	      << "\t" << " D0  " << this->D0
-      // 	      << "\t" << " Z0  " << this->Z0
-      // 	      << "\t" << " Omega  " << this->Omega
-      // 	      << "\t" << " TanLambda  " << this->TanLambda
-      // 	      << "\t" << " tanPhi0  " << this->tanPhi0
-	      << "\t" << " R " << this->R 
-	      << "\t" << "X: " << this->X 
-	      << "\t" << "Y: " << this->Y
-	      << "\t" << "ChiS: " << this->ChiS 
-	      << "\t" << "ZMin: " << this->ZMin
-	      << "\t" << "ZMax: " << this->ZMax
-	      << std::endl ;
-  }
-};
-
-ClusterSegment* fitCircle(HitCluster* c) ;
-
-/** Helper class that does a 2d circle fit on cluster segemts */
-struct CircleFitter{
-  ClusterSegment* operator() (HitCluster* c) {  
-    ClusterSegment* s =  fitCircle( c ) ;
-      
-    return s ;
-    //return fitCircle( c ) ;
-  }
-};
 //-------------------------------------------------------------------------
 template <bool HitOrder, bool FitOrder, bool PropagateIP=false>
 
@@ -249,53 +197,22 @@ struct KalTrack2LCIO{
 };
 
 //-------------------------------------------------------------------------
-
-
-struct SortSegmentsWRTRadius {
-  bool operator() (const ClusterSegment* c1, const ClusterSegment* c2) {
-    return c1->R < c2->R ;
-  }
-};
-
-class SegmentDistance{
-  typedef ClusterSegment HitClass ;
-  typedef double PosType ;
+template <class T>
+class RCut {
 public:
-
-  /** Required typedef for cluster algorithm 
-   */
-  typedef HitClass hit_type ;
-
-  /** C'tor takes merge distance */
-  SegmentDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut){} 
-
-  /** Merge condition: ... */
-  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
-    
-    if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-
-    double r1 = h0->first->R ;
-    double r2 = h1->first->R ;
-    double x1 = h0->first->X ;
-    double x2 = h1->first->X ;
-    double y1 = h0->first->Y ;
-    double y2 = h1->first->Y ;
-
-    //     //------- don't merge hits from same layer !
-    //     if( h0->first->ext<HitInfo>()->layerID == h1->first->ext<HitInfo>()->layerID )
-    //       return false ;
-    double dr = 2. * std::abs( r1 -r2 ) / (r1 + r2 ) ; 
-    
-    double distMS = ( x1 - x2 ) * ( x1 - x2 ) + ( y1 - y2 ) * ( y1 - y2 ) ;
- 
-
-    return ( dr < 0.1 && distMS < _dCutSquared ) ;
-  }
+  RCut( double rcut ) : _rcut( rcut ) {}  
   
+  // bool operator() (T* hit) {  // DEBUG ....
+  //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
+  bool operator() (T* hit) {  
+    return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
+			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
+  }
 protected:
-  float _dCutSquared ;
-  float _dCut ;
+  RCut() {} ;
+  double _rcut ;
 } ;
+
 //---------------------------------------------------------------------------------
 
 /** Predicate class for identifying clusters with duplicate pad rows - returns true
@@ -443,70 +360,10 @@ struct LCIOTrack{
     trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
  
     // FIXME - these are no meaningfull tracks - just a test for clustering tracker hits
-    
     return trk ;
   }
 
 } ;
-
-struct LCIOTrackFromSegment{
-  
-  lcio::Track* operator() (ClusterSegment* s) {  
-    
-    TrackImpl* trk = new TrackImpl ;
-    
-    double e = 0.0 ;
-    int nHit = 0 ;
-
-    double zpos = 0.0 ;
-    for( HitCluster::iterator hi = s->Cluster->begin(); hi != s->Cluster->end() ; hi++) {
-      
-      TrackerHit* th =  (*hi)->first  ; 
-      trk->addHit( th ) ;
-      e +=  th->getEDep() ;
-      zpos = th->getPosition()[2] ; 
-      nHit++ ;
-    }
-
-   
-    trk->setdEdx( e/nHit ) ;
-    trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
-
-    // -------- get track parameters from helix fit:
-    HelixClass * helix = new HelixClass();
-    //    helix->Initialize_BZ(x0, y0, r0,  bz, phi0, _bField, signPz, zBegin);
-
-    double signPz = zpos / std::abs( zpos ) ;
-    helix->Initialize_BZ( s->X, s->Y, s->R , s->Bz, s->Phi0,  3.5 , signPz, s->ZMin);
-
-    trk->setChi2( s->ChiS ) ;
-
-    trk->setD0( helix->getD0() ) ;
-    trk->setPhi( helix->getPhi0() ) ;
-    trk->setOmega( helix->getOmega() ) ;
-    trk->setZ0( helix->getZ0() ) ;
-    trk->setTanLambda( helix->getTanLambda() ) ;
-    
-    //   float x0 = par[0];
-    //   float y0 = par[1];
-    //   float r0 = par[2];
-    //   float bz = par[3];
-    //   float phi0 = par[4];
-
-    //   HelixClass * helix = new HelixClass();
-    //   helix->Initialize_BZ(x0, y0, r0, 
-    // 		       bz, phi0, _bField,signPz,
-    // 		       zBegin);
-    //   std::cout << "Track " << iclust << " ;  d0 = " << helix->getD0()
-    // 	    << " ; z0 = " << helix->getZ0() 
-    // 	    << " ; omega = " << helix->getOmega() 
- 
-    delete helix ;    
-    return trk ;
-  }
-
-} ;
-
 
 
 ClupatraProcessor aClupatraProcessor ;
@@ -551,9 +408,9 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			      (float) 0.01 ) ;
 
   registerProcessorParameter( "RCut" , 
-			      "Cut for r_min in mm"  ,
-			      _rCut ,
-			      (float) 0.0 ) ;
+ 			      "Cut for r_min in mm"  ,
+ 			      _rCut ,
+ 			      (float) 0.0 ) ;
   
 }
 
@@ -577,11 +434,8 @@ void ClupatraProcessor::processRunHeader( LCRunHeader* run) {
 
 void ClupatraProcessor::processEvent( LCEvent * evt ) { 
 
-
   clock_t start =  clock() ; 
 
-  LCCollectionVec* lcioTracks = new LCCollectionVec( LCIO::TRACK )  ;
-  
   GenericHitVec<TrackerHit> h ;
   
   GenericClusterVec<TrackerHit> cluList ;
@@ -644,6 +498,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     TrackerHitCast cast ;
     ZSort zsort ;
     std::transform(  col->begin(), col->end(), std::back_inserter( hitList ), cast ) ;
+
     hitList.sort( zsort ) ;
     //    std::for_each( hitList.begin() , hitList.end() , printZ ) ;
 
@@ -747,8 +602,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   evt->addCollection( oddCol3 , "OddClu_3" ) ;
 
 
-  
-
   for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
     (*it)->takeHits( std::back_inserter( oddHits )  ) ;
     delete (*it) ;
@@ -842,43 +695,35 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   //================================================================================
    
-  // create vecor with left over hits in each layer
+  // create vecor with left over hits
   std::vector< Hit* > leftOverHits ;
   leftOverHits.reserve(  h.size() ) ;
 
-  typedef GenericHitVec<TrackerHit>::const_iterator GHVI ;
+  typedef HitVec::const_iterator GHVI ;
 
-  for( GHVI it = h.begin(); it != h.end() ;++it){
+  for( GHVI it = h.begin(); it != h.end() ; ++it ){
 
-    if( (*it)->second == 0 ){
-
-      leftOverHits.push_back( *it ) ;
-    }
+    if ( (*it)->second == 0 ) leftOverHits.push_back( *it ) ;
   }
-
-  //============ now try reclustering with circle segments ======================
+  
   GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
 
-  std::list< ClusterSegment* > segs ;
-  
-  // fit circles (helices actually) to the cluster segments...
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( segs ) , CircleFitter() ) ;
-
 
   //*********************************************************
-  //   try  to run KalTest on circle segments ------------------------------------------------------
+  //   run KalTest on track segments (clusters)
   //*********************************************************
-  //  LCIOTrackFromSegment segToTrack ;
 
   streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
 			 << std::endl ;
 
 
   LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
+
   // LCFlagImpl trkFlag(0) ;
   // trkFlag.setBit( LCIO::TRBIT_HITS ) ;
   // kaltracks->setFlag( trkFlag.getFlag()  ) ;
-  evt->addCollection( kaltracks , "KalTestTracks" ) ;
+
+  //  evt->addCollection( kaltracks , "KalTestTracks" ) ;
 
 
   std::list< KalTrack* > ktracks ;
@@ -887,16 +732,16 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
     
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
-
+  
   std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
-
-
+  
+  
   //=========== assign left over hits ... ==================================================================
   
   Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
-
+  
   HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
-
+  
   for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
     
     Hit* hit = *ih ;
@@ -922,9 +767,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
 
     if( bestTrk ) {
-
+      
       const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
-
+      
       if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
 	
 	HitCluster* clu = bestTrk->getCluster< HitCluster >() ;
@@ -947,6 +792,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::list< KalTrack* > newKTracks ;
 
   //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
+
   KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
@@ -954,17 +800,14 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
 
-
-
   //========== cleanup KalTracks ========
   std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
   std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
-
   //=====================================
 
 
   //*********************************************************
-  //   end running KalTest on circle segments-------------------------------------------------------
+  //   end running KalTest on track segments-------------------------------------------------------
   //*********************************************************
 
 
@@ -989,84 +832,16 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //========================================================================================================
 
 
-  segs.sort( SortSegmentsWRTRadius() ) ;
 
-  // DEBUG output :
-  //std::for_each( segs.begin(), segs.end() , std::mem_fun( &ClusterSegment::dump )  ) ; 
-
-  GenericHitVec< ClusterSegment > segclu ;
-  GenericClusterVec< ClusterSegment > mergedSegs ;
-  
-  double _circleCenterDist = 30. ; // FIXME make proc para
-  SegmentDistance segDist( _circleCenterDist )  ; 
- 
-  addToGenericHitVec( segclu , segs.begin(), segs.end(), AllwaysTrue() , NullIndex() ) ;
-
-  cluster( segclu.begin(), segclu.end(), std::back_inserter( mergedSegs ), &segDist, 2 ) ;
- 
-  // now merge the corresponding hit lists...
-
-  for( GenericClusterVec< ClusterSegment >::iterator it = mergedSegs.begin() ;
-       it != mergedSegs.end() ; ++it){
-
-    streamlog_out( DEBUG)  <<  " ===== merged segments =========" << std::endl ;
-
-    GenericCluster<ClusterSegment>::iterator si = (*it)->begin() ;
-   
-    ClusterSegment* merged = (*si)->first  ;
-
-    // merged->dump() ;
-
-    ++si ;
-
-    while( si != (*it)->end() ){
-
-      ClusterSegment* seg = (*si)->first ;
-      //      seg->dump() ;
-
-      merged->Cluster->merge(  *seg->Cluster ) ;
-
-      ++si ;
-    } 
-    mergedClusters.push_back( merged->Cluster ) ; 
-
-    streamlog_out( DEBUG) <<  " ===== " << std::endl ;
-
-  }
-
-  LCCollectionVec* mergeCol = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( mergedClusters.begin(), mergedClusters.end(), std::back_inserter( *mergeCol ) , converter ) ;
-  evt->addCollection( mergeCol , "MergedTrackSegments" ) ;
-  mergedClusters.clear() ;
-
-  //============ end reclustering with circle segments ===========================
-
- 
-  //====== no fit the new merged clusters ================================
-
-  // clean up segment lists
-  std::for_each( segs.begin(), segs.end(), delete_elements<ClusterSegment> ) ;
-  segs.clear() ;
- 
-  // fit circles (helices actually) to the merged cluster segments...
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( segs ) , CircleFitter() ) ;
-
-  // create "lcio::Tracks" from the clustered TrackerHits
-  //   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *lcioTracks ) , converter ) ;
-
-  std::transform( segs.begin(), segs.end(), std::back_inserter( *lcioTracks ) , LCIOTrackFromSegment() ) ;
-
-  evt->addCollection( lcioTracks , _outColName ) ;
-  
+  evt->addCollection( kaltracks , _outColName ) ;
   
   _nEvt ++ ;
 
   clock_t end = clock () ; 
   
-
   streamlog_out( DEBUG )  << "---  clustering time: " 
  			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
-
+  
 }
 
 
@@ -1078,6 +853,8 @@ void ClupatraProcessor::check( LCEvent * evt ) {
 
   bool checkForDuplicatePadRows =  true ;
   bool checkForMCTruth =  true ;
+
+  bool checkForSplitTracks =  false ; // WARNING: this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
 
   streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
 
@@ -1094,8 +871,10 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
     oddCol->setSubset( true ) ;
     // try iterator class ...
+
     LCIterator<Track> trIt( evt, _outColName ) ;
     while( Track* tr = trIt.next()  ){
+
       
       // check for duplicate layer numbers
       std::vector<int> hitsInLayer( pL.getNRows() ) ; 
@@ -1141,6 +920,9 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     typedef std::map< MCParticle* , unsigned > MCPMAP ;
     MCPMAP hitMap ;
     
+    LCTOOLS::printTracks( evt->getCollection("KalTestTracks") ) ;
+
+
     LCIterator<Track> trIt( evt, "KalTestTracks" ) ;
     //    LCIterator<Track> trIt( evt, _outColName ) ;
     //    LCIterator<Track> trIt( evt, "TPCTracks" ) ;
@@ -1190,85 +972,96 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     }
     evt->addCollection( oddCol , "OddMCPTracks" ) ;
 
-    streamlog_out( DEBUG ) << " checking for split tracks - mcptrkmap size : " <<  mcpTrkMap.size() << std::endl ;
-
-    // check for split tracks 
-    for( MCPTRKMAP::iterator it0 = mcpTrkMap.begin() ; it0 != mcpTrkMap.end() ; ++it0){
+  
+    if( checkForSplitTracks ) {
       
-      streamlog_out( DEBUG ) << " checking for split tracks - map size : " <<  it0->second.size() << std::endl ;
-
-
-      if( it0->second.size() > 1 ) {
-
-
-	typedef std::list< EVENT::Track* > TL ;
-	TL trkList ;
-
-	for( TRKMAP::iterator it1 = it0->second.begin() ; it1 != it0->second.end() ; ++it1){
-	    
-	  double totalHits = hitMap[ it0->first ]  ; // total hits for this track 
-
-	  double thisMCPHits = it1->second ;     //  hits from this mcp
-
-	  double ratio =  thisMCPHits / totalHits  ;
-
-	  streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
-				 << totalHits << " / " << thisMCPHits << " = " << ratio << std::endl ;
-
-	  if( ratio > 0.03 && ratio < 0.95 ){
-	    // split track
-
-	    splitCol->addElement( it1->first ) ; 
-
-	    trkList.push_back( it1->first ) ;
-	  } 
-	}
-
-	streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
-
-	for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
+      streamlog_out( DEBUG ) << " checking for split tracks - mcptrkmap size : " <<  mcpTrkMap.size() << std::endl ;
+      
+      // check for split tracks 
+      for( MCPTRKMAP::iterator it0 = mcpTrkMap.begin() ; it0 != mcpTrkMap.end() ; ++it0){
+	
+	streamlog_out( DEBUG ) << " checking for split tracks - map size : " <<  it0->second.size() << std::endl ;
+	
+	
+	if( it0->second.size() > 1 ) {
 	  
-
-	  KalTrack* trk0 = (*it0)->ext<KalTrackLink>() ; 
 	  
-	  HelixClass hel ;
-	  hel.Initialize_Canonical( (*it0)->getPhi(),
-				    (*it0)->getD0(),
-				    (*it0)->getZ0(),
-				    (*it0)->getOmega(),
-				    (*it0)->getTanLambda(),
-				    3.50 ) ;
-
-	  streamlog_out( DEBUG1 ) << hel.getXC() << "\t"
-				  << hel.getYC() << "\t"
-				  << hel.getRadius() << "\t" 
-				  << hel.getTanLambda() << std::endl ; 
+	  typedef std::list< EVENT::Track* > TL ;
+	  TL trkList ;
 	  
-
-	  // streamlog_out( DEBUG1 ) << (*it0)->getPhi() << "\t"
-	  // 			  << (*it0)->getD0()  << "\t"
-	  // 			  << (*it0)->getOmega()  << "\t"
-	  // 			  << (*it0)->getZ0()  << "\t"
-	  // 			  << (*it0)->getTanLambda()  << "\t"
-	  // 			  << std::endl ;
-
-	  for( TL::iterator it1 =  trkList.begin() ; it1 != trkList.end() ; ++it1 ){
+	  for( TRKMAP::iterator it1 = it0->second.begin() ; it1 != it0->second.end() ; ++it1){
 	    
-	    KalTrack* trk1 = (*it1)->ext<KalTrackLink>() ; 
+	    double totalHits = hitMap[ it0->first ]  ; // total hits for this track 
 	    
-	    double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
-
-	    // streamlog_out( DEBUG1 ) << "  chi2 between split tracks : " 
-	    // 			    << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
-
+	    double thisMCPHits = it1->second ;     //  hits from this mcp
 	    
+	    double ratio =  thisMCPHits / totalHits  ;
+	    
+	    streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
+				   << thisMCPHits << " / " << totalHits << " = " << ratio << std::endl ;
+	    
+	    if( ratio > 0.03 && ratio < 0.95 ){
+	      // split track
+	      
+	      splitCol->addElement( it1->first ) ; 
+	      
+	      trkList.push_back( it1->first ) ;
+	    } 
 	  }
+	  
+	  streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
+	  
+	  for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
+	    
+	    
+	    KalTrack* trk0 = (*it0)->ext<KalTrackLink>() ; 
+	    
+	    HelixClass hel ;
+	    hel.Initialize_Canonical( (*it0)->getPhi(),
+				      (*it0)->getD0(),
+				      (*it0)->getZ0(),
+				      (*it0)->getOmega(),
+				      (*it0)->getTanLambda(),
+				      3.50 ) ;
+	    
+	    streamlog_out( DEBUG1 ) << hel.getXC() << "\t"
+				    << hel.getYC() << "\t"
+				    << hel.getRadius() << "\t" 
+				    << hel.getTanLambda() << std::endl ; 
+	    
+	    
+	    // streamlog_out( DEBUG1 ) << (*it0)->getPhi() << "\t"
+	    // 			  << (*it0)->getD0()  << "\t"
+	    // 			  << (*it0)->getOmega()  << "\t"
+	    // 			  << (*it0)->getZ0()  << "\t"
+	    // 			  << (*it0)->getTanLambda()  << "\t"
+	    // 			  << std::endl ;
+	    
+	    streamlog_out( DEBUG1 ) << " trk0 : " << *trk0 << std::endl ;
+	    
+	    TL::iterator its = it0 ;
+	    ++its ;
+	    
+	    for( TL::iterator it1 =  its ; it1 != trkList.end() ; ++it1 ){
+	      
+	      KalTrack* trk1 = (*it1)->ext<KalTrackLink>() ; 
+	      
+	      streamlog_out( DEBUG1 ) << "    - trk0 : " << *trk0 << std::endl ;
+	      streamlog_out( DEBUG1 ) << "    - trk1 : " << *trk1 << std::endl ;
+	      
+	      double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
+	      
+	      streamlog_out( DEBUG1 ) << "  chi2 between split tracks : " 
+				      << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
+	      
+	      
+	    }
+	  }
+	  
 	}
-
       }
+      evt->addCollection( splitCol , "SplitTracks" ) ;
     }
-    evt->addCollection( splitCol , "SplitTracks" ) ;
-    
 
   }
   //====================================================================================
@@ -1286,79 +1079,4 @@ void ClupatraProcessor::end(){
 }
 
 
-
-
 //====================================================================================================
-
-ClusterSegment* fitCircle(HitCluster* c){
-
-
-  // code copied from GenericViewer
-  // should be replaced by a more efficient circle fit...
-  
-  //	    for (int iclust(0); iclust < nelem; ++iclust) {
-  int nhits = (int) c->size() ;
-  float * ah = new float[nhits];
-  float * xh = new float[nhits];
-  float * yh = new float[nhits];
-  float * zh = new float[nhits];
-  float zmin = 1.0E+10;
-  float zmax = -1.0E+10;
-
-  int ihit = -1 ;
-  typedef HitCluster::iterator IT ;
-  for( IT it=c->begin() ; it != c->end() ; ++it ){
-    
-    ++ihit ;
-    TrackerHit * hit = (*it)->first ;
-    float x = (float)hit->getPosition()[0];
-    float y = (float)hit->getPosition()[1];
-    float z = (float)hit->getPosition()[2];
-    ah[ihit] = 1.0;
-    xh[ihit] = x;
-    yh[ihit] = y;
-    zh[ihit] = z;
-    if (z < zmin)
-      zmin = z;
-    if (z > zmax)
-      zmax = z;
-  } 	
-  //  ClusterShapes * shapes = new ClusterShapes(nhits,ah,xh,yh,zh);
-  ClusterShapes shapes(nhits,ah,xh,yh,zh) ;
-  float zBegin, zEnd;
-  if (fabs(zmin)<fabs(zmax)) {
-    zBegin = zmin;
-    zEnd   = zmax;
-  }
-  else {
-    zBegin = zmax;
-    zEnd   = zmin;
-  }
-  //  float signPz = zEnd - zBegin;		
-  //  float dz = (zmax - zmin) / 500.;
-  float par[5];
-  float dpar[5];
-  float chi2;
-  float distmax;
-  shapes.FitHelix(500, 0, 1, par, dpar, chi2, distmax);
-
-  ClusterSegment* segment = new ClusterSegment ;
-  segment->X    = par[0];
-  segment->Y    = par[1];
-  segment->R    = par[2];
-  segment->Bz   = par[3];
-  segment->Phi0 = par[4];
-  segment->ChiS = chi2 ;
-  segment->ZMin = zmin ;
-  segment->ZMax = zmax ;
-  segment->Cluster = c ;
-
-  delete[] xh;
-  delete[] yh;
-  delete[] zh;
-  delete[] ah;
-
-  return segment ;
-}
-
-
