@@ -3,6 +3,7 @@
 #include <time.h>
 #include <vector>
 #include <map>
+#include <set>
 #include <algorithm>
 
 //---- MarlinUtil 
@@ -65,14 +66,32 @@ struct VecFromArray{
   const gear::Vector3D& v(){ return _v ; }
 } ;
 
+/** helper function to restrict the range of the azimuthal angle to ]-pi,pi]*/
+inline double toBaseRange( double phi){
+  while( phi <= -M_PI ){  phi += 2. * M_PI ; }
+  while( phi >   M_PI ){  phi -= 2. * M_PI ; }
+  return phi ;
+}
+
 /** helper class to compute the chisquared of two points in rho and z coordinate */
 class Chi2_RPhi_Z{
   double _sigsr, _sigsz ;
 public :
   Chi2_RPhi_Z(double sigr, double sigz) : _sigsr( sigr * sigr ) , _sigsz( sigz * sigz ){}
   double operator()( const gear::Vector3D& v0, const gear::Vector3D& v1) {
-    double dRPhi = v0.rho() * v0.phi() - v1.rho() * v1.phi() ;
+
+    //    return (v0 - v1 ).r() ;
+
+    //double dRPhi = v0.rho() * v0.phi() - v1.rho() * v1.phi() ;
+
+    double dPhi = std::abs(  v0.phi() - v1.phi() )  ;
+    if( dPhi > M_PI )
+      dPhi = 2.* M_PI - dPhi ;
+
+    double dRPhi =  dPhi *  v0.rho() ; 
+
     double dZ = v0.z() - v1.z() ;
+
     return  dRPhi * dRPhi / _sigsr + dZ * dZ / _sigsz  ;
   }
 };
@@ -173,6 +192,15 @@ struct KalTestFitter{
       
       trk->addIPHit() ;
     }  
+    
+    // // ----- debug ----
+    // std::set<int> layers ;
+    // for( HitCluster::iterator it=clu->begin() ; it != clu->end() ; ++it){
+    //   if( layers.find( tpcLayerID( *it ) ) != layers.end()  )
+    // 	std::cout << " +++++++++++++++++++ duplicate layerID in addHits : " <<  tpcLayerID( *it ) << std::endl ;
+    //   layers.insert( tpcLayerID( *it ) ) ;
+    // }
+    // // ---- end debug ----------
     
     trk->addHits( clu->begin() , clu->end() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
     
@@ -520,30 +548,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   // find 'odd' clusters that have duplicate hits in pad rows
   GenericClusterVec<TrackerHit> ocs ;
 
-
-  //  typedef GenericClusterVec<TrackerHit>::iterator GCVI ;
-
-  //   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
-  //     std::cout << " *** cluster :" << (*it)->ID 
-  // 	      << " size() :" << (*it)->size() 
-  // 	      << " at : " << *it << std::endl ;
-  //   }
-  //  GCVI remIt =
-  //     std::remove_copy_if( cluList.begin(), cluList.end(), std::back_inserter( ocs ) ,  DuplicatePadRows() ) ;
-
   split_list( cluList, std::back_inserter(ocs),  DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-
-  //   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
-  //     std::cout << " +++ cluster :" << (*it)->ID 
-  // 	      << " size() :" << (*it)->size() 
-  // 	      << " at : " << *it << std::endl ;
-  //   }
-
-  //   for( GCVI it = cluList.begin() ; it != cluList.end() ; ++it ){
-  //     if( (*it)->size() > 20 ){
-  //       ocs.splice( ocs.begin() , cluList , it  );
-  //     }
-  //   }
 
 
   LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
@@ -557,7 +562,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 
-  //   //-------------------- split up cluster with duplicate rows 
+  //-------------------- split up cluster with duplicate rows 
 
   GenericClusterVec<TrackerHit> sclu ; // new split clusters
 
@@ -627,9 +632,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   for(unsigned i=0 ; i< nOddHits ; ++i){
     int layer =  oddHits[i]->first->ext<HitInfo>()->layerID  ;
-    oddHits[i]->Index0 =   2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
+    oddHits[i]->Index0 =  2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
   }
-
+  
   //----- recluster in pad row ranges
   cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
 
@@ -693,9 +698,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   evt->addCollection( cluCol , "CluTrackSegments" ) ;
 
 
+  //DEBUG ..... check if there are really no duplicate pad rows ...
+  ocs.clear() ; 
+  split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+  LCCollectionVec* dupCol = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *dupCol ) , converter ) ;
+  evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
+
+  streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.sizE() : " << dupCol->getNumberOfElements() << std::endl ;
+
   //================================================================================
    
-  // create vecor with left over hits
+  // create vector with left over hits
   std::vector< Hit* > leftOverHits ;
   leftOverHits.reserve(  h.size() ) ;
 
@@ -706,7 +720,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     if ( (*it)->second == 0 ) leftOverHits.push_back( *it ) ;
   }
   
-  GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
+  //  GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
 
 
   //*********************************************************
@@ -715,15 +729,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
 			 << std::endl ;
-
-
-  LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
-
-  // LCFlagImpl trkFlag(0) ;
-  // trkFlag.setBit( LCIO::TRBIT_HITS ) ;
-  // kaltracks->setFlag( trkFlag.getFlag()  ) ;
-
-  //  evt->addCollection( kaltracks , "KalTestTracks" ) ;
 
 
   std::list< KalTrack* > ktracks ;
@@ -736,7 +741,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
   
   
-  //=========== assign left over hits ... ==================================================================
+  LCCollectionVec* trksegs = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *trksegs ) , KalTrack2LCIO() ) ;
+  evt->addCollection( trksegs , "KalTrackSegments" ) ;
+
+  
+//=========== assign left over hits ... ==================================================================
   
   Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
   
@@ -754,6 +764,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       
       const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
       
+      // double rh  =  hPos.v().rho() ;
+      // double rk  =  kPos->rho() ;
+      // if( std::abs( rh - rk ) > 0.1 ) {
+      // 	streamlog_out( WARNING ) << " --- different radii for hit and crossing point : " <<  tpcLayerID( hit ) << ": " << rh << " - " << rk 
+      // 				 <<  *kPos  << std::endl ;
+      // } 
+      
       if( kPos != 0 ){
 	
   	double ch2 = ch2rz( hPos.v() , *kPos )  ;
@@ -763,18 +780,33 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  ch2Min = ch2 ;
 	  bestTrk = *it ;
 	}
+      
       }
+      
+      // else {
+      // 	streamlog_out( MESSAGE ) << " --- no crossing point found for layer : " <<  tpcLayerID( hit ) << ": " << hPos.v() << std::endl ;
+      // }
+    
     }
-
     if( bestTrk ) {
       
       const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
       
-      if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
-	
+      // double rh  =  hPos.v().rho() ;
+      // double rk  =  kPos->rho() ;
+      // if( std::abs( rh - rk ) > 0.1 ) {
+      // 	streamlog_out( WARNING ) << "  different radii for hit and crossing point : " << rh << " - " << rk << std::endl ;
+      // } 
+      
+      //      if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
+
+      if(  (  hPos.v() - *kPos ).r()  < 3. ) {   // check for bad outliers... FIXME: need proper criterion here .....
+
+
 	HitCluster* clu = bestTrk->getCluster< HitCluster >() ;
 	
-	streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos << std::endl ;
+	streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos  
+				<<   " dist: " <<  (  hPos.v() - *kPos ).r()  << std::endl ;
 	
 	clu->addHit( hit ) ;
       }	
@@ -783,10 +815,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
     else
       streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
+    
   }
-
+  
   //================================================================================================================ 
-
+  
   //std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
   std::list< KalTrack* > newKTracks ;
@@ -797,9 +830,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
 
+
+  LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
+  LCFlagImpl trkFlag(0) ;
+  trkFlag.setBit( LCIO::TRBIT_HITS ) ;
+  kaltracks->setFlag( trkFlag.getFlag()  ) ;
+  
   std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
+  //  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *kaltracks ) , converter ) ;
 
-
+  evt->addCollection( kaltracks , _outColName ) ;
+  
+  
   //========== cleanup KalTracks ========
   std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
   std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
@@ -830,10 +872,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
   
   //========================================================================================================
-
-
-
-  evt->addCollection( kaltracks , _outColName ) ;
   
   _nEvt ++ ;
 
@@ -854,7 +892,8 @@ void ClupatraProcessor::check( LCEvent * evt ) {
   bool checkForDuplicatePadRows =  true ;
   bool checkForMCTruth =  true ;
 
-  bool checkForSplitTracks =  false ; // WARNING: this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
+  bool checkForSplitTracks =  false ;   // WARNING: DEBUG only - this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
+
 
   streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
 
@@ -887,8 +926,10 @@ void ClupatraProcessor::check( LCEvent * evt ) {
       unsigned nHit = thv.size() ;
       unsigned nDouble = 0 ;
       for(unsigned i=0 ; i < hitsInLayer.size() ; ++i ) {
-	if( hitsInLayer[i] > 1 ) 
+	if( hitsInLayer[i] > 1 ){
 	  ++nDouble ;
+	  streamlog_out( DEBUG4 ) << " &&&&&&&&&&&&&&&&&&&&&&&&&& duplicate hit in layer : " << i << std::endl ;
+	}
       }
       if( double(nDouble) / nHit > _duplicatePadRowFraction ){
 	//if( nDouble  > 0){
@@ -920,7 +961,9 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     typedef std::map< MCParticle* , unsigned > MCPMAP ;
     MCPMAP hitMap ;
     
-    LCTOOLS::printTracks( evt->getCollection("KalTestTracks") ) ;
+    
+    if( streamlog_level( DEBUG4) )
+      LCTOOLS::printTracks( evt->getCollection("KalTestTracks") ) ;
 
 
     LCIterator<Track> trIt( evt, "KalTestTracks" ) ;

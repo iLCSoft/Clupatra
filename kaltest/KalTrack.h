@@ -101,7 +101,7 @@ public:
       
       addHit( pos ,  l , lcioHit( *first ) ) ;
 
-      //      std::cout << " addHit at layer " <<  l << " r: " << pos.Perp() << std::endl ;
+      //      std::cout << " ------- addHit at layer " <<  l << std::endl ; //<< " r: " << pos.Perp() << std::endl ;
       
       ++first ;
     }

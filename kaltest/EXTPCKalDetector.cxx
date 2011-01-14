@@ -175,7 +175,7 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
     //    if( streamlog_level( DEBUG0 ) &&
     if( layer % 10 == 0 ){
       
-      streamlog_out( DEBUG0)   << " ***** adding TPC layer : [" << layer + layerID  <<  "] at R = " << r << std::endl ;
+      streamlog_out( DEBUG4 )   << " ***** adding TPC layer : [" <<  layerID  <<  "] at R = " << r << std::endl ;
     }
     
     r += rstep;

@@ -60,6 +60,7 @@ KalTrack::KalTrack(TKalDetCradle* det) : _det( det) , _xingPts( _det->GetEntries
   _kalHits = new TObjArray ;
   _kalHits->SetOwner() ;
 
+  for( unsigned i=0 ; i< _xingPts.size() ; _xingPts[i++] = 0  ) ;
 }
 
 KalTrack::~KalTrack(){
@@ -91,10 +92,10 @@ void KalTrack::addHit( const TVector3& pos, int layer , EVENT::TrackerHit* hit) 
       ml->ProcessHit( pos, *_kalHits , hit ); // create hit point
     
 
-      //if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
-      if(   layer % 10 == 0 ){
+      if( streamlog_level( DEBUG )  &&  layer % 10 == 0 ){
 	double radius = pos.Perp() ;
-	streamlog_out( DEBUG )  << " ***** adding a TPC hit in layer : [" << layer <<  "] at R = " << radius << std::endl ;
+	streamlog_out( DEBUG )  << " ***** adding a TPC hit in layer : [" << layer <<  "] at R = " 
+				<< radius << " id: " <<  hit->id()  <<std::endl ;
       }
     
 
@@ -138,11 +139,11 @@ void KalTrack::fitTrack( bool fitDirection ) {
   
   Int_t i1, i2, i3; // (i1,i2,i3) = (1st,mid,last) hit to filter
   if (gkDir == kIterBackward) {
-    i3 = 1;
+    i3 = 0 ; // fg: first index is 0 and not 1 
     i1 = _kalHits->GetEntries() - 1;
     i2 = i1 / 2;
   } else {
-    i1 = 1;
+    i1 = 0 ; 
     i3 = _kalHits->GetEntries() - 1;
     i2 = i3 / 2;
   }
@@ -216,6 +217,9 @@ void KalTrack::fitTrack( bool fitDirection ) {
   kaltrack.SetOwner();   // kaltrack owns sites
   kaltrack.Add(&sited);  // add the dummy site to this track
 
+  streamlog_out( DEBUG0 )  << "Kaltrack::fitTrack :  add dummy site at index : " << htdp->GetMeasLayer().GetIndex() << std::endl ;
+
+
   // ---------------------------
   //  Prepare hit iterrator
   // ---------------------------
@@ -227,12 +231,16 @@ void KalTrack::fitTrack( bool fitDirection ) {
   // ---------------------------
 
   TVTrackHit *hitp = 0;
-  while ((hitp = dynamic_cast<TVTrackHit *>(next()))) {
+
+  while ( (hitp = dynamic_cast<TVTrackHit *>( next() ) ) ) {
+
     TKalTrackSite  &site = *new TKalTrackSite(*hitp); // new site
+
+    streamlog_out( DEBUG0 )  << "Kaltrack::fitTrack :  add site at index : " << hitp->GetMeasLayer().GetIndex() << std::endl ;
 
     if (!kaltrack.AddAndFilter(site)) {               // filter it
 
-      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << std::endl;
+      //streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << std::endl;
 
       delete &site;                        // delete it if failed
     }
@@ -264,7 +272,7 @@ double KalTrack::chi2( const KalTrack& t0 , const KalTrack& t1) {
 
    double diff2 = ( ts0(i,0) - ts1(i,0 ) ) ; 
 
-   //   std::cout << " diff : " << i <<  " : " <<  diff2  << " - cov() " << cov(i,i)  << std::endl ;
+   //   std::cout << " -------    diff : " << i <<  " : " <<  diff2  << " - cov() " << cov(i,i)  << std::endl ;
 
    diff2 *= diff2 ;
 
@@ -370,7 +378,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   
   if( streamlog_level( DEBUG ) ) {
     streamlog_out( DEBUG ) << " KalTrack::toLCIOTrack : returning covariance matrix :  - alpha : " << alpha << std::endl ;
-    covK.DebugPrint() ;
+    //    covK.DebugPrint() ;
   }
 
   EVENT::FloatVec cov( 15 )  ; 
@@ -394,36 +402,13 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   cov[13] =   covK( 4 , 3 )   ; //   tanl, z0
   cov[14] =   covK( 4 , 4 )   ; //   tanl, tanl
 
-  // cov[ 0] = 100.*  covK( 0 , 0 )   ; //   d0,   d0
-  // cov[ 1] =  -10.* covK( 1 , 0 )   ; //   phi0, d0
-  // cov[ 2] =        covK( 1 , 1 )   ; //   phi0, phi
-
-  // cov[ 3] =  -10.* covK( 2 , 0 ) * alpha   ; //   omega, d0
-  // cov[ 4] =        covK( 2 , 1 ) * alpha   ; //   omega, phi
-  // cov[ 5] =        covK( 2 , 2 ) * alpha * alpha  ; //   omega, omega
-
-  // cov[ 6] = -100.* covK( 3 , 0 )   ; //   z0  , d0
-  // cov[ 7] =   10.* covK( 3 , 1 )   ; //   z0  , phi
-  // cov[ 8] =   10.* covK( 3 , 2 ) * alpha   ; //   z0  , omega
-  // cov[ 9] =  100.* covK( 3 , 3 )   ; //   z0  , z0
-
-  // cov[10] = -10.* covK( 4 , 0 )   ; //   tanl, d0
-  // cov[11] =       covK( 4 , 1 )   ; //   tanl, phi
-  // cov[12] =       covK( 4 , 2 ) * alpha  ; //   tanl, omega
-  // cov[13] =  10.* covK( 4 , 3 )   ; //   tanl, z0
-  // cov[14] =       covK( 4 , 4 )   ; //   tanl, tanl
-
-
+ 
   trk->setCovMatrix( cov ) ;
 
   float pivot[3] ;
   pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) ;
   pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) ;
   pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) ;
-
-  // pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) * 10. ;
-  // pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) * 10. ;
-  // pivot[2] =  ((TKalTrackSite&) cursite).GetPivot()(2) * 10. ;
 
   trk->setReferencePoint( pivot ) ;
 
@@ -442,8 +427,6 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 			 << " - r: " << std::sqrt( pivot[0]*pivot[0]+pivot[1]*pivot[1] ) << "]" 
 			 << std::endl ;
 
-  //  streamlog_out( DEBUG ) << kaltrack << std::endl ;
-
   trk->setNdf( ndf ) ;
 
 
@@ -459,16 +442,20 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   int nHit = kaltrack.GetEntriesFast() ;
 
+  EVENT::TrackerHit* hLast = 0 ; 
+
   for(int i=0 ; i < nHit ; ++i ){
-    
+
     EVENT::TrackerHit* h = const_cast<EVENT::TrackerHit*> 
       (static_cast<const EVENT::TrackerHit*>
        (  static_cast<const EXTPCHit&>
 	  (dynamic_cast<TKalTrackSite &> ( *kaltrack[i] ).GetHit() ).GetHitPtr() ) ) ;
-    // what a casting show ....    
 
-    if( h ) 
+    if( h   && h != hLast ) {// protect against duplicate hits (from dummy site in fitTrack() ....)  
+
       trk->addHit( h ) ;
+       hLast = h ;
+    }
 
   }
 #endif 
@@ -550,13 +537,13 @@ void KalTrack::findXingPoints() {
     return ; // no sites on this track
 
   // get first and last site used in track fit
-  TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ;
+  TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ; //fixme : need 1 here, to ignore dummy site !? 
   TKalTrackSite& site1 =  *dynamic_cast<TKalTrackSite*>( _trk->Last() ) ;
   
   int  idx0 = site0.GetHit().GetMeasLayer().GetIndex()  ; 
   int  idx1 = site1.GetHit().GetMeasLayer().GetIndex()  ; 
 
-  streamlog_out( DEBUG ) << " KalTrack::getCrossingPoints : " 
+  streamlog_out( DEBUG4 ) << " KalTrack::findXingPoints : " 
 			 << " index at track site[0] : "  <<  idx0  
 			 << " index at last site :     "  <<  idx1 
 			 <<   std::endl ;
@@ -577,7 +564,7 @@ void KalTrack::findXingPoints() {
 
     if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help0 , xx, fid)  ){
       
-      streamlog_out( DEBUG ) << " ---- crossing layer " << idx <<  " at: " 
+      streamlog_out( DEBUG4  ) << " ---- crossing layer " << idx <<  " at: " 
 			     << xx[0] << ", "  << xx[1] << ", " << xx[2] 
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
@@ -605,7 +592,7 @@ void KalTrack::findXingPoints() {
   
   std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( site.GetCurState()).CreateTrack() ); // tmp track
   
-  //++idx ;  // next site 
+  ++idx ;  // next site 
 
   int lastIdx =  _det->GetEntriesFast() ;  // need # of tracking layers
 
@@ -615,14 +602,14 @@ void KalTrack::findXingPoints() {
     TVector3 xx ;       // expected hit position vector
     double  fid  = 0. ; // deflection angle from the last hit
 
-    if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help , xx, fid)  ){
+    if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help0 , xx, fid)  ){
       
-      streamlog_out( DEBUG ) << " ---- crossing layer " << idx <<  " at: " 
+      streamlog_out( DEBUG4 ) << " ---- crossing layer " << idx <<  " at: " 
 			     << xx[0] << ", "  << xx[1] << ", " << xx[2] 
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1], xx[2] )  ;
+      _xingPts[ idx ]  = new  gear::Vector3D( xx[0] , xx[1], xx[2] )  ;
       // _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )  ;
 
       ++idx ;
