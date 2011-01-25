@@ -63,6 +63,8 @@ public:
 
   int indexOfFirstLayer( int detectorID ) ;
 
+  int maxLayerIndex() ;
+
 protected:
   void init() ;
 

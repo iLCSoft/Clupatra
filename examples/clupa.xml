@@ -42,7 +42,7 @@
 	</global>
 
 	<processor name="MyClupatraProcessor" type="ClupatraProcessor">
-		<parameter name="Verbosity" value="DEBUG4 MESSAGE DEBUG" />
+		<parameter name="Verbosity" value="DEBUG1 MESSAGE DEBUG" />
 		<!--ClupatraProcessor : simple nearest neighbour clustering-->
 		<!--Name of the input collections-->
 		<parameter name="HitCollections" type="string" lcioInType="TrackerHit"> AllTPCTrackerHits </parameter>
@@ -55,9 +55,9 @@
 		<parameter name="DuplicatePadRowFraction" type="float"
 			value="0.0" />
 		<!--Minimum number of hits per cluster-->
-		<parameter name="MinimumClusterSize" type="int" value="10" />
+		<parameter name="MinimumClusterSize" type="int" value="6" />
 		<!--Cut for r_min in mm-->
-		<parameter name="RCut" type="float" value="0" />
+		<parameter name="RCut" type="float" value="0." />
 	</processor>
 
 	<processor name="MyGenericViewer" type="GenericViewer">

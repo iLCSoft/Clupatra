@@ -92,3 +92,10 @@ int KalTest::indexOfFirstLayer(int detID) {
   }
   return _idOffsets[ detID ] ; 
  }
+
+
+int  KalTest::maxLayerIndex() {
+
+    return _det->GetEntriesFast() ;
+
+}

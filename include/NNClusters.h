@@ -229,7 +229,7 @@ public:
    *  to speed up the clustering process.
    */
   int Index0 ;
-  double Dist ;  // arbitrary distance for assignment
+  //  double Dist ;  // arbitrary distance for assignment
   
 protected:
   /** Don't allow default c'tor w/o hit */

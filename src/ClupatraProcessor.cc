@@ -748,76 +748,173 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
 //=========== assign left over hits ... ==================================================================
   
-  Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
-  
-  HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
-  
-  for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
+ static const bool use_best_track = false ;
+
+  if( use_best_track ) {
+
+    streamlog_out( DEBUG ) << "  ------ assign left over hits - best matching track for every hit ..."  << std::endl ;
+
+    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
     
-    Hit* hit = *ih ;
-    VecFromArray hPos(  hit->first->getPosition() ) ;
-  
-    double ch2Min = 999999999999999. ;
-    KalTrack* bestTrk = 0 ;
+    HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
+    
+    for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
+      
+      Hit* hit = *ih ;
+      VecFromArray hPos(  hit->first->getPosition() ) ;
+      
+      double ch2Min = 999999999999999. ;
+      KalTrack* bestTrk = 0 ;
+      
+      for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+	
+	const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
+	
+	// double rh  =  hPos.v().rho() ;
+	// double rk  =  kPos->rho() ;
+	// if( std::abs( rh - rk ) > 0.1 ) {
+	// 	streamlog_out( WARNING ) << " --- different radii for hit and crossing point : " <<  tpcLayerID( hit ) << ": " << rh << " - " << rk 
+	// 				 <<  *kPos  << std::endl ;
+	// } 
+	
+	if( kPos != 0 ){
+	  
+	  double ch2 = ch2rz( hPos.v() , *kPos )  ;
+	  
+	  if( ch2 < ch2Min ){
+	    
+	    ch2Min = ch2 ;
+	    bestTrk = *it ;
+	  }
+	  
+	}
+	
+	// else {
+	// 	streamlog_out( MESSAGE ) << " --- no crossing point found for layer : " <<  tpcLayerID( hit ) << ": " << hPos.v() << std::endl ;
+	// }
+	
+      }
+      if( bestTrk ) {
+	
+	const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
+	
+	// double rh  =  hPos.v().rho() ;
+	// double rk  =  kPos->rho() ;
+	// if( std::abs( rh - rk ) > 0.1 ) {
+	// 	streamlog_out( WARNING ) << "  different radii for hit and crossing point : " << rh << " - " << rk << std::endl ;
+	// } 
+	
+	//      if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
+	
+	if(  (  hPos.v() - *kPos ).r()  < 3. ) {   // check for bad outliers... FIXME: need proper criterion here .....
+	  
+	  
+	  HitCluster* clu = bestTrk->getCluster< HitCluster >() ;
+	  
+	  streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos  
+				 <<   " dist: " <<  (  hPos.v() - *kPos ).r()  << std::endl ;
+	  
+	  clu->addHit( hit ) ;
+	}	
+	else 
+	  streamlog_out( DEBUG ) << " ---- NOT assigning left over hit : " << hPos.v() << " <-> " << *kPos << std::endl ;
+      }
+      else
+	streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
+      
+    }
+    
+  } else { // ================== use best matching hit for every track segment =========================
+
+    
+    streamlog_out( DEBUG1 ) << "  ------ assign left over hits - best matching hit for every track ..."  << std::endl ;
+    
+    HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
+    
+    //FIXME: ------- sort ktracks wrt to pt (1/omega) ...
+
+
+
+    //------------- create vector of left over hits per layer
+    typedef std::list<Hit*> HitList ;
+    typedef std::vector< HitList > HitListVector ;
+    HitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
+    
+    
+    for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ) {
+      
+      Hit* hit = *ih ;
+      std::cout << " ++++++  layerId: " << tpcLayerID( hit ) << " max layer index : " <<  _kalTest->maxLayerIndex() << std::endl  ;
+      
+      
+      hitsInLayer[ tpcLayerID( hit ) ].push_back( hit )  ;
+    }
+    //------------------------
+    
+    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
     
     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
-      const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
+      KalTrack* theTrack = *it ;
       
-      // double rh  =  hPos.v().rho() ;
-      // double rk  =  kPos->rho() ;
-      // if( std::abs( rh - rk ) > 0.1 ) {
-      // 	streamlog_out( WARNING ) << " --- different radii for hit and crossing point : " <<  tpcLayerID( hit ) << ": " << rh << " - " << rk 
-      // 				 <<  *kPos  << std::endl ;
-      // } 
+      const PointList& xptList = theTrack->getXingPoints() ;
       
-      if( kPos != 0 ){
-	
-  	double ch2 = ch2rz( hPos.v() , *kPos )  ;
-	
-	if( ch2 < ch2Min ){
-	  
-	  ch2Min = ch2 ;
-	  bestTrk = *it ;
+      int xpLayer = 0 ;
+      
+      
+      for(PointList::const_iterator itXP = xptList.begin() ; itXP != xptList.end() ; ++itXP , xpLayer++ ) {
+
+	const gear::Vector3D* kPos =  *itXP ;
+
+	if( kPos == 0 ) {   // we don't have a xing point
+	  continue ;
 	}
-      
+	
+	double ch2Min = 999999999999999. ;
+	Hit* bestHit = 0 ;
+	
+	HitList& hLL = hitsInLayer.at( xpLayer ) ;
+
+	for( HitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){
+	  
+	  Hit* hit = *ih ;
+	  
+	  VecFromArray hPos(  hit->first->getPosition() ) ;
+	  
+	  double ch2 = ch2rz( hPos.v() , *kPos )  ;
+	  
+	  if( ch2 < ch2Min ){
+	    
+	    ch2Min = ch2 ;
+	    bestHit = hit ;
+	  }
+	}
+	if( bestHit != 0 ) {
+	  
+	  VecFromArray hPos(  bestHit->first->getPosition() ) ;
+	  
+	  //	  if( ch2Min  <  6. ) { // Sum( pdf(ch2,ndf==2) )_0^6 ~ 95% )
+	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 95% )
+	    
+	    streamlog_out( DEBUG1 ) <<   " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos
+				    <<   " dist: " <<  (  hPos.v() - *kPos ).r()
+				    <<   " chi2: " <<  ch2Min 
+				    <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->getCovMatrix()[0] + bestHit->first->getCovMatrix()[2] ) 
+				    <<	 "  z= " <<  sqrt( bestHit->first->getCovMatrix()[5] )
+				    << std::endl ;
+	    
+	    hLL.remove(  bestHit ) ;
+	    
+	    HitCluster* clu = theTrack->getCluster< HitCluster >() ;
+	    
+	    clu->addHit( bestHit ) ;
+	    
+	  }
+	}
       }
-      
-      // else {
-      // 	streamlog_out( MESSAGE ) << " --- no crossing point found for layer : " <<  tpcLayerID( hit ) << ": " << hPos.v() << std::endl ;
-      // }
-    
     }
-    if( bestTrk ) {
-      
-      const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
-      
-      // double rh  =  hPos.v().rho() ;
-      // double rk  =  kPos->rho() ;
-      // if( std::abs( rh - rk ) > 0.1 ) {
-      // 	streamlog_out( WARNING ) << "  different radii for hit and crossing point : " << rh << " - " << rk << std::endl ;
-      // } 
-      
-      //      if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
-
-      if(  (  hPos.v() - *kPos ).r()  < 3. ) {   // check for bad outliers... FIXME: need proper criterion here .....
-
-
-	HitCluster* clu = bestTrk->getCluster< HitCluster >() ;
-	
-	streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos  
-				<<   " dist: " <<  (  hPos.v() - *kPos ).r()  << std::endl ;
-	
-	clu->addHit( hit ) ;
-      }	
-      else 
-	streamlog_out( DEBUG ) << " ---- NOT assigning left over hit : " << hPos.v() << " <-> " << *kPos << std::endl ;
-    }
-    else
-      streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
     
   }
-  
   //================================================================================================================ 
   
   //std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
