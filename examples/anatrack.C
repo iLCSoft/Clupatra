@@ -5,7 +5,7 @@
 
 
 //plot6hists(TFile* fi, char* title, char* h1,char* h2,char* h3,char* h4, char* h5, char* h6=0){
-plot6hists(TFile* fi,const std::string& fileName, char* title, char* h1,char* h2,char* h3,char* h4, char* h5, char* h6=0){
+plot6hists(TFile* fi,const char* dir, const std::string& fileName, char* title, char* h1,char* h2,char* h3,char* h4, char* h5, char* h6=0){
  
   c1 = new TCanvas(title,title,-5);
   c1->Clear();
@@ -13,7 +13,9 @@ plot6hists(TFile* fi,const std::string& fileName, char* title, char* h1,char* h2
   
   int pad = 1;
   
-  std::string path("MyAnaTrack/") ;
+  std::string path = std::string("/") + std::string( dir ) + std::string("/" ) ;
+  //  std::string path( "/tracks_mup_50gev/" ) ;
+
   std::string hName ;
   TH1D* hist = 0 ;
 
@@ -36,7 +38,8 @@ plot6hists(TFile* fi,const std::string& fileName, char* title, char* h1,char* h2
 }
 
 
-void anatrack(const char* FILEN) {
+
+void anatrack(const char* FILEN, const char* dirName) {
 
   gROOT->Reset();
   gROOT->SetStyle("Plain");
@@ -53,18 +56,19 @@ void anatrack(const char* FILEN) {
   gStyle->SetTitleOffset(1.0,"x");
 
 
-  std::string fN =  "anatrack.pdf" ;
+  
+  std::string fN =  std::string(dirName) + ".pdf" ;
 
   TFile* f = new TFile(FILEN) ; 
-  f->cd("MyAnaTrack") ;
+  f->cd( dirName  ) ;
 
-
+  const char* dn = dirName ;
   
-  plot6hists( f, fN+"(" ,"track_params",       "hphi",    "hd0" ,    "homega" ,    "hz0",    "htanL"    , "hpt"    ) ;
-  plot6hists( f, fN     ,"track_params_mcp",   "hphimcp", "hd0mcp" , "homegamcp" , "hz0mcp", "htanLmcp" , "hptmcp" ) ;
-  plot6hists( f, fN     ,"track_params_error", "hephi",   "hed0" ,   "heomega" ,   "hez0",   "hetanL"   , "hept"   ) ;
-  plot6hists( f, fN     ,"track_params_delta", "hdphi",   "hdd0" ,   "hdomega" ,   "hdz0",   "hdtanL"   , "hdpt"   ) ;
-  plot6hists( f, fN+")" ,"track_params_pulls", "hpphi",   "hpd0" ,   "hpomega" ,   "hpz0",   "hptanL"   , "hppt"   ) ;
+  plot6hists( f, dn , fN+"(" ,"track_params",       "hphi",    "hd0" ,    "homega" ,    "hz0",    "htanL"    , "hpt"    ) ;
+  plot6hists( f, dn , fN     ,"track_params_mcp",   "hphimcp", "hd0mcp" , "homegamcp" , "hz0mcp", "htanLmcp" , "hptmcp" ) ;
+  plot6hists( f, dn , fN     ,"track_params_error", "hephi",   "hed0" ,   "heomega" ,   "hez0",   "hetanL"   , "hept"   ) ;
+  plot6hists( f, dn , fN     ,"track_params_delta", "hdphi",   "hdd0" ,   "hdomega" ,   "hdz0",   "hdtanL"   , "hdpt"   ) ;
+  plot6hists( f, dn , fN+")" ,"track_params_pulls", "hpphi",   "hpd0" ,   "hpomega" ,   "hpz0",   "hptanL"   , "hppt"   ) ;
 
 }
 

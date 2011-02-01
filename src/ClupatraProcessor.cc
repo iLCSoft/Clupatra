@@ -183,8 +183,21 @@ struct KalTestFitter{
     
     clu->sort( LayerSort<HitOrder>() ) ;
     
-    KalTrack* trk = _kt->createKalTrack() ;
     
+    // need to reverse the order for incomming track segments (curlers)
+    // assume particle comes from IP
+    Hit* hf = clu->front() ;
+    Hit* hb = clu->back() ;
+
+    bool reverse_order = ( ( HitOrder ==  KalTest::OrderOutgoing ) ?    
+			   ( std::abs( hf->first->getPosition()[2] ) > std::abs( hb->first->getPosition()[2] )) :   
+			   ( std::abs( hf->first->getPosition()[2] ) < std::abs( hb->first->getPosition()[2] )) )  ;
+    
+    // reverse_order = false ;
+
+
+    KalTrack* trk = _kt->createKalTrack() ;
+
     trk->setCluster<HitCluster>( clu ) ;
     
 
@@ -202,8 +215,12 @@ struct KalTestFitter{
     // }
     // // ---- end debug ----------
     
-    trk->addHits( clu->begin() , clu->end() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
+    if( reverse_order )
+      trk->addHits( clu->rbegin() , clu->rend() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
+    else
+      trk->addHits( clu->begin() , clu->end() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
     
+
     if( PropagateIP  && HitOrder == KalTest::OrderIncoming ) {
       
       trk->addIPHit() ;
@@ -392,6 +409,51 @@ struct LCIOTrack{
   }
 
 } ;
+
+// helper for creating lcio headere for short printout
+template <class T> 
+const std::string & myheader(){return header(*(T*)(0)); }
+
+
+/** Predicate class for track merging with NN clustering.
+ */
+class TrackStateDistance{
+  typedef Track HitClass ;
+
+public:
+  
+  /** Required typedef for cluster algorithm 
+   */
+  typedef HitClass hit_type ;
+  
+  /** C'tor takes merge distance */
+  TrackStateDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
+
+
+  /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
+  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
+    
+    if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
+    
+    Track* trk0 = h0->first ;
+    Track* trk1 = h1->first ;
+
+    KalTrack* ktrk0 = h0->first->ext<KalTrackLink>() ; 
+    KalTrack* ktrk1 = h1->first->ext<KalTrackLink>() ; 
+
+    double chi2  = KalTrack::chi2( *ktrk0 , *ktrk1 ) ; 	   
+
+    return chi2  < _dCut ;
+      
+  }
+  
+protected:
+  TrackStateDistance() ;
+  float _dCutSquared ;
+  float _dCut ;
+} ;
+
+
 
 
 ClupatraProcessor aClupatraProcessor ;
@@ -748,7 +810,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
 //=========== assign left over hits ... ==================================================================
   
- static const bool use_best_track = false ;
+  static const bool use_best_track = false ;
 
   if( use_best_track ) {
 
@@ -851,7 +913,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
     //------------------------
     
-    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
+    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
     
     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
@@ -894,7 +956,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  VecFromArray hPos(  bestHit->first->getPosition() ) ;
 	  
 	  //	  if( ch2Min  <  6. ) { // Sum( pdf(ch2,ndf==2) )_0^6 ~ 95% )
-	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 95% )
+	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 99.x% ?? ) // FIXME: need steering parameter and optimize value
 	    
 	    streamlog_out( DEBUG1 ) <<   " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos
 				    <<   " dist: " <<  (  hPos.v() - *kPos ).r()
@@ -915,15 +977,21 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
     
   }
-  //================================================================================================================ 
+
+   //================================================================================================================ 
   
+
+
   //std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
 
   std::list< KalTrack* > newKTracks ;
 
   //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
-  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
+  //  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
+
+  //FIXME: DEBUG - non ip fitter
+  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
 
@@ -938,19 +1006,105 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   evt->addCollection( kaltracks , _outColName ) ;
   
+ 
+
+ //================================================================================================================ 
+  //   merge track segments based on track parameters and errors ...
+  //
+  static const int merge_track_segments = true ;
+
+  if( merge_track_segments ) {
+
+    GenericHitVec<Track> trkVec ;
+    GenericClusterVec<Track> trkCluVec ;
+    LCCollectionVec* mergedTracks = new LCCollectionVec( LCIO::TRACK ) ;
   
+    addToGenericHitVec( trkVec , kaltracks ,  AllwaysTrue()  ) ;
+
+    TrackStateDistance trkMerge( 50. ) ;
+
+    cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), &trkMerge  , 2 ) ;
+
+
+    streamlog_out( DEBUG4 ) << " merged tracks : " << std::endl ;
+    
+    for( GenericClusterVec<Track>::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
+      
+      streamlog_out( DEBUG4 ) <<  myheader<Track>() << std::endl ;
+      
+      GenericCluster<Track>* trkClu = *it ;
+      
+      std::list<Track*> mergedTrk ;
+      for( GenericCluster<Track>::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
+	
+	streamlog_out( DEBUG4 ) << lcshort(  (*itC)->first ) << std::endl ; 
+	
+	mergedTrk.push_back( (*itC)->first ) ; 
+      }
+
+      TrackImpl* trk = new TrackImpl ;
+      Track* bestTrk = 0 ;
+      double chi2Min = 99999999999999999. ;
+      for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
+	
+	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
+
+	for(unsigned i=0 ; i < hV.size() ; ++i){
+
+	  trk->addHit( hV[i] ) ;
+	  double chi2ndf = (*itML)->getChi2() / (*itML)->getNdf() ;
+
+	  if( chi2ndf < chi2Min ){
+	    bestTrk = (*itML) ;
+	    chi2Min = chi2ndf ;
+	  }
+	}
+      }
+      if( bestTrk != 0 ){ 
+
+	trk->setD0( bestTrk->getD0() ) ;
+	trk->setOmega( bestTrk->getOmega() ) ;
+	trk->setPhi( bestTrk->getPhi() ) ;
+	trk->setZ0( bestTrk->getZ0() ) ;
+	trk->setTanLambda( bestTrk->getTanLambda() ) ;
+	trk->setCovMatrix( bestTrk->getCovMatrix()  ) ;
+	// ...
+	
+      }
+      else{
+	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
+      }
+      mergedTracks->addElement( trk )  ;
+
+    }
+
+    // add all tracks that have not been merged :
+    for( GenericHitVec<Track>::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
+
+      if( (*it)->second == 0 ){
+
+	mergedTracks->addElement(  new TrackImpl( *dynamic_cast<TrackImpl*>( (*it)->first ) ) ) ;
+      }
+    }
+
+
+    evt->addCollection( mergedTracks , "MergedKalTracks" ) ;
+  }
+  //======================================================================================================
+
+ 
   //========== cleanup KalTracks ========
   std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
-  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
+
+  //FIXME: memory leak - need for debugging....
+
+  //  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
   //=====================================
 
 
-  //*********************************************************
-  //   end running KalTest on track segments-------------------------------------------------------
-  //*********************************************************
-
 
   //========  create collections of used and unused TPC hits ===========================================
+
   LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
   LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
   usedHits->setSubset() ;
@@ -989,7 +1143,7 @@ void ClupatraProcessor::check( LCEvent * evt ) {
   bool checkForDuplicatePadRows =  true ;
   bool checkForMCTruth =  true ;
 
-  bool checkForSplitTracks =  false ;   // WARNING: DEBUG only - this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
+  bool checkForSplitTracks =  true ;   // WARNING: DEBUG only - this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
 
 
   streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
@@ -1008,7 +1162,8 @@ void ClupatraProcessor::check( LCEvent * evt ) {
     oddCol->setSubset( true ) ;
     // try iterator class ...
 
-    LCIterator<Track> trIt( evt, _outColName ) ;
+    //    LCIterator<Track> trIt( evt, _outColName ) ;
+    LCIterator<Track> trIt( evt, "MergedKalTracks" ) ;
     while( Track* tr = trIt.next()  ){
 
       
@@ -1148,7 +1303,30 @@ void ClupatraProcessor::check( LCEvent * evt ) {
 	      trkList.push_back( it1->first ) ;
 	    } 
 	  }
+	  // chi2 between split track segments :
+	  for( TRKMAP::iterator ist0 = it0->second.begin() ; ist0 != it0->second.end() ; ++ist0){
+	    
+	    KalTrack* sptrk0 = ist0->first->ext<KalTrackLink>() ; 
+	    
+	    TRKMAP::iterator ist0_pp = ist0 ;
+	    ++ist0_pp ;
+
+	    for( TRKMAP::iterator ist1 = ist0_pp ; ist1 != it0->second.end() ; ++ist1){
 	  
+	      KalTrack* sptrk1 = ist1->first->ext<KalTrackLink>() ; 
+	      
+	      double chi2 =  KalTrack::chi2( *sptrk0 ,  *sptrk1 ) ;
+	      
+	      streamlog_out( DEBUG4 ) << " *********************  chi2 between split tracks : "  << chi2 << std::endl 
+				      << myheader< Track >() << std::endl 
+				      << lcshort( ist0->first )  << std::endl 
+				      << lcshort( ist1->first )	 << std::endl ; 
+	      
+	    }
+	  }
+
+
+
 	  streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
 	  
 	  for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
@@ -1191,7 +1369,7 @@ void ClupatraProcessor::check( LCEvent * evt ) {
 	      
 	      double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
 	      
-	      streamlog_out( DEBUG1 ) << "  chi2 between split tracks : " 
+	      streamlog_out( DEBUG1 ) << " +++++++++++++++++  chi2 between split tracks : " 
 				      << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
 	      
 	      

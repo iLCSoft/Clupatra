@@ -264,26 +264,86 @@ double KalTrack::chi2( const KalTrack& t0 , const KalTrack& t1) {
  const TKalTrackState& ts0 = t0.getTrackState() ; 
  const TKalTrackState& ts1 = t1.getTrackState() ; 
 
- TKalMatrix cov  = ts0.GetCovMat() ;
+ double dPhi ;
+ const TMatrixD& c0 =  ts0.GetCovMat() ;
+ TMatrixD cov0(5,5) ;  for(int i=0;i<5;++i) for(int j=0;j<5;++j) cov0[i][j] = c0[i][j] ;
 
- double chi2( 0.0 ) ;
+ const TMatrixD& c1  = ts1.GetCovMat() ;
+ TMatrixD cov1(5,5) ;  for(int i=0;i<5;++i) for(int j=0;j<5;++j) cov1[i][j] = c1[i][j] ;
 
- for(int i=0; i<5 ; ++i ) {
+ // cov0.Print() ;
 
-   double diff2 = ( ts0(i,0) - ts1(i,0 ) ) ; 
+ THelicalTrack h0 = ts0.GetHelix() ;
+ h0.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , &cov0 ) ;
 
-   //   std::cout << " -------    diff : " << i <<  " : " <<  diff2  << " - cov() " << cov(i,i)  << std::endl ;
+ //cov0.Print() ;
 
-   diff2 *= diff2 ;
+ THelicalTrack h1 = ts1.GetHelix() ;
+ h1.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , &cov1 ) ;
 
-   chi2 +=  diff2 / cov( i , i ) ;
+  double tp0[5] , tp1[5] ;
+  tp0[0] =  - h0.GetDrho() ; 
+  tp0[1] =    toBaseRange( h0.GetPhi0() + M_PI/2. ) ;
+  tp0[2] =    1. /h0.GetRho()  ;              
+  tp0[3] =    h0.GetDz()   ;
+  tp0[4] =    h0.GetTanLambda()  ;
 
- } 
+  tp1[0] =  - h1.GetDrho() ; 
+  tp1[1] =    toBaseRange( h1.GetPhi0() + M_PI/2. ) ;
+  tp1[2] =    1. /h1.GetRho()  ;              
+  tp1[3] =    h1.GetDz()   ;
+  tp1[4] =    h1.GetTanLambda()  ;
 
- return chi2 ;
-
-
- // ===== compute 'proper' chi2  ===== DOESN'T WORK :(
+  //adjust z0 to phi<2Pi :
+  double& z0 = tp0[3] ;
+  double r0 = std::abs( h0.GetRho() ) ;
+  double sz0 =  2.* M_PI * r0 * std::abs( tp0[4] ) ;
+  if( z0 > 0.  ){
+    //    streamlog_out( DEBUG4 ) << " adjusting z0 : " << z0 << " sz0 : " << sz0 << " r: " << r0 << std::endl ; 
+    while( z0 > sz0 )  z0 -= sz0 ;
+    //streamlog_out( DEBUG4 ) << " adjusted z0 : " << z0 << " sz0 : " << sz0 << std::endl ; 
+  }else{
+    while( z0 < -sz0 ) z0 += sz0 ;
+  }
+  double& z1 = tp1[3] ;
+  double r1 = std::abs( h1.GetRho() ) ;
+  double sz1 =  2.* M_PI * r1 * std::abs( tp1[4] ) ;
+  if( z1 > 0.  ){
+    //streamlog_out( DEBUG4 ) << " adjusting z1 : " << z1 << " sz1 : " << sz1 << std::endl ; 
+    while( z1 > sz1 )  z1 -= sz1 ;
+    // streamlog_out( DEBUG4 ) << " adjusting z1 : " << z1 << " sz1 : " << sz1 << std::endl ; 
+  }else{
+    while( z1 < -sz1 ) z1 += sz1 ;
+  }
+    
+  // adjust kappa cov parameter for omega
+  double al2 = ( 1. / h0.GetRho() ) / h0.GetKappa() ;
+  al2 *= al2 ;
+  cov0( 2, 2 ) *= al2 ;
+  cov1( 2, 2 ) *= al2 ;
+  
+  // add errors in quadrature
+  TKalMatrix cov  = ( cov0 + cov1 ) ;
+  
+  double chi2( 0.0 ) ;
+  
+  for(int i=0; i<5 ; ++i ) {
+    
+    double diff2 = ( std::abs( tp0[i] )- std::abs( tp1[i] )  ) ; 
+    
+    diff2 *= diff2 ;
+    
+    streamlog_out( DEBUG )  << " -------    diff : " << i <<  " : " << tp0[i] <<" - " <<  tp1[i] << " = " <<  diff2  
+			    << " - cov() " << cov(i,i)  <<  " diff2/cov(i,i) " << diff2/cov(i,i)  << std::endl ;
+    
+    chi2 +=  ( diff2 / cov( i , i ) )  ;
+    
+  } 
+  
+  return chi2 ;
+  
+  
+  // ===== compute 'proper' chi2  ===== DOESN'T WORK :(
   // TKalMatrix cov( ts0.GetCovMat().GetSub(0,4,0,4) ) ; 
   // TKalMatrix covInv( TKalMatrix::kInverted , cov ) ;
   // TKalMatrix s0( ts0.GetSub(0,4,0,0) );
@@ -335,8 +395,16 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   //  ---- get parameters at origin 
   
   THelicalTrack helix = trkState.GetHelix() ;
+
   double dPhi ;
-  helix.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , 0 ) ;
+
+  // need to get the 5x5 sub matrix of the covariance matrix  
+  const TMatrixD& c0 =  trkState.GetCovMat() ;
+  TMatrixD covK(5,5) ;  for(int i=0;i<5;++i) for(int j=0;j<5;++j) covK[i][j] = c0[i][j] ;
+  
+  helix.MoveTo(  TVector3( 0., 0., 0. ) , dPhi , 0 , &covK ) ;
+
+  //-------------------------------------
 
   // double phi       =    toBaseRange( helix.GetPhi0()  - M_PI/2. ) ;
   // double omega     =   -1. /helix.GetRho()  ;              
@@ -374,7 +442,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   double alpha = omega / cpa  ;
 
-  const TKalMatrix& covK = trkState.GetCovMat() ; 
+  //  const TKalMatrix& covK = trkState.GetCovMat() ; 
   
   if( streamlog_level( DEBUG ) ) {
     streamlog_out( DEBUG ) << " KalTrack::toLCIOTrack : returning covariance matrix :  - alpha : " << alpha << std::endl ;
@@ -405,6 +473,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
  
   trk->setCovMatrix( cov ) ;
 
+  //fixme: shouldn't we set the origin here ??
   float pivot[3] ;
   pivot[0] =  ((TKalTrackSite&) cursite).GetPivot()(0) ;
   pivot[1] =  ((TKalTrackSite&) cursite).GetPivot()(1) ;

@@ -16,8 +16,9 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
   </execute>
   
   <global>
-    <parameter name="LCIOInputFiles"> /data/ilcsoft/data/ILD_00_gunScan_mu+_theta88.00_p50.00_REC.slcio
-                           /data/ilcsoft/data/ILD_00_gunScan_mu+_theta88.00_p3.00_REC.slcio  </parameter>
+    <parameter name="LCIOInputFiles">  /data/ilcsoft/data/ILD_00_gunScan_mu+_theta88.00_p3.00_REC.slcio  
+                                       /data/ilcsoft/data/ILD_00_gunScan_mu+_theta88.00_p50.00_REC.slcio
+                          </parameter>
     <parameter name="GearXMLFile" value="gear_ILD_00.xml" />
     <parameter name="MaxRecordNumber" value="1001" />
     <parameter name="SkipNEvents" value="0" />
@@ -32,7 +33,7 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
     <parameter name="HitCollections" type="string" lcioInType="TrackerHit"> AllTPCTrackerHits </parameter>
     <!--Name of the output collections-->
     <parameter name="OutputCollection" type="string"
-	       lcioOutType="Track"> CluTracks </parameter>
+	       lcioOutType="Track"> KalTestTracks </parameter>
     <!--Cut for distance between hits in mm-->
     <parameter name="DistanceCut" type="float" value="40" />
     <!--fraction of hits in same pad row per track-->
