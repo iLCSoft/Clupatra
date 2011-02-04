@@ -85,7 +85,7 @@ public:
   Double_t GetSigmaZ(Double_t z) const;
 
   /** Overwrite method from TVMeasLayer to use dEdx and from GEAR */
-  Double_t GetEnergyLoss( Bool_t isoutgoing, const TVTrack  &hel, Double_t  df) const ;
+  //  Double_t GetEnergyLoss( Bool_t isoutgoing, const TVTrack  &hel, Double_t  df) const ;
 
 private:
   Double_t fPhiMin;   // minimum phi

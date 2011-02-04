@@ -47,10 +47,8 @@ void KalTest::init() {
   EXTPCKalDetector* tpcdet = new EXTPCKalDetector( tpcParams )  ;
   
   tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z()  ) ; //  Tesla 
-  //  tpcdet->SetBField(   _gearMgr->getBField().at( gear::Vector3D( 0.,0.,0.)  ).z() * 10 ) ; // 10 for Tesla -> kGauss
-
  
- 
+  // FIXME: DEBUG.....
   _det->Install( *vtxdet ) ;  
   _det->Install( *tpcdet ) ;  
   
@@ -64,7 +62,7 @@ void KalTest::init() {
 
 
 
-  vtxdet->PowerOff();       // power off vtx not to process hit
+  //vtxdet->PowerOff();       // power off vtx not to process hit
   
   // --- possible options :
   // _det->SwitchOffMS();    // switch off multiple scattering

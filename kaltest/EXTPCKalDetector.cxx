@@ -111,7 +111,7 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   
   A       = 26.9815386 ;
   Z       =  13. ;
-  density =  2.699 ;
+  density =  2.699 ; // 26.99 ; //FIXME - DEBUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2.699 ;
   radlen  =  tpcParams.getDoubleVal("TPCWallProperties_RadLen")  / 10.  ; 
   TMaterial &al = *new TMaterial("TPCAl", "", A, Z, density, radlen, 0.);
 

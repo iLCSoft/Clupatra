@@ -29,6 +29,8 @@ EXVTXKalDetector::EXVTXKalDetector(Int_t m)
    static float radius[nLayers] = {  16.  ,  18.  ,  37.  ,  39. ,  58. ,  60. ,  165.    , 309.    } ;
    static float length[nLayers] = {  62.5 ,  62.5 , 125.  , 125. , 125. , 125. ,  371.3   , 644.9   } ;
    static float thick[nLayers] =  {    .1 ,    .1 ,    .1 ,    .1,    .1,    .1,     .275 ,    .275 } ;
+   //FIXME DEBUG
+   //static float thick[nLayers] =  {    1. ,    1. ,    1. ,    1.,    1.,    1.,     2.75 ,    2.75 } ;
    
    
    // static const Double_t lhalf     = 5. ;
