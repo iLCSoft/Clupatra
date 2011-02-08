@@ -144,6 +144,15 @@ struct LayerSort<KalTest::OrderIncoming>{
   }
 } ;
 
+//------ ordering of KalTracks 
+struct KalTrackLengthSort {
+  bool operator()( const KalTrack* t0, const KalTrack* t1) {
+    return ( t0->getNHits() >= t1->getNHits() );
+  }
+};
+
+
+
 //------------------------------
 //helpers for z ordering of hits
 struct TrackerHitCast{
@@ -155,6 +164,8 @@ struct ZSort {
     return ( l->getPosition()[2] < r->getPosition()[2] );
   }
 };
+
+
 
 void printZ(TrackerHit* h) { 
   std::cout << h->getPosition()[2] << ", " ;
@@ -928,7 +939,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   evt->addCollection( trksegs , "KalTrackSegments" ) ;
 
   
-//=========== assign left over hits ... ==================================================================
+
+  //===========  merge track segments based on xing points ==================================================
+
+
+
+  //=========== assign left over hits ... ==================================================================
   
   static const bool use_best_track = false ;
 
@@ -1006,16 +1022,17 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       
     }
     
-  } else { // ================== use best matching hit for every track segment =========================
 
+    //        ==========================================================================================
+  } else { // ================== use best matching hit for every track segment =========================
+    //        ==========================================================================================
     
+
+
     streamlog_out( DEBUG1 ) << "  ------ assign left over hits - best matching hit for every track ..."  << std::endl ;
     
     HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
     
-    //FIXME: ------- sort ktracks wrt to pt (1/omega) ...
-
-
 
     //------------- create vector of left over hits per layer
     typedef std::list<Hit*> HitList ;
@@ -1026,49 +1043,70 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ) {
       
       Hit* hit = *ih ;
-      std::cout << " ++++++  layerId: " << tpcLayerID( hit ) << " max layer index : " <<  _kalTest->maxLayerIndex() << std::endl  ;
-      
-      
+      //      std::cout << " ++++++  layerId: " << tpcLayerID( hit ) << " max layer index : " <<  _kalTest->maxLayerIndex() << std::endl  ;
       hitsInLayer[ tpcLayerID( hit ) ].push_back( hit )  ;
     }
-    //------------------------------
-    const bool add_tracksegment_hits = true ;
-    if( add_tracksegment_hits  ){
-      
-      
-      
+    //-----------------------------
+    
+    std::map< HitCluster* , KalTrack* > clu2trkMap ;
 
+    const bool use_segment_hits = true ;
+    
+    if( use_segment_hits  ){
       
+      // store first and last hit of every segment in map with leftover hits in this layer
       
+      for( GenericClusterVec<TrackerHit>::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+	
+	Hit* h0 = (*icv)->front() ;
+	Hit* h1 = (*icv)->back() ;
+	
+	hitsInLayer[ tpcLayerID( h0 ) ].push_back( h0 )  ;
+	hitsInLayer[ tpcLayerID( h1 ) ].push_back( h1 )  ;
+      }
+      
+      // sort the tracks wrt. lenghts (#hits)
+      ktracks.sort( KalTrackLengthSort() ) ;
 
+      // store assoaciation between cluster and track 
+      for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+	HitCluster* c = (*it)->getCluster< HitCluster >() ;
+	clu2trkMap[ c ] = *it ;
+      }	   
     }
     //-------------------------------
-
+    
 
     Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
     
     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
       KalTrack* theTrack = *it ;
+      if( theTrack == 0 ) 
+	continue ;
       
-      const PointList& xptList = theTrack->getXingPoints() ;
+      
+      streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack << std::endl ;
       
       int xpLayer = 0 ;
       
+      // const PointList& xptList = theTrack->getXingPoints() ;
+      // for(PointList::const_iterator itXP = xptList.begin() ; itXP != xptList.end() ; ++itXP , xpLayer++ ) {
+      // 	const gear::Vector3D* kPos =  *itXP ;
       
-      for(PointList::const_iterator itXP = xptList.begin() ; itXP != xptList.end() ; ++itXP , xpLayer++ ) {
-
-	const gear::Vector3D* kPos =  *itXP ;
-
+      PointList& xpVec = theTrack->getXingPoints() ;
+      for( unsigned ixp=0 ; ixp < xpVec.size() ; ++ixp, xpLayer++  ) {
+      	const gear::Vector3D* kPos =  xpVec[ixp]  ;
+	
 	if( kPos == 0 ) {   // we don't have a xing point
 	  continue ;
 	}
 	
-	double ch2Min = 999999999999999. ;
+       	double ch2Min = 999999999999999. ;
 	Hit* bestHit = 0 ;
 	
 	HitList& hLL = hitsInLayer.at( xpLayer ) ;
-
+	
 	for( HitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){
 	  
 	  Hit* hit = *ih ;
@@ -1083,6 +1121,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	    bestHit = hit ;
 	  }
 	}
+	
 	if( bestHit != 0 ) {
 	  
 	  VecFromArray hPos(  bestHit->first->getPosition() ) ;
@@ -1097,14 +1136,133 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 				    <<	 "  z= " <<  sqrt( bestHit->first->getCovMatrix()[5] )
 				    << std::endl ;
 	    
-	    hLL.remove(  bestHit ) ;
 	    
-	    HitCluster* clu = theTrack->getCluster< HitCluster >() ;
-	    
-	    clu->addHit( bestHit ) ;
-	    
+	    if( bestHit->second != 0 ) { //--------------------------------------------------------------------------------
+	      
+	      // hit is already part of a track segment 
+	      
+	      
+	      HitCluster* c = bestHit->second  ;
+	      KalTrack* trk = clu2trkMap[ c ] ;
+	      
+
+	      if( trk == theTrack ) {
+		streamlog_out( ERROR ) << " =======================  found best matching hit from track itself: " << *bestHit->first 
+				       <<     std::endl  
+				       <<  "      track has  " << trk->getNHits()  << " hits " << std::endl ;
+
+		for( unsigned ii=0 ; ii < xpVec.size() ; ++ii) {
+		  if( xpVec[ii] ) 
+		    streamlog_out( ERROR ) << "  xing pt : "  << ii << " - " << *xpVec[ii]  ;
+		}
+		
+		
+		for( HitCluster::iterator its = c->begin(); its != c->end() ; ++its ){
+		  Hit* hit = *its ;
+		  VecFromArray hPos(  hit->first->getPosition() ) ;
+		  streamlog_out( ERROR ) << "  hit  : layer: "  <<   tpcLayerID( hit )   << " - " << hPos.v()  ;
+		}
+		
+
+	      } else {
+
+		
+		streamlog_out( DEBUG3 ) << " +++++++++ found best hit already part of a track segment !!!!!! " 
+					<< " trk : " << trk  << " #hits: " << trk->getNHits() 
+					<< " cluster " << c << c->size() 
+					<< std::endl ;   
+		
+		
+		unsigned goodHits(0), allHits(0) ;
+		
+		double chi2Max = 10. ; // fixme parameter
+		
+		for( HitCluster::iterator its = c->begin(); its != c->end() ; ++its ){
+		  
+		  ++allHits ;
+		  
+		  Hit* hit = *its ;
+		  VecFromArray hPos(  hit->first->getPosition() ) ;
+		  
+		  const gear::Vector3D* kPos = theTrack->getXingPointForLayer( tpcLayerID( hit ) ) ;
+		  
+		  if( kPos != 0 ) {
+		    
+		    double chi2 = ch2rz( hPos.v() , *kPos )  ;
+		    
+		    streamlog_out( DEBUG3 ) << " +++++++++ chi2 : " << chi2 << hPos.v() 
+					    << " +++++++++                  " << *kPos 
+					    << " +++++++++  hit id " << std::hex << hit->first->id() << std::dec 
+					    << std::endl ;
+		    
+		    if( chi2 < chi2Max ){
+		      
+		      ++goodHits ;
+		    }
+		  }
+		}
+		
+		double goodFraction = double( goodHits ) / double(  allHits ) ;
+		
+		streamlog_out( DEBUG3 ) << " +++++++++ fraction of matching hits : " << goodFraction 
+					<< std::endl ;   
+		
+		
+		// ---------------------  merge the track segements -------------------------
+		
+		if( goodFraction > 0.5  ) { // fixme: what is reasonable here - make parameter ...
+		  
+		  
+		  for( HitCluster::iterator its = c->begin(); its != c->end() ; ++its ){
+
+		    delete  xpVec[  tpcLayerID( *its ) ] ; // erase crossing points for these hit
+		    xpVec[  tpcLayerID( *its ) ]  = 0 ;   
+		  }
+		  HitCluster* clu = theTrack->getCluster< HitCluster >() ;
+		  
+		  // merge the cluster into the larger one and delete it - remove the hits from the hitsinlayer vector first
+		  
+		  Hit* h0 = c->front() ;
+		  Hit* h1 = c->back() ;
+		  
+		  hitsInLayer[ tpcLayerID( h0 ) ].remove( h0 )  ;
+		  hitsInLayer[ tpcLayerID( h1 ) ].remove( h1 )  ;
+		  
+		  clu->mergeClusters( c ) ;
+		  
+		  cluList.remove( c  ) ;
+		  
+		  
+		  streamlog_out( DEBUG3) << " ************ found matching segment, merged all hits: delete cluster : " << c 
+					 << " and track : " << trk << std::endl ;
+		  
+		  delete c ;
+		  
+		  ktracks.remove( trk ) ;
+		  
+		} //-------------------------------------------------------------
+
+	      }
+
+		
+	    }  else  {  //--------------------------------------------------------------------------------
+	      
+	      hLL.remove(  bestHit ) ;
+	      
+	      HitCluster* clu = theTrack->getCluster< HitCluster >() ;
+	      
+	      streamlog_out( DEBUG3) << "    ************ found matching hit, add to  cluster : " << clu  << std::endl ;
+	      
+	      clu->addHit( bestHit ) ;
+	    }
+
+
 	  }
-	}
+	} 
+          // else {
+	  //	  streamlog_out( DEBUG1 ) << "????????????????????? no best Hit found xing pnt  : chi2  " << *xpVec[ixp]  << " : " << ch2Min << std::endl ;
+	  //	}
+
       }
     }
     
@@ -1159,18 +1317,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), &trkMerge  , 2 ) ;
 
 
-    streamlog_out( DEBUG4 ) << " ===== merged tracks - #cluster: " << trkCluVec.size()   << "  ============================== " << std::endl ;
+    streamlog_out( DEBUG4 ) << " ===== merged tracks - # cluster: " << trkCluVec.size()   << "  ============================== " << std::endl ;
     
     for( GenericClusterVec<Track>::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
       
-      streamlog_out( DEBUG4 ) <<  myheader<Track>() << std::endl ;
+      streamlog_out( DEBUG2 ) <<  myheader<Track>() << std::endl ;
       
       GenericCluster<Track>* trkClu = *it ;
       
       std::list<Track*> mergedTrk ;
       for( GenericCluster<Track>::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
 	
-	streamlog_out( DEBUG4 ) << lcshort(  (*itC)->first ) << std::endl ; 
+	streamlog_out( DEBUG2 ) << lcshort(  (*itC)->first ) << std::endl ; 
 	
 	mergedTrk.push_back( (*itC)->first ) ; 
       }

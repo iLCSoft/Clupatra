@@ -121,6 +121,9 @@ void KalTrack::addHit( const TVector3& pos, int layer , EVENT::TrackerHit* hit) 
   }
 }
 
+unsigned KalTrack::getNHits() const { 
+  return _kalHits->GetEntriesFast() ; 
+}
 
 void KalTrack::fitTrack( bool fitDirection ) {
   
@@ -612,14 +615,37 @@ void KalTrack::findXingPoints() {
   int  idx0 = site0.GetHit().GetMeasLayer().GetIndex()  ; 
   int  idx1 = site1.GetHit().GetMeasLayer().GetIndex()  ; 
 
+
+  // ----- sanity check - don't compute xing points if some sites have been discarded in the fit
+  int nHits = _kalHits->GetEntriesFast() - 1 ;
+  if( nHits !=  std::abs( idx0 - idx1 ) ) {
+
+    streamlog_out( DEBUG4 ) << "  ======= findXingPoints:   hits discarded in fit : No Crossing Points Computed !!! " 
+			    << "  nHits-1 : " << nHits-1 << "  -  std::abs( idx0 - idx1 ) " <<  std::abs( idx0 - idx1 )
+			    << std::endl ;
+    return ;
+  }
+  if( nHits < 15 ) { // quality cut !?
+
+    streamlog_out( DEBUG4 ) << "  ======= findXingPoints:   less then 15 hits:  No Crossing Points Computed !!! " 
+			    << "  nHits: " << nHits 
+			    << std::endl ;
+    return ;
+  }
+  
+
+
+
   streamlog_out( DEBUG4 ) << " KalTrack::findXingPoints : " 
-			 << " index at track site[0] : "  <<  idx0  
-			 << " index at last site :     "  <<  idx1 
-			 <<   std::endl ;
+			  << " index at track site[0] : "  <<  idx0  
+			  << " index at last site :     "  <<  idx1 
+			  <<   std::endl ;
   
   // search inwards first 
   int            idx  =  ( idx1 > idx0  ? idx0  : idx1  ) ; 
   TKalTrackSite& site =  ( idx1 > idx0  ? site0 : site1 ) ; 
+
+
 
   --idx ;  // next site inwards
 
@@ -645,7 +671,7 @@ void KalTrack::findXingPoints() {
       
     } else {
 
-      streamlog_out( DEBUG ) << " ---- no crossing point found with layer " << idx << std::endl ;      
+      streamlog_out( DEBUG4 ) << " ---- no crossing point found with layer " << idx << std::endl ;      
 
       break ;
     }
@@ -655,7 +681,7 @@ void KalTrack::findXingPoints() {
   idx  =  ( idx1 > idx0  ? idx1  : idx0  ) ; 
   site =  ( idx1 > idx0  ? site1 : site0 ) ; 
   
-  streamlog_out( DEBUG ) << " ---- creating track for site at layer : " << idx 
+  streamlog_out( DEBUG4 ) << " ---- creating track for site at layer : " << idx 
 			 << " state " << & site.GetCurState()
 			 << std::endl ;
   
@@ -674,10 +700,10 @@ void KalTrack::findXingPoints() {
     if (  dynamic_cast<TVSurface *>( _det->At(idx)  )->CalcXingPointWith( *help0 , xx, fid)  ){
       
       streamlog_out( DEBUG4 ) << " ---- crossing layer " << idx <<  " at: " 
-			     << xx[0] << ", "  << xx[1] << ", " << xx[2] 
-			     << " r: " << xx.Perp()  
-			     << std::endl ;
-
+			      << xx[0] << ", "  << xx[1] << ", " << xx[2] 
+			      << " r: " << xx.Perp()  
+			      << std::endl ;
+      
       _xingPts[ idx ]  = new  gear::Vector3D( xx[0] , xx[1], xx[2] )  ;
       // _xingPts[ idx ]  = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )  ;
 
@@ -685,9 +711,31 @@ void KalTrack::findXingPoints() {
       
     } else {
 
-      streamlog_out( DEBUG ) << " ---- no crossing point found with layer " << idx << std::endl ;      
+      streamlog_out( DEBUG4 ) << " ---- no crossing point found with layer " << idx << std::endl ;      
 
       break ;
     }
   }
+
+
+  if( streamlog_level( DEBUG4 ) ){
+
+    TIter next(_kalHits, kIterBackward);
+
+    TVTrackHit *hitp = 0;
+    
+    while ( (hitp = dynamic_cast<TVTrackHit *>( next() ) ) ) {
+      
+      int layer =  hitp->GetMeasLayer().GetIndex() ;
+      
+      if(  _xingPts[layer] != 0 ) {
+	
+	streamlog_out( ERROR )  << "   !!!!!!!!!!!!!!!!!!!! found xingPoint in layer  " << layer << " where we have a hit !!!!???????? " << std::endl ;
+	
+      }
+    }
+  }
+
+
+
 }

@@ -63,7 +63,8 @@ public:
   /**Calculate crossing points with next layers at end of track segment */
   void findXingPoints() ;
 
-  const PointList& getXingPoints() { return _xingPts ; }
+  //  const PointList& getXingPoints() { return _xingPts ; }
+  PointList& getXingPoints() { return _xingPts ; }
  
   gear::Vector3D* getXingPointForLayer(int l) { return _xingPts.at( l ) ; }
   
@@ -78,7 +79,10 @@ public:
   /** current track state */
   TKalTrackState& getTrackState() const ;
  
-  
+  /** Number of hits on this track */
+  unsigned getNHits() const ;
+
+
   template <class T>
   void setCluster(T* cluster) {  _cluster = cluster ;  }
 

@@ -35,14 +35,14 @@
 	<global>
 		<parameter name="LCIOInputFiles"> recfile.slcio </parameter>
 		<parameter name="GearXMLFile" value="gear_ILD_00.xml" />
-		<parameter name="MaxRecordNumber" value="11" />
+		<parameter name="MaxRecordNumber" value="12" />
 		<parameter name="SkipNEvents" value="0" />
 		<parameter name="SupressCheck" value="false true false" />
 		<parameter name="Verbosity" value="DEBUG MESSAGE" />
 	</global>
 
 	<processor name="MyClupatraProcessor" type="ClupatraProcessor">
-		<parameter name="Verbosity" value="DEBUG1 MESSAGE DEBUG" />
+		<parameter name="Verbosity" value="DEBUG3 MESSAGE DEBUG" />
 		<!--ClupatraProcessor : simple nearest neighbour clustering-->
 		<!--Name of the input collections-->
 		<parameter name="HitCollections" type="string" lcioInType="TrackerHit"> AllTPCTrackerHits </parameter>
