@@ -6,6 +6,9 @@
 #include <set>
 #include <algorithm>
 
+#include <math.h>
+#include <cmath>
+
 //---- MarlinUtil 
 #include "NNClusters.h"
 #include "ClusterShapes.h"
@@ -102,6 +105,7 @@ struct HitInfoStruct{
   HitInfoStruct() :layerID(-1), usedInTrack(false) {}
   int layerID ;
   bool usedInTrack ;
+  double chi2Residual ;
 } ;
 struct HitInfo : LCOwnedExtension<HitInfo, HitInfoStruct> {} ;
 
@@ -441,7 +445,7 @@ void printTrackShort(const LCObject* o){
 			   << lcshort( trk ) << std::endl  ;
   
   
-  double r0 = 1. / std::abs( trk->getOmega() ) ;
+  double r0 = 1. / trk->getOmega() ;
   double d0 = trk->getD0() ;
   double p0 = trk->getPhi() ;
   
@@ -449,6 +453,24 @@ void printTrackShort(const LCObject* o){
   double y0 = ( d0 - r0 ) * cos( p0 ) ;
   
   streamlog_out( MESSAGE ) << " circle: r = " << r0 << ", xc = " << x0 << " , yc = " << y0 << std::endl ;
+    
+}
+
+void printTrackerHit(const LCObject* o){
+  
+  TrackerHit* trk = const_cast<TrackerHit*> ( dynamic_cast<const TrackerHit*> (o) ) ; 
+  
+  if( o == 0 ) {
+    
+    streamlog_out( ERROR ) << "  printTrackerHit : dynamic_cast<TrackerHit*> failed for LCObject : " << o << std::endl ;
+    return  ;
+  }
+  
+  streamlog_out( MESSAGE ) << *trk << std::endl 
+			   << " err: rPhi" <<  sqrt( trk->getCovMatrix()[0] + trk->getCovMatrix()[2] ) 
+			   << " z :  " <<   trk->getCovMatrix()[5] << std::endl 
+			   << " chi2 residual to best matching track : " << trk->ext<HitInfo>()->chi2Residual << std::endl ;
+
     
 }
 
@@ -556,8 +578,8 @@ public:
     if(  dtl >  DTANLMAX * DTANLMAX ) 
       return false ;
 
-    double r0 = 1. / std::abs( trk0->getOmega() ) ;
-    double r1 = 1. / std::abs( trk1->getOmega() ) ;
+    double r0 = 1. / trk0->getOmega()  ;
+    double r1 = 1. / trk1->getOmega()  ;
 
 
     double d0 = trk0->getD0() ;
@@ -572,7 +594,7 @@ public:
     double y0 = ( d0 - r0 ) * cos( p0 ) ;
     double y1 = ( d1 - r1 ) * cos( p1 ) ;
     
-    double dr = 2. * std::abs( r0 -r1 ) / (r0 + r1 ) ;
+    double dr = 2. * std::abs( ( r0 -r1 ) / (r0 + r1 ) ) ;
 
     double distMS = sqrt ( ( x0 - x1 ) * ( x0 - x1 ) + ( y0 - y1 ) * ( y0 - y1 )  ) ;
     
@@ -1086,7 +1108,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	continue ;
       
       
-      streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack << std::endl ;
+      // ----- define chi2 cut    ~15 for 1 GeV pt 
+      double chi2Cut = 1000. / ( std::log(1.) - std::log( std::abs(theTrack->getOmega()) ) ) ;
+
+
+      streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack 
+			      << "   chi2 cut : " << chi2Cut  << " -  omega : " << theTrack->getOmega() <<  std::endl ;
       
       int xpLayer = 0 ;
       
@@ -1127,7 +1154,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  VecFromArray hPos(  bestHit->first->getPosition() ) ;
 	  
 	  //	  if( ch2Min  <  6. ) { // Sum( pdf(ch2,ndf==2) )_0^6 ~ 95% )
-	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 99.x% ?? ) // FIXME: need steering parameter and optimize value
+	  //	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 99.x% ?? ) // FIXME: need steering parameter and optimize value
+	  
+	  
+	  bestHit->first->ext<HitInfo>()->chi2Residual = ch2Min ;
+
+
+	  if( ch2Min  < chi2Cut ) { 
 	    
 	    streamlog_out( DEBUG1 ) <<   " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos
 				    <<   " dist: " <<  (  hPos.v() - *kPos ).r()
@@ -1383,6 +1416,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   }
 
 
+  //------ register some debugging print funtctions for picking in CED :
+
+  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
   CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
   //======================================================================================================
 

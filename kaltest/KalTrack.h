@@ -72,6 +72,9 @@ public:
   void addIPHit() ;
 
 
+  /** omega of the track (1./R) */
+  double getOmega() ; 
+
   /** Compute the chi2 ( (a0-a1)^t * cov0^-1 * (a0-a1) ) between two track states - using the covariance matrix of the first */ 
   static double chi2( const KalTrack& t0 , const KalTrack& t1) ;
 
