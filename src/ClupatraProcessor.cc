@@ -100,6 +100,31 @@ public :
   }
 };
 
+/** helper class to compute the chisquared of two points in rho and z coordinate */
+struct Chi2_RPhi_Z_Hit{
+  double operator()( const TrackerHit* h, const gear::Vector3D& v1) {
+
+
+    gear::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
+
+    double sigsr =  sqrt( h->getCovMatrix()[0] + h->getCovMatrix()[2] ) ;
+    double sigsz =  h->getCovMatrix()[5] ;
+    // double sigsr =  0.01 ; 
+    // double sigsz =  0.1 ;
+    
+
+    double dPhi = std::abs(  v0.phi() - v1.phi() )  ;
+    if( dPhi > M_PI )
+      dPhi = 2.* M_PI - dPhi ;
+
+    double dRPhi =  dPhi *  v0.rho() ; 
+
+    double dZ = v0.z() - v1.z() ;
+
+    return  dRPhi * dRPhi / sigsr + dZ * dZ / sigsz  ;
+  }
+};
+
 // helper class to assign additional parameters to TrackerHits
 struct HitInfoStruct{
   HitInfoStruct() :layerID(-1), usedInTrack(false) {}
@@ -975,7 +1000,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     streamlog_out( DEBUG ) << "  ------ assign left over hits - best matching track for every hit ..."  << std::endl ;
 
     Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
-    
+    Chi2_RPhi_Z_Hit ch2rzh ;
+
+
     HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
     
     for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
@@ -999,7 +1026,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	if( kPos != 0 ){
 	  
-	  double ch2 = ch2rz( hPos.v() , *kPos )  ;
+	  //	  double ch2 = ch2rz( hPos.v() , *kPos )  ;
+	  double ch2 = ch2rzh( hit->first , *kPos )  ;
 	  
 	  if( ch2 < ch2Min ){
 	    
@@ -1099,8 +1127,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     //-------------------------------
     
 
-    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
+    //    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
+    Chi2_RPhi_Z_Hit  ch2rzh ;
     
+
     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
       KalTrack* theTrack = *it ;
@@ -1138,10 +1168,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  
 	  Hit* hit = *ih ;
 	  
-	  VecFromArray hPos(  hit->first->getPosition() ) ;
-	  
-	  double ch2 = ch2rz( hPos.v() , *kPos )  ;
-	  
+	  //VecFromArray hPos(  hit->first->getPosition() ) ;
+	  //double ch2 = ch2rz( hPos.v() , *kPos )  ;
+	  double ch2 = ch2rzh( hit->first , *kPos )  ;
+
 	  if( ch2 < ch2Min ){
 	    
 	    ch2Min = ch2 ;
@@ -1221,8 +1251,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 		  
 		  if( kPos != 0 ) {
 		    
-		    double chi2 = ch2rz( hPos.v() , *kPos )  ;
-		    
+		    //double chi2 = ch2rz( hPos.v() , *kPos )  ;
+		    double chi2 = ch2rzh( hit->first , *kPos )  ;
+
 		    streamlog_out( DEBUG3 ) << " +++++++++ chi2 : " << chi2 << hPos.v() 
 					    << " +++++++++                  " << *kPos 
 					    << " +++++++++  hit id " << std::hex << hit->first->id() << std::dec 
