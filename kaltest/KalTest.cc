@@ -16,6 +16,8 @@
 
 #include "streamlog/streamlog.h"
 
+#include "ConfigFlags.h"
+
 
 
 KalTest::KalTest( const gear::GearMgr& gearMgr) :  
@@ -28,13 +30,29 @@ KalTest::KalTest( const gear::GearMgr& gearMgr) :
   _det->SetOwner( true ) ; // takes care of deleting subdetector in the end ...
   
 
-  // this could be made a public init() method taking options ....
-  init() ;
+  _cfg = new ConfigFlags(  CFG::size ) ;
   
+  _cfg->registerOption( KalTest::CFG::ownsHits    , "KalTest::CFG::ownsHits"  , true ) ;
+  _cfg->registerOption( KalTest::CFG::useQMS      , "KalTest::CFG::useQMS"    , false ) ;
+  _cfg->registerOption( KalTest::CFG::usedEdx     , "KalTest::CFG::usedEdx"   , false ) ;
+  
+  streamlog_out( DEBUG4 ) << " ******  KalTest configuration : " << std::endl 
+			  <<   *_cfg
+ 			  <<   std::endl ;
+
+
+  // this  now a public init() method taking options ....
+  // init() 
 }
 
+
+void KalTest::setOption(unsigned CFGOption, bool val) { 
+
+  _cfg->setOption( CFGOption , val ) ;
+}   
+
 KalTest::~KalTest(){
-  
+  delete _cfg ;
   delete _det ;
 }
 
@@ -64,11 +82,40 @@ void KalTest::init() {
 
   //vtxdet->PowerOff();       // power off vtx not to process hit
   
-  // --- possible options :
-  // _det->SwitchOffMS();    // switch off multiple scattering
-  // _det->SwitchOffDEDX();  // switch off enery loss
+  // --- set some options :
+
+  if( ! (*_cfg)[ KalTest::CFG::useQMS ]  )   _det->SwitchOffMS();    
+
+  if( ! (*_cfg)[ KalTest::CFG::usedEdx ]  )  _det->SwitchOffDEDX();  
   
 }
+
+KalTrack* KalTest::createKalTrack()  { 
+
+  return new KalTrack( _det , _cfg->option( KalTest::CFG::ownsHits )  ) ; 
+}
+
+
+
+TVTrackHit*  KalTest::createHit(EVENT::TrackerHit* hit, int layer, int detID) {
+  
+  layer +=  indexOfFirstLayer( detID ) ;
+  
+  if( layer >= 0 && ( _det->GetEntries() > layer ) ) {
+    
+    TObject* o =  _det->At( layer ) ;
+    
+    EXVMeasLayer* ml = dynamic_cast< EXVMeasLayer * >( o ) ;
+    
+    if (ml != 0 && ml->IsActive() && dynamic_cast<const EXVKalDetector &>( ml->GetParent(kFALSE) ).IsPowerOn() ) {
+      
+      return ml->createHit(  hit ) ;
+    }
+  }
+
+  return 0 ; 
+}
+
 
 int KalTest::indexOfFirstLayer(int detID) { 
   

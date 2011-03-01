@@ -48,6 +48,8 @@ public:
   virtual void ProcessHit(const TVector3  &xx,
 			  TObjArray &hits, EVENT::TrackerHit* hit=0) = 0;
   
+  virtual TVTrackHit* createHit( EVENT::TrackerHit* hit=0 ) = 0;
+
   inline int getLayerID(){ return _layerID ; } 
   
   inline TString GetMLName () const { return fName;    }

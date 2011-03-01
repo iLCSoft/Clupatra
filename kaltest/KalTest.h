@@ -17,11 +17,13 @@
 #include "KalTrack.h"
 
 class TKalDetCradle ;
+class TVTrackHit ;
 
 namespace IMPL{
   class TrackImpl ;
 }
 
+class ConfigFlags ;
 
 
 /** Interface to KaltTest Kalman fitter - instantiates and holds the detector geometry.
@@ -39,8 +41,9 @@ public:
   static const bool OrderIncoming  = false ;
   static const bool PropagateToIP  = true ;
   
-/** Enums for identifying detectors
- */
+  
+  /** 'Enums' for identifying detectors
+   */
   struct DetID {
     static const int unknown = 0 ;
     static const int VXD =  1 ;
@@ -54,25 +57,45 @@ public:
   } ;
 
 
+  /** 'Enums' for configuration options
+   */
+  struct CFG {
+    static const unsigned  ownsHits = 0 ;
+    static const unsigned  useQMS   = 1 ;
+    static const unsigned  usedEdx  = 2 ;
+    //---
+    static const unsigned  size     = 3 ;
+  } ;
+  
+  
   /** Default c'tor, initializes the geometry from GEAR. */
   KalTest( const gear::GearMgr& gearMgr) ;
   
   ~KalTest() ;
   
-  KalTrack* createKalTrack()  { return new KalTrack( _det ) ; }
-
+  KalTrack* createKalTrack() ; // { return new KalTrack( _det ) ; }
+  
+  /** Create a TVTrackHit from an lcio::TrackerHit - need lcio layer and detector ID.
+   */
+  TVTrackHit* createHit(EVENT::TrackerHit* hit, int layer, int detectorID) ;
+  
   int indexOfFirstLayer( int detectorID ) ;
-
+  
   int maxLayerIndex() ;
+  
+  void setOption(unsigned CFGOption, bool val) ;  
+
+  void init() ;
 
 protected:
-  void init() ;
 
   const gear::GearMgr* _gearMgr ;
 
   TKalDetCradle* _det ;            // the detector cradle
 
   std::vector<int> _idOffsets ;
+
+  ConfigFlags* _cfg ;
 
 } ;
 

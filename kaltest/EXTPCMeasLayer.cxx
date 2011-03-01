@@ -159,7 +159,7 @@ void EXTPCMeasLayer::CalcDhDa(const TVTrackHit &vht,
                               const TKalMatrix &dxphiada,
                                     TKalMatrix &H) const
 {
-  const EXTPCHit &ht = dynamic_cast<const EXTPCHit &>(vht);
+  //  const EXTPCHit &ht = dynamic_cast<const EXTPCHit &>(vht);
 
   // Calculate
   //    H = (@h/@a) = (@phi/@a, @z/@a)^t
@@ -235,16 +235,6 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
   Double_t   rphi = h(0, 0);
   Double_t   d    = h(1, 0);
 
-  //fg: we need zdrift here ! 
-  Double_t zDrift   =  GetLength() * 0.5 - std::abs( d )  ;
-
-
-  // Double_t dx = GetSigmaX( zDrift );
-  // Double_t dz = GetSigmaZ( zDrift );
-
-  //   Double_t dx = GetSigmaX(d);
-  //   Double_t dz = GetSigmaZ(d);
-
   // use errors stored in LCIO hit
   double dx = sqrt( hit->getCovMatrix()[0] + hit->getCovMatrix()[2] );
   double dz = sqrt( hit->getCovMatrix()[5] );
@@ -270,10 +260,41 @@ void EXTPCMeasLayer::ProcessHit(const TVector3  &xx,
 
   Double_t b = EXTPCKalDetector::GetBfield();
   hits.Add(new EXTPCHit(*this, meas, dmeas, side, v , hit, b  ));
-
-  // TVector3 pv = dynamic_cast<EXTPCHit*>(  hits.Last() )->GetExactX() ; 
-  // streamlog_out( DEBUG ) << " EXTPCHit hit[" << hits.Last() << "]at : " << pv[0] << ", "  << pv[1] << ", "  << pv[2] << std::endl ;
 }
+
+
+TVTrackHit* EXTPCMeasLayer::createHit( EVENT::TrackerHit* hit ) {
+  
+  static const double epsilon = 0.0001 ; // 1 micron 
+  
+  TVector3  xx( hit->getPosition()[0] , hit->getPosition()[1], hit->getPosition()[2] ) ;
+  
+  Int_t      side = (xx.Z() < 0. ? -1 : 1);
+  TKalMatrix h    = XvToMv(xx, side);
+
+  Double_t meas [2];
+  Double_t dmeas[2];
+  meas [0] = h(0, 0); 
+  meas [1] = h(1, 0);
+  dmeas[0] = sqrt( hit->getCovMatrix()[0] + hit->getCovMatrix()[2] );
+  dmeas[1] = sqrt( hit->getCovMatrix()[5] );
+
+  
+  if( streamlog_level( DEBUG4 ) ){
+
+    if( std::abs( xx.Perp() - GetR() ) > epsilon ) {
+
+      streamlog_out( ERROR ) << " TPC hit at r = " << xx.Perp() 
+			     << " not on measurement layer R = " << GetR() << std::endl ; 
+    }
+  }
+
+  Double_t v = EXTPCKalDetector::GetVdrift();
+  Double_t b = EXTPCKalDetector::GetBfield();
+
+  return new EXTPCHit(*this, meas, dmeas, side, v , hit, b ) ;
+}
+
 
 void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,
 			       TObjArray  &hits) {

@@ -291,13 +291,62 @@ public:
   // bool operator() (T* hit) {  // DEBUG ....
   //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
   bool operator() (T* hit) {  
-    return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
+    return  ( (std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
+			  hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut )   ||
+	      ( std::abs( hit->getPosition()[2] ) > (500. + _rcut ) )
+	      ); 
   }
 protected:
   RCut() {} ;
   double _rcut ;
 } ;
+
+template <class T>
+class RCutInverse {
+public:
+  RCutInverse( double rcut ) : _rcut( rcut ) {}  
+  
+  bool operator() (T* hit) {  
+    return (  ( std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
+			   hit->getPosition()[1]*hit->getPosition()[1] )   <= _rcut )   &&
+	      (  std::abs( hit->getPosition()[2] ) <= (500. + _rcut ) )
+	      ) ;
+
+  }
+protected:
+  RCutInverse() {} ;
+  double _rcut ;
+} ;
+
+// template <class T>
+// class RCut {
+// public:
+//   RCut( double rcut ) : _rcut( rcut ) {}  
+  
+//   // bool operator() (T* hit) {  // DEBUG ....
+//   //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
+//   bool operator() (T* hit) {  
+//     return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
+// 			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
+//   }
+// protected:
+//   RCut() {} ;
+//   double _rcut ;
+// } ;
+
+// template <class T>
+// class RCutInverse {
+// public:
+//   RCutInverse( double rcut ) : _rcut( rcut ) {}  
+  
+//   bool operator() (T* hit) {  
+//     return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
+// 			hit->getPosition()[1]*hit->getPosition()[1] )   <= _rcut ; 
+//   }
+// protected:
+//   RCutInverse() {} ;
+//   double _rcut ;
+// } ;
 
 //---------------------------------------------------------------------------------
 
@@ -691,6 +740,10 @@ void ClupatraProcessor::init() {
 
   _kalTest = new KalTest( *marlin::Global::GEAR ) ;
 
+  _kalTest->setOption( KalTest::CFG::ownsHits , true ) ;
+
+  _kalTest->init() ;
+
   _nRun = 0 ;
   _nEvt = 0 ;
 }
@@ -705,10 +758,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   clock_t start =  clock() ; 
 
   GenericHitVec<TrackerHit> h ;
+  GenericHitVec<TrackerHit> hSmallR ; 
   
   GenericClusterVec<TrackerHit> cluList ;
   
   RCut<TrackerHit> rCut( _rCut ) ;
+  RCutInverse<TrackerHit> rCutInverse( _rCut ) ;
   
   ZIndex<TrackerHit,200> zIndex( -2750. , 2750. ) ; 
   
@@ -771,6 +826,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     //    std::for_each( hitList.begin() , hitList.end() , printZ ) ;
 
     addToGenericHitVec( h, hitList.begin() , hitList.end() , rCut ,  zIndex ) ;
+
+    // create a vector with the hits at smaller R
+    addToGenericHitVec( hSmallR, hitList.begin() , hitList.end() , rCutInverse ,  zIndex ) ;
   }  
   
   // cluster the sorted hits  ( if |diff(z_index)|>1 the loop is stopped)
@@ -959,7 +1017,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
     if ( (*it)->second == 0 ) leftOverHits.push_back( *it ) ;
   }
-  
+
+  // add all hits that failed the rcut 
+  std::copy( hSmallR.begin() , hSmallR.end() , std::back_inserter( leftOverHits )  ) ;
+
+
   //  GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
 
 
@@ -1100,7 +1162,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     std::map< HitCluster* , KalTrack* > clu2trkMap ;
 
-    const bool use_segment_hits = true ;
+    const bool use_segment_hits = false ; //true ;
     
     if( use_segment_hits  ){
       
@@ -1139,7 +1201,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       
       
       // ----- define chi2 cut    ~15 for 1 GeV pt 
-      double chi2Cut = 1000. / ( std::log(1.) - std::log( std::abs(theTrack->getOmega()) ) ) ;
+      double chi2Cut = 100000. / ( std::log(1.) - std::log( std::abs(theTrack->getOmega()) ) ) ;
 
 
       streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack 
@@ -1159,7 +1221,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  continue ;
 	}
 	
-       	double ch2Min = 999999999999999. ;
+       	double ch2Min = 10e99 ;
 	Hit* bestHit = 0 ;
 	
 	HitList& hLL = hitsInLayer.at( xpLayer ) ;
@@ -1474,6 +1536,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   unUsedHits->reserve( h.size() ) ;
   //  typedef GenericHitVec<TrackerHit>::iterator GHVI ;
   for( GHVI it = h.begin(); it != h.end() ;++it){
+    if( (*it)->second != 0 ){
+      usedHits->push_back( (*it)->first ) ;
+    } else {
+      unUsedHits->push_back( (*it)->first ) ;          
+    }
+  }
+  for( GHVI it = hSmallR.begin(); it != hSmallR.end() ;++it){
     if( (*it)->second != 0 ){
       usedHits->push_back( (*it)->first ) ;
     } else {

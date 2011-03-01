@@ -53,12 +53,18 @@ std::ostream& operator<<(std::ostream& o, const KalTrack& trk) {
 
 
 /** C'tor - initiale with detector */
-KalTrack::KalTrack(TKalDetCradle* det) : _det( det) , _xingPts( _det->GetEntriesFast() ) {
+KalTrack::KalTrack(TKalDetCradle* det, bool ownHits) : _det( det) , _xingPts( _det->GetEntriesFast() ) {
   _trk = new TKalTrack ;
   _trk->SetOwner();
 
   _kalHits = new TObjArray ;
-  _kalHits->SetOwner() ;
+
+  // if( ownHits )
+  //   _kalHits->SetOwner() ;
+
+  _kalHits->SetOwner( ownHits ) ;
+
+  streamlog_out( DEBUG ) << " creating Kaltrack  - owning hits = " << ownHits << std::endl ;
 
   for( unsigned i=0 ; i< _xingPts.size() ; _xingPts[i++] = 0  ) ;
 }
@@ -68,6 +74,8 @@ KalTrack::~KalTrack(){
   delete _kalHits ;
   for( unsigned i=0 ; i< _xingPts.size() ; delete _xingPts[i++] ) ;
 }
+
+
 
 
 void KalTrack::addIPHit(){
@@ -243,7 +251,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
     if (!kaltrack.AddAndFilter(site)) {               // filter it
 
-      //streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << std::endl;
+      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << std::endl;
 
       delete &site;                        // delete it if failed
     }
@@ -260,6 +268,29 @@ void KalTrack::fitTrack( bool fitDirection ) {
   //  double bla = chi2( *this , *this ) ;
 
 }
+
+bool KalTrack::addAndFilter( TVTrackHit* hit){
+  
+  TKalTrackSite* site = new TKalTrackSite( *hit ); // new site
+  
+  bool success = _trk->AddAndFilter( *site ) ;
+  
+  if( ! success ) {
+    
+    streamlog_out( DEBUG4 )  << "Kaltrack::addAndFilter :  site discarded!" << std::endl;
+    
+    delete site;                        // delete it if failed
+    
+    return false ;
+  }
+  
+  _kalHits->Add( hit ) ;
+  
+  return true ;
+}
+
+
+
 
 
 double KalTrack::chi2( const KalTrack& t0 , const KalTrack& t1) {
@@ -531,7 +562,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
     if( h   && h != hLast ) {// protect against duplicate hits (from dummy site in fitTrack() ....)  
 
       trk->addHit( h ) ;
-       hLast = h ;
+      hLast = h ;
     }
 
   }
@@ -605,6 +636,61 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   // ============================================================================================================
 }
 
+void KalTrack::findNextXingPoint(gear::Vector3D& v, int& layer, int step) {
+  
+  layer = -1 ; // default return value
+  
+  TKalTrackSite& siteL =  *dynamic_cast<TKalTrackSite*>( _trk->Last() ) ;
+  TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ; 
+  
+  int  idx0 = site0.GetHit().GetMeasLayer().GetIndex()  ; 
+  int  idxL = siteL.GetHit().GetMeasLayer().GetIndex()  ; 
+
+  int idx = idxL ;
+
+  bool isIncoming  = idxL < idx0 ; 
+  
+  streamlog_out( DEBUG2 ) << " KalTrack::findNextXingPoint : " 
+			  << " index at track site[0] : "  <<  idx0  
+			  << " index at last site :     "  <<  idxL  << std::endl 
+			  << "  site0: pivot : " << gear::Vector3D( site0.GetPivot() )
+			  << "  siteL: pivot : " << gear::Vector3D( siteL.GetPivot() )
+			  << "  isIncoming: " << isIncoming 
+			  <<   std::endl ;
+  
+  std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( siteL.GetCurState() ).CreateTrack() ); // tmp track
+  
+  TVector3 xx ;       // expected hit position vector
+  double  fid  = 0. ; // deflection angle from the last hit
+  
+  
+  if  (isIncoming )  idx -= step ;     
+  else               idx += step ;
+  
+
+
+  int lastIdx =  _det->GetEntriesFast() ;  // need # of tracking layers
+  
+  
+  if(  idx < 0 || idx >= lastIdx ) return ;
+  
+  
+  if (  dynamic_cast<TVSurface *>( _det->At( idx )  )->CalcXingPointWith( *help , xx, fid)  ){
+    
+    streamlog_out( DEBUG2  ) << " ---- next crossing at layer " << idx <<  " at: " 
+			     << xx[0] << ", "  << xx[1] << ", " << xx[2] 
+			     << " r: " << xx.Perp()  
+			     << std::endl ;
+    
+    // return values
+    layer = idx  ;
+
+    v = gear::Vector3D( xx[0] , xx[1] , xx[2] )   ;
+  }
+
+}
+
+
 
 void KalTrack::findXingPoints() {
 
@@ -615,7 +701,7 @@ void KalTrack::findXingPoints() {
   int nHits = _kalHits->GetEntriesFast()  ;
 
 
-  if( nSites < 15 ){
+  if( nSites < 10 ){
     
     streamlog_out( DEBUG4 ) << "  ======= findXingPoints:   less then nSites used in fit:  No Crossing Points Computed !!! " 
 			    << "  nSites: " << nSites
@@ -643,10 +729,10 @@ void KalTrack::findXingPoints() {
   int  idx0 = site0.GetHit().GetMeasLayer().GetIndex()  ; 
   int  idx1 = siteL.GetHit().GetMeasLayer().GetIndex()  ; 
   
-  bool isIncomming  = idx1 < idx0 ; // the last site has the best track parameters 
+  bool isIncoming  = idx1 < idx0 ; // the last site has the best track parameters 
 
-  TKalTrackSite& siteIN =   ( isIncomming  ? siteL : site0 ) ; 
-  TKalTrackSite& siteOUT =  ( isIncomming  ? site0 : siteL ) ; 
+  TKalTrackSite& siteIN =   ( isIncoming  ? siteL : site0 ) ; 
+  TKalTrackSite& siteOUT =  ( isIncoming  ? site0 : siteL ) ; 
 
 
   streamlog_out( DEBUG4 ) << " KalTrack::findXingPoints : " 
@@ -660,7 +746,7 @@ void KalTrack::findXingPoints() {
   // search inwards first 
   int            idx  =  ( idx1 > idx0  ? idx0  : idx1  ) ;  
   //  TKalTrackSite& site =  ( idx1 > idx0  ? site0 : siteL ) ; 
-  //  TKalTrackSite& site =  ( isIncomming  ? siteL : site10 ) ; 
+  //  TKalTrackSite& site =  ( isIncoming  ? siteL : site10 ) ; 
   
   
   std::auto_ptr<TVTrack> help0(& static_cast<TKalTrackState &>( siteIN.GetCurState()).CreateTrack() ); // tmp track
@@ -669,7 +755,7 @@ void KalTrack::findXingPoints() {
   double  fid  = 0. ; // deflection angle from the last hit
   
   
-  // if( ! isIncomming ){
+  // if( ! isIncoming ){
   //   help0->MoveTo(  site0.GetPivot() , fid   ) ;
   // }
   
@@ -687,7 +773,6 @@ void KalTrack::findXingPoints() {
 			     << " r: " << xx.Perp()  
 			     << std::endl ;
 
-      //      _xingPts[ idx ] = new  gear::Vector3D( xx[0]*10., xx[1]*10., xx[2]*10 )   ;
       _xingPts[ idx ] = new  gear::Vector3D( xx[0] , xx[1] , xx[2] )   ;
 
       --idx ;
@@ -703,7 +788,7 @@ void KalTrack::findXingPoints() {
   // now search outwards
   idx  =  ( idx1 > idx0  ? idx1  : idx0  ) ; 
   //site =  ( idx1 > idx0  ? siteL : site0 ) ; 
-  //site =  ( isIncomming  ? site10 : siteL ) ; 
+  //site =  ( isIncoming  ? site10 : siteL ) ; 
 
 
   streamlog_out( DEBUG4 ) << " ---- creating track for site at layer : " << idx 
@@ -712,7 +797,7 @@ void KalTrack::findXingPoints() {
   
   std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( siteOUT.GetCurState()).CreateTrack() ); // tmp track
   
-  // if(  isIncomming ){
+  // if(  isIncoming ){
   //   help->MoveTo(  site0.GetPivot() , fid   ) ;
   // }
   

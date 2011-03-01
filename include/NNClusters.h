@@ -19,6 +19,7 @@
 #include "EVENT/LCCollection.h"
 #include "IMPL/ClusterImpl.h"
 
+
 #include "ClusterShapes.h"
 #include "CLHEP/Vector/ThreeVector.h"
 
@@ -247,7 +248,7 @@ protected:
  *  @version $Id: NNClusters.h,v 1.5 2007-06-05 15:35:49 engels Exp $
  */
 template <class T >
-class GenericCluster : public std::list< GenericHit<T> * > {
+class GenericCluster : public std::list< GenericHit<T> * >, public lcrtrel::LCRTRelations {
 
 public :
   int ID ; //DEBUG

@@ -76,6 +76,8 @@ public:
 				TObjArray  &hits, 
 				EVENT::TrackerHit* hit=0);
 
+  virtual TVTrackHit* createHit( EVENT::TrackerHit* hit ) ;
+
   virtual void  addIPHit(const TVector3   &xx,
 			 TObjArray  &hits) ;
 

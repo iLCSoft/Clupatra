@@ -52,6 +52,8 @@ public:
                                        TObjArray  &hits, 
 				 EVENT::TrackerHit* hit=0);
 
+  virtual TVTrackHit* createHit( EVENT::TrackerHit* hit ) ;
+
 
    Double_t GetSigmaX() const { return fSigmaX; }
    Double_t GetSigmaZ() const { return fSigmaZ; }

@@ -13,8 +13,11 @@
 //#include "LCRTRelations.h"
 #include "EVENT/LCObject.h"
 
+#include "TVTrackHit.h"
+#include "TObjArray.h"
+
 class TVector3 ;
-class TObjArray ;
+//class TObjArray ;
 class TKalTrack ;
 class TKalDetCradle ;
 class TKalTrackState ;
@@ -55,7 +58,7 @@ public:
   // KalTrack(Int_t n = 1) : TKalTrack(n) {}
   
   /** C'tor - initiale with detector */
-  KalTrack(TKalDetCradle* det) ;
+  KalTrack(TKalDetCradle* det, bool ownHits=false ) ;
 
   ~KalTrack() ;
 
@@ -68,6 +71,11 @@ public:
  
   gear::Vector3D* getXingPointForLayer(int l) { return _xingPts.at( l ) ; }
   
+
+  /** Find the next crossing point for the current Track - step: #layers from last hit used in fit */
+  void findNextXingPoint(gear::Vector3D& v, int& layer, int step=1 )  ;
+  
+
   /** Add a faked hit to get track state at the IP */
   void addIPHit() ;
 
@@ -116,6 +124,19 @@ public:
     //    addIPHit() ;
   }
   
+  /** Add a TVTrackHit - created by the user. To be used with KalTest::CFG::ownsHits = false !
+   *  Hits will be used in fit in the order in which they where added with this method. 
+   */
+  void addHit( TVTrackHit* hit){
+
+    _kalHits->Add( hit ) ;
+    //    std::cout <<  "  added hit to KalTrack (" << this << ") - # hits = " << _kalHits->GetEntriesFast() << std::endl ; 
+  }
+
+  /**Add the hit and filter/update the track state */
+  bool addAndFilter( TVTrackHit* hit) ;
+
+
   /** Fit the hits added with addHits in the specified order (KalTest::FitForward/KalTestFitBackward) */
   void fitTrack( bool fitOrder ) ;
 
