@@ -133,9 +133,16 @@ public:
     //    std::cout <<  "  added hit to KalTrack (" << this << ") - # hits = " << _kalHits->GetEntriesFast() << std::endl ; 
   }
 
-  /**Add the hit and filter/update the track state */
-  bool addAndFilter( TVTrackHit* hit) ;
+  /** Add the hit and filter/update the track state - will fail if the current track does not reach the surface or 
+   *  the deltaChi2 is larger than maxDeltaChi2 (if given).
+   */
+  bool addAndFilter( TVTrackHit* hit, double maxDeltaChi2 = -1.) ;
 
+
+  /** Compute the delta Chi2 that would result from adding the hit - the hit is not added and the track state is not changed.
+   */
+  double testDeltaChi2( TVTrackHit* hit ) ;
+    
 
   /** Fit the hits added with addHits in the specified order (KalTest::FitForward/KalTestFitBackward) */
   void fitTrack( bool fitOrder ) ;

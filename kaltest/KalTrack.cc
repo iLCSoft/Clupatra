@@ -8,6 +8,8 @@
 #include "kaltest/TKalDetCradle.h"
 #include "kaltest/TKalTrack.h"         // from KalTrackLib
 
+#include "TKalFilterCond.h"
+
 #include "EXVMeasLayer.h"
 #include "EXVTXKalDetector.h"
 #include "EXTPCKalDetector.h"
@@ -33,7 +35,42 @@
 
 #include "streamlog/streamlog.h"
 
-//#define  streamlog_level( MLEVEL ) ( streamlog::out.would_write< streamlog::MLEVEL >() )
+
+
+//---------------------------------------------------------------------------------------------------------------
+
+/** Helper class for defining a filter condition based on the delta chi2 in the AddAndFilter step.
+ */
+class KalTrackFilter : public TKalFilterCond{
+
+public:
+  
+  /** C'tor - takes as optional argument the maximum allowed delta chi2 for adding the hit (in IsAccepted() )
+   */
+  KalTrackFilter(double maxDeltaChi2 = -1.) : _deltaChi2( 0.0 ) , 
+					      _maxDeltaChi2( maxDeltaChi2 ) {
+  } 
+  virtual ~KalTrackFilter() {} 
+  
+  double deltaChi2() { return _deltaChi2 ; }
+  
+  virtual Bool_t IsAccepted(const TKalTrackSite &site) {
+    
+    _deltaChi2 = site.GetDeltaChi2();
+    
+    streamlog_out( DEBUG3 ) << " KalTrackFilter::IsAccepted called  !  deltaChi2 = "  <<  _deltaChi2  << std::endl;
+
+    return ( _maxDeltaChi2 > -1. ?  _deltaChi2 < _maxDeltaChi2  : true )   ; 
+  }
+
+protected:
+
+  double _deltaChi2 ;
+  double _maxDeltaChi2 ;
+
+} ;
+//---------------------------------------------------------------------------------------------------------------
+
 
 /** helper function to restrict the range of the azimuthal angle to ]-pi,pi]*/
 inline double toBaseRange( double phi){
@@ -269,15 +306,19 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
 }
 
-bool KalTrack::addAndFilter( TVTrackHit* hit){
+bool KalTrack::addAndFilter( TVTrackHit* hit, double maxDeltaChi2){
   
+  KalTrackFilter filter( maxDeltaChi2 )   ;
+
   TKalTrackSite* site = new TKalTrackSite( *hit ); // new site
-  
+
+  site->SetFilterCond( &filter ) ;
+
   bool success = _trk->AddAndFilter( *site ) ;
   
   if( ! success ) {
     
-    streamlog_out( DEBUG4 )  << "Kaltrack::addAndFilter :  site discarded!" << std::endl;
+    streamlog_out( DEBUG4 )  << "Kaltrack::addAndFilter :  site discarded!    - delta Chi2: " <<  filter.deltaChi2()    << std::endl;
     
     delete site;                        // delete it if failed
     
@@ -289,6 +330,27 @@ bool KalTrack::addAndFilter( TVTrackHit* hit){
   return true ;
 }
 
+double KalTrack::testDeltaChi2( TVTrackHit* hit ){
+
+  KalTrackFilter filter( -0.0 )   ; // filter will always fail
+
+  TKalTrackSite* site = new TKalTrackSite( *hit ); // new site
+
+  site->SetFilterCond( &filter ) ;
+
+  bool success = _trk->AddAndFilter( *site ) ;
+  
+  if(  success ) {
+    
+    streamlog_out( ERROR )  << "Kaltrack::testDeltaChi2 :  site accepted    - delta Chi2: " <<  filter.deltaChi2()    << std::endl;
+    
+  } else {
+    
+    delete site;                        // delete it if failed
+  }    
+
+  return  filter.deltaChi2()  ;
+}
 
 
 
