@@ -46,22 +46,7 @@ namespace OuterRimHelper{
   typedef GenericHitVec<TrackerHit>  HitVec ;
 
 
-  // copy_if (missing from STL)
-  template <class In, class Out, class Pred> Out copy_if(In first, In last, Out res, Pred p){
-  
-    while( first != last ){
-
-      if( p( *first) ){
-
-	*res++ = first ;
-	++first ;
-      }
-    }
-    return res ;
-  }
-
-
-  // delete helper
+  //--- delete helper
   template<class P>  void delete_ptr(P* p) { delete p;}
 
   /** helper class that maps array to gear::Vector3D */
@@ -128,12 +113,16 @@ namespace OuterRimHelper{
   };
   //------------------------------------------------------
 
-  // helper class to assign additional parameters to TrackerHits
   struct HitInfoStruct{
-    HitInfoStruct() :layerID(-1), usedInTrack(false) , chi2Residual(-1.) {} //, hit(0) {}
+    HitInfoStruct() :layerID(-1), usedInTrack(false) , chi2Residual(-1.) , deltaChi2(-1.), pNNHit(0) , nNNHit(0), pDist(-1.), nDist(-1.)  {} //, hit(0) {}
     int layerID ;
     bool usedInTrack ;
     double chi2Residual ;  
+    double deltaChi2 ;
+    Hit* pNNHit ;
+    Hit* nNNHit ;
+    double pDist ;
+    double nDist ;
     //    TVTrackHit* hit ;
   } ;
   struct HitInfo : LCOwnedExtension<HitInfo, HitInfoStruct> {} ;
@@ -342,9 +331,11 @@ namespace OuterRimHelper{
 	trk->addIPHit() ;
       }  
 
-      trk->fitTrack( FitOrder  ) ;
-
-    
+      if( reverse_order )
+	trk->fitTrack( ! FitOrder  ) ;
+      else
+ 	trk->fitTrack(   FitOrder  ) ;
+     
       return trk;
     }
   };
@@ -486,7 +477,59 @@ namespace OuterRimHelper{
     float _dCutSquared ;
     float _dCut ;
   } ;
+  //---------------------------------------------------------------------------------
+  
+  /** Predicate class for 'distance' of NN clustering based on previous nearest neighbor search.
+   */
+  class NearestHitDistance{
+    typedef TrackerHit HitClass ;
+    typedef double PosType ;
+  public:
+    
+    /** Required typedef for cluster algorithm 
+     */
+    typedef HitClass hit_type ;
+    
+    /** C'tor takes merge distance */
+    NearestHitDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
+    
+    /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
+    inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
+      
+      if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
+      
+      int l0 =  h0->first->ext<HitInfo>()->layerID ;
+      int l1 =  h1->first->ext<HitInfo>()->layerID ;
+      
+      if(  std::abs( l0 - l1 ) != 1 ) 
+	return false ;
+      
 
+      bool ret = ( l0 < l1 ? 
+		   h0->first->ext<HitInfo>()->nNNHit ==  h1  &&  h1->first->ext<HitInfo>()->pNNHit ==  h0  :
+		   h0->first->ext<HitInfo>()->pNNHit ==  h1  &&  h1->first->ext<HitInfo>()->nNNHit ==  h0  ) ;
+
+      streamlog_out( DEBUG4 ) << "--- NearestHitDistance::mergeHits: "  << std::endl 
+			      << " h0: " << h0 
+			      << " h0.pNNHit " << h0->first->ext<HitInfo>()->pNNHit
+			      << " h0.nNNHit " << h0->first->ext<HitInfo>()->nNNHit << std::endl 
+			      << " h1: " << h1 
+			      << " h1.pNNHit " << h1->first->ext<HitInfo>()->pNNHit
+			      << " h1.nNNHit " << h1->first->ext<HitInfo>()->nNNHit 
+			      << "  ---> " <<  ( h0->first->ext<HitInfo>()->nNNHit ==  h1  &&  h1->first->ext<HitInfo>()->pNNHit ==  h0 )
+			      << "  , " <<     ( h0->first->ext<HitInfo>()->pNNHit ==  h1  &&  h1->first->ext<HitInfo>()->nNNHit ==  h0 )
+			      << std::endl ;
+
+      return ret ;
+    }
+    
+  protected:
+    NearestHitDistance() ;
+    float _dCutSquared ;
+    float _dCut ;
+  } ;
+  
+  //-------------------------------------------------------------------------------------------------------
   class HitDistance_2{
     typedef TrackerHit HitClass ;
     typedef double PosType ;
@@ -609,6 +652,7 @@ namespace OuterRimHelper{
 			     << " err: rPhi" <<  sqrt( trk->getCovMatrix()[0] + trk->getCovMatrix()[2] ) 
 			     << " z :  " <<   trk->getCovMatrix()[5] << std::endl 
 			     << " chi2 residual to best matching track : " << trk->ext<HitInfo>()->chi2Residual
+			     << " delta chi2 to best matching track : " << trk->ext<HitInfo>()->deltaChi2
 			     << std::endl ;
 
     
@@ -750,17 +794,103 @@ namespace OuterRimHelper{
     float _dCut ;
   } ; 
 
+  //-----------------------------------------------------------------
+
+  /** Find the nearest hits in the previous and next layers - (at most maxStep layers appart - NOT YET).
+   */
+  void findNearestHits( HitCluster& clu, KalTest* kt, int maxStep=1){
+
+    typedef std::list<Hit*> HitList ;
+    typedef std::vector< HitList > HitListVector ;
+    HitListVector hitsInLayer( kt->maxLayerIndex() ) ;
+    HitLayerID  tpcLayerID( kt->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
+    
+    for(HitCluster::iterator it= clu.begin() ; it != clu.end() ; ++it ){
+      Hit* hit = *it ; 
+      hitsInLayer[ tpcLayerID( hit ) ].push_back( hit )  ;
+    }
+    //-----------------------------
+
+    for(HitCluster::iterator it= clu.begin() ; it != clu.end() ; ++it ){
+      
+      Hit* hit0 = *it ; 
+      gear::Vector3D pos0( hit0->first->getPosition()[0] , hit0->first->getPosition()[1] , hit0->first->getPosition()[2] ) ;
+      int layer = tpcLayerID( hit0 ) ;
+      
+      int l=0 ;
+      if( (l=layer+1) <  kt->maxLayerIndex() ) {
+	
+	HitList& hL = hitsInLayer[ l ] ;
+	
+	double minDist2 = 1.e99 ;
+	Hit*   bestHit = 0 ;
+
+	for( HitList::iterator iH = hL.begin() ; iH != hL.end() ; ++iH ) {
+	  
+	  Hit* hit1 = *iH ; 
+	  gear::Vector3D pos1( hit1->first->getPosition()[0] , hit1->first->getPosition()[1] , hit1->first->getPosition()[2] ) ;
+	  
+	  double dist2 = ( pos0 - pos1 ).r2() ;
+
+	  if( dist2 < minDist2 ){
+	    minDist2 = dist2 ;
+	    bestHit = hit1 ;
+	  }
+	}
+	if( bestHit ){
+
+	  hit0->first->ext<HitInfo>()->nNNHit =  bestHit ;
+	  hit0->first->ext<HitInfo>()->nDist  =  minDist2 ;
+	}
+      }
+
+      if( (l=layer-1) > 0  ) {
+	
+	HitList& hL = hitsInLayer[ l ] ;
+	
+	double minDist2 = 1.e99 ;
+	Hit* bestHit = 0 ;
+	
+	for( HitList::iterator iH = hL.begin() ; iH != hL.end() ; ++iH ) {
+	  
+	  Hit* hit1 = *iH ; 
+	  gear::Vector3D pos1( hit1->first->getPosition()[0] , hit1->first->getPosition()[1] , hit1->first->getPosition()[2] ) ;
+	  
+	  double dist2 = ( pos0 - pos1 ).r2() ;
+	  
+	  if( dist2 < minDist2 ){
+	    minDist2 = dist2 ;
+	    bestHit = hit1 ;
+	  }
+	}
+	if( bestHit ){
+
+	  hit0->first->ext<HitInfo>()->pNNHit =  bestHit ;
+	  hit0->first->ext<HitInfo>()->pDist  =  minDist2 ;
+	}
+      }
+
+    }
+  }
+
+
+
 
 }  // namespace OuterRimhelper
 
 using namespace OuterRimHelper ;
 
 
+//========================================================================================================
+
 OuterRimSearch aOuterRimSearch ;
 
 
+//*********************************************************************************************************
 OuterRimSearch::OuterRimSearch() : Processor("OuterRimSearch") {
+//*********************************************************************************************************
   
+
   // modify processor description
   _description = "OuterRimSearch : simple nearest neighbour clustering" ;
   
@@ -905,7 +1035,7 @@ void OuterRimSearch::processEvent( LCEvent * evt ) {
   //---------------------------------------------------------------------------------------------
   // find 'odd' clusters that have duplicate hits in pad rows
 
-  GenericClusterVec<TrackerHit> ocs ;
+  HitClusterVec ocs ;
 
   split_list( cluList, std::back_inserter(ocs),  DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
 
@@ -920,9 +1050,37 @@ void OuterRimSearch::processEvent( LCEvent * evt ) {
 
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  // TO DO: clean up the clusters with duplicate pad rows ....
+  // clean up the clusters with duplicate pad rows ....
   //  
-  // cluList.merge( sclu ) ;
+  HitClusterVec cclu ; // clean clusters
+ 
+  NearestHitDistance nnDist(0.) ;
+ 
+  for( HitClusterVec::iterator iC = ocs.begin() ; iC != ocs.end() ; ++iC ){
+
+    HitCluster* clu = *iC ;
+
+    findNearestHits( *clu , _kalTest ) ;
+
+    //---- get hits from cluster into a vector
+    std::vector< Hit* > v ;
+    v.reserve( clu->size() ) ;
+    clu->takeHits( std::back_inserter( v )  ) ;
+    delete clu ;
+
+    //-- recluster with nearest neighbours
+
+    cluster( v.begin(), v.end() , std::back_inserter( cclu ),  &nnDist  , _minCluSize ) ;
+
+  }
+  ocs.clear() ;
+
+  LCCollectionVec* ccol = new LCCollectionVec( LCIO::TRACK ) ;
+  std::transform( cclu.begin(), cclu.end(), std::back_inserter( *ccol ) , converter ) ;
+  evt->addCollection( ccol , "cleaned_clusters" ) ;
+
+
+  cluList.merge( cclu ) ;
   
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1001,7 +1159,7 @@ void OuterRimSearch::processEvent( LCEvent * evt ) {
   cluList.sort( omegaSort ) ;
 
   Chi2_RPhi_Z_Hit ch2rzh ;
-  static const double chi2Cut = 15. ; // FIXME: make parameter
+  static const double chi2Cut = 100 ; //15. ; // FIXME: make parameter
 
   
   if( streamlog_level( DEBUG4 ) ) {
@@ -1081,8 +1239,15 @@ void OuterRimSearch::processEvent( LCEvent * evt ) {
 	    
 	    
 	    
-	    if( trk->addAndFilter( bestHit->first->ext<KTHit>() ) ) {
+	    //	    if( trk->addAndFilter( bestHit->first->ext<KTHit>() ) ) {
 	      
+	    double deltaChi2 =  trk->testDeltaChi2(  bestHit->first->ext<KTHit>() ) ;
+
+	    bestHit->first->ext<HitInfo>()->deltaChi2 = deltaChi2 ;
+
+	    if(  deltaChi2 < 25.   &&
+		 trk->addAndFilter( bestHit->first->ext<KTHit>() )  ){
+
 	      hitAdded = true ;
 	      
 	      hLL.remove(  bestHit ) ;
