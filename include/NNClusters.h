@@ -317,16 +317,20 @@ public :
 } ;
 
 
-/** Helper vector of GenericHit<T> taking care of memory management, i.e. deletes all
- *  GenericHit<T> objects when it goes out of scope.
+/** Helper vector of GenericHit<T>. When setOwner(true) is called it will take care of memory management, 
+ *  i.e. delete all GenericHit<T> objects when it goes out of scope. 
  */
 template <class T> 
 class GenericHitVec : public std::vector< GenericHit<T>* > {
   typedef std::vector< GenericHit<T>* > Vector ;
+  bool _isOwner ;
 public:
+  GenericHitVec() : _isOwner( false ) {}
   ~GenericHitVec() {
-    for( typename GenericHitVec::iterator i = Vector::begin() ; i != Vector::end() ; i++) delete *i ;
+    if( _isOwner ) 
+      for( typename GenericHitVec::iterator i = Vector::begin() ; i != Vector::end() ; i++) delete *i ;
   }
+  void setOwner( bool val=true ) { _isOwner = val ; }
 };
 
 
