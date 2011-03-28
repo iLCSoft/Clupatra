@@ -339,7 +339,7 @@ public:
  *  @see EnergyCut
  */
 template <class T, class Pred> 
-void addToGenericHitVec(GenericHitVec<T>& v, LCCollection* col, Pred pred ){
+void addToGenericHitVec(GenericHitVec<T>& v, EVENT::LCCollection* col, Pred pred ){
 
   for( int i=0 ; i < col->getNumberOfElements() ; i++ ){
 
@@ -356,7 +356,7 @@ void addToGenericHitVec(GenericHitVec<T>& v, LCCollection* col, Pred pred ){
  *  @see ZIndex.
  */
 template <class T, class Pred, class Order> 
-void addToGenericHitVec(GenericHitVec<T>& v, LCCollection* col, Pred pred , Order order ){
+void addToGenericHitVec(GenericHitVec<T>& v, EVENT::LCCollection* col, Pred pred , Order order ){
 
   for( int i=0 ; i < col->getNumberOfElements() ; i++ ){
 
@@ -548,7 +548,7 @@ struct LCIOCluster{
 
   inline lcio::Cluster* operator() (GenericCluster<T>* c) {  
     
-    ClusterImpl* clu = new ClusterImpl ;
+    IMPL::ClusterImpl* clu = new IMPL::ClusterImpl ;
     
     unsigned n = c->size() ;
     unsigned i=0 ;

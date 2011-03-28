@@ -229,150 +229,170 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
 
 
-  //-------------------- split up cluster with duplicate rows 
+  //-------------------- split up cluster with duplicate rows ---------------------------------------------------------
 
-  GClusterVec sclu ; // new split clusters
-
-  GHitVec oddHits ;
-  oddHits.reserve( h.size() ) ;
 
   typedef GClusterVec::iterator GCVI ;
 
 
-  //========================== first iteration ================================================
-  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  ocs.clear() ;
-
-  int _nRowForSplitting = 10 ; //FIXME:  make proc param
-  // reset the hits index to row ranges for reclustering
-  unsigned nOddHits = oddHits.size() ;
-  for(unsigned i=0 ; i< nOddHits ; ++i){
-    int layer =  oddHits[i]->first->layerID  ;
-    oddHits[i]->Index0 =   2 * int( layer / _nRowForSplitting ) ;
-  }
-
-  //----- recluster in pad row ranges
-  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
 
   LCCollectionVec* oddCol2 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2 ) , converter ) ;
   evt->addCollection( oddCol2 , "OddClu_2" ) ;
-
-
-  streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
-			 << std::endl ; 
- 
-  //--------- remove pad row range clusters where merge occured 
-  split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-
-
   LCCollectionVec* oddCol3 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
   evt->addCollection( oddCol3 , "OddClu_3" ) ;
-
-
-  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  ocs.clear() ;
-
-
-  //   //========================== second iteration in shifted pad row ranges ================================================
-
-
-  oddHits.clear() ;
-  for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  sclu.clear() ;
-
-  //  int _nRowForSplitting = 10 ; //FIXME:  make proc param
-  // reset the hits index to row ranges for reclustering
-  nOddHits = oddHits.size() ;
-
-  streamlog_out( DEBUG ) << "   left over odd hits for second iteration of pad row range clustering " << nOddHits << std::endl ;
-
-  for(unsigned i=0 ; i< nOddHits ; ++i){
-    int layer =  oddHits[i]->first->layerID  ;
-    oddHits[i]->Index0 =  2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
-  }
-  
-  //----- recluster in pad row ranges
-  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
-
   LCCollectionVec* oddCol2_1 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2_1 ) , converter ) ;
   evt->addCollection( oddCol2_1 , "OddClu_2_1" ) ;
-
-
-  streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
-			 << std::endl ; 
- 
-  //--------- remove pad row range clusters where merge occured 
-  split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-
-
   LCCollectionVec* oddCol3_1 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
   evt->addCollection( oddCol3_1 , "OddClu_3_1" ) ;
-
-  //----------------end  split up cluster with duplicate rows 
-  
-  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  ocs.clear() ;
-  
-
-  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-  // --- recluster the good clusters w/ all pad rows
-
-  oddHits.clear() ;
-  for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  sclu.clear() ;
-
-  //   reset the index for 'good' hits coordinate again...
-  nOddHits = oddHits.size() ;
-  for(unsigned i=0 ; i< nOddHits ; ++i){
-    oddHits[i]->Index0 = z_index ( oddHits[i]->first ) ;
-  }
-
-  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
-
   LCCollectionVec* oddCol4 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol4 ) , converter ) ;
   evt->addCollection( oddCol4 , "OddClu_4" ) ;
 
-  // --- end recluster the good clusters w/ all pad rows
-
-  // merge the good clusters to final list
-  cluList.merge( sclu ) ;
+  //========================== first iteration ================================================
+  int _nRowForSplitting = 10 ; //FIXME:  make proc param
   
+  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){  // loop over all odd clusters ...
+    
+    GClusterVec sclu ; // new split clusters
+    GClusterVec socs ; // split odd clusters
+    
+    GHitVec oddHits ;
+    oddHits.reserve( (*it)->size() ) ;
+    
+    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    delete (*it) ;
+    
+    // reset the hits index to row ranges for reclustering
+    unsigned nOddHits = oddHits.size() ;
+    for(unsigned i=0 ; i< nOddHits ; ++i){
+      int layer =  oddHits[i]->first->layerID  ;
+      oddHits[i]->Index0 =   2 * int( layer / _nRowForSplitting ) ;
+    }
+    
+    //----- recluster in pad row ranges
+    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+    
+    std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2 ) , converter ) ;
+
+    streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size()   << std::endl ; 
+ 
+    //--------- remove pad row range clusters where merge occured 
+    split_list( sclu, std::back_inserter(socs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+
+
+    std::transform( socs.begin(), socs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
+
+
+    for( GCVI it = socs.begin() ; it != socs.end() ; ++it ){
+      //      (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+      (*it)->freeHits() ;
+      delete (*it) ;
+    }
+    socs.clear() ;
+    
+
+    //========================== second iteration in shifted pad row ranges ================================================
+    
+    
+    oddHits.clear() ;
+    for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
+      (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+      delete (*it) ;
+    }
+    sclu.clear() ;
+    
+    // reset the hits index to row ranges for reclustering
+    nOddHits = oddHits.size() ;
+    
+    streamlog_out( DEBUG ) << "   left over odd hits for second iteration of pad row range clustering " << nOddHits << std::endl ;
+    
+    for(unsigned i=0 ; i< nOddHits ; ++i){
+      int layer =  oddHits[i]->first->layerID  ;
+      oddHits[i]->Index0 =  2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
+    }
+    
+    //----- recluster in pad row ranges
+    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+    
+    std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2_1 ) , converter ) ;
+
+    streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
+			   << std::endl ; 
+ 
+    //--------- remove pad row range clusters where merge occured 
+    split_list( sclu, std::back_inserter(socs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+
+
+    std::transform( socs.begin(), socs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
+
+    //----------------end  split up cluster with duplicate rows 
+    
+    for( GCVI it = socs.begin() ; it != socs.end() ; ++it ){
+      (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+      delete (*it) ;
+    }
+    socs.clear() ;
+    
+    
+    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+    // --- recluster the good clusters w/ all pad rows
+
+    oddHits.clear() ;
+    for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
+      (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+      delete (*it) ;
+    }
+    sclu.clear() ;
+
+    //   reset the index for 'good' hits coordinate again...
+    nOddHits = oddHits.size() ;
+    for(unsigned i=0 ; i< nOddHits ; ++i){
+      oddHits[i]->Index0 = oddHits[i]->first->zIndex ; //z_index ( oddHits[i]->first ) ;
+    }
+    
+    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+
+    std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol4 ) , converter ) ;
+
+    // --- end recluster the good clusters w/ all pad rows
+
+    // merge the good clusters to final list
+    cluList.merge( sclu ) ;
+    
+
+  }
+  ocs.clear() ;
+
+
   LCCollectionVec* cluCol = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
   evt->addCollection( cluCol , "CluTrackSegments" ) ;
 
 
-  //DEBUG ..... check if there are really no duplicate pad rows ...
-  ocs.clear() ; 
-  split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-  LCCollectionVec* dupCol = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *dupCol ) , converter ) ;
-  evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
+  // //DEBUG ..... check if there are really no duplicate pad rows ...
+  // ocs.clear() ; 
+  // split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+  // LCCollectionVec* dupCol = new LCCollectionVec( LCIO::TRACK ) ;
+  // std::transform( ocs.begin(), ocs.end(), std::back_inserter( *dupCol ) , converter ) ;
+  // evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
+  // streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.size() : " << dupCol->getNumberOfElements() << std::endl ;
 
-  streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.size() : " << dupCol->getNumberOfElements() << std::endl ;
+
+  //=============================================================================================================
+
+
+  // //DEBUG ..... check if there are really no duplicate pad rows ...
+  // ocs.clear() ; 
+  // split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+  // LCCollectionVec* dupCol = new LCCollectionVec( LCIO::TRACK ) ;
+  // std::transform( ocs.begin(), ocs.end(), std::back_inserter( *dupCol ) , converter ) ;
+  // evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
+
+  // streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.size() : " << dupCol->getNumberOfElements() << std::endl ;
+
+
 
   //================================================================================
    
@@ -418,15 +438,28 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   evt->addCollection( trksegs , "KalTrackSegments" ) ;
 
   
-
+  
   //===========  merge track segments based on xing points ==================================================
-
-
-
+  
+  
+  
   //=========== assign left over hits ... ==================================================================
   
-  static const bool use_best_track = false ;
 
+  //------------- create vector of left over hits per layer
+  GHitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
+
+  addToHitListVector(  leftOverHits.begin(), leftOverHits.end() , hitsInLayer ,  _kalTest->indexOfFirstLayer( KalTest::DetID::TPC)  ) ;
+
+  for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+
+    addHitsAndFilter( *icv , hitsInLayer , 25. ,  3 ) ; 
+  }
+
+  //=======================================================================================================  
+  static const bool use_best_track = false ;
+  static const bool use_best_hit = false ;
+  
   if( use_best_track ) {
 
     streamlog_out( DEBUG ) << "  ------ assign left over hits - best matching track for every hit ..."  << std::endl ;
@@ -504,11 +537,11 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
       
     }
     
-
-    //        ==========================================================================================
-  } else { // ================== use best matching hit for every track segment =========================
-    //        ==========================================================================================
-    
+  }
+  //        ==========================================================================================
+  //} else { // ================== use best matching hit for every track segment =========================
+  //        ==========================================================================================
+  if( use_best_hit ) {
 
 
     streamlog_out( DEBUG1 ) << "  ------ assign left over hits - best matching hit for every track ..."  << std::endl ;

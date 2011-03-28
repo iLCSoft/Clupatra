@@ -2,8 +2,14 @@
 #define clupatra_h
 
 #include "NNClusters.h"
+#include "lcio.h"
 #include "EVENT/TrackerHit.h"
-
+#include "IMPL/TrackImpl.h"
+#include "UTIL/Operators.h"
+#include "LCRTRelations.h"
+#include "GEAR.h"
+#include "TVTrackHit.h"
+#include "KalTest.h"
 
 namespace clupatra{
   
@@ -58,10 +64,10 @@ namespace clupatra{
   inline lcio::TrackerHit* lcioHit( const ClupaHit* h) { return h->lcioHit ; }
 
   // allow assignment to lcio::TrackerHit (memory mgmt)
-  struct HitInfo : LCOwnedExtension<HitInfo, ClupaHit > {} ;
+  struct HitInfo : lcrtrel::LCOwnedExtension<HitInfo, ClupaHit > {} ;
   
 
-  int z_index( ClupaHit* h) { return h->zIndex ; } 
+  inline int z_index( ClupaHit* h) { return h->zIndex ; } 
 
 
   // helper class to assign additional parameters to TrackerHit clusters
@@ -71,15 +77,15 @@ namespace clupatra{
     gear::Vector3D nextXPoint ;
     int nextLayer ;
   } ;
-  struct ClusterInfo : LCOwnedExtension<ClusterInfo, ClusterInfoStruct> {} ;
+  struct ClusterInfo : lcrtrel::LCOwnedExtension<ClusterInfo, ClusterInfoStruct> {} ;
 
 
   struct TrackInfoStruct{
-    TrackInfoStruct() {}
+    TrackInfoStruct() : nextXPoint(0.,0.,0.), nextLayer(-1) {}
     gear::Vector3D nextXPoint ;
     int nextLayer ;
   } ;
-  struct TrackInfo : LCOwnedExtension<TrackInfo, TrackInfoStruct> {} ;
+  struct TrackInfo : lcrtrel::LCOwnedExtension<TrackInfo, TrackInfoStruct> {} ;
 
   //------------------ typedefs for generic hits and clusters ---------
 
@@ -92,6 +98,34 @@ namespace clupatra{
   // typedef GenericHit<TrackerHit>     Hit ;
   // typedef GenericHitVec<TrackerHit>  HitVec ;
 
+  //------------- create vector of left over hits per layer
+  typedef std::list<GHit*> GHitList ;
+  typedef std::vector< GHitList > GHitListVector ;
+
+
+  //-------------------------------------------------------------------------------------
+  
+  /** Add the generic hits from (First,Last) to the GHitListVector - vector needs to be initialized, e.g. with
+   *     hLV.resize( KalTest::getMaxLayerIndex() ) 
+   */
+  //HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
+  template <class First, class Last>
+  void addToHitListVector( First first, Last last, GHitListVector& hLV, unsigned offset=0 ){
+    
+    while( first != last ){
+      hLV[ (*first)->first->layerID + offset  ].push_back( *first )  ;
+      ++first ;
+    }
+  }
+  //-------------------------------------------------------------------------------------
+
+  /** Try to add hits from hLV (hit lists per layer) to the cluster. The cluster needs to have a fitted KalTrack associated to it.
+   *  Hits are added if the resulting delta Chi2 is less than dChiMax - a maxStep is the maximum number of steps (layers) w/o 
+   *  successfully merging a hit.
+   */
+  void addHitsAndFilter( GCluster* clu, GHitListVector& hLV , double dChiMax, unsigned maxStep =  3 ) ; 
+
+  //-------------------------------------------------------------------------------------
 
 
   //----------------  delete helper
@@ -195,7 +229,7 @@ namespace clupatra{
   
   //-----------------
 
-  struct LCIOTrackerHit{ EVENT::TrackerHit* operator()( GHit* h) { return h->first->lcioHit  ; }   } ;
+  struct LCIOTrackerHit{ lcio::TrackerHit* operator()( GHit* h) { return h->first->lcioHit  ; }   } ;
 
   //---------------------------------------------------
   // helper for sorting cluster wrt layerID
@@ -224,7 +258,7 @@ namespace clupatra{
   //------------------------------
   //helpers for z ordering of hits
   struct TrackerHitCast{
-    TrackerHit* operator()(LCObject* o) { return (TrackerHit*) o ; }
+    lcio::TrackerHit* operator()(lcio::LCObject* o) { return (lcio::TrackerHit*) o ; }
   };
 
 
@@ -400,8 +434,8 @@ namespace clupatra{
 
 
   struct KalTrack2LCIO{
-    TrackImpl* operator() (KalTrack* trk) {  
-      TrackImpl* lTrk = new TrackImpl ;
+    lcio::TrackImpl* operator() (KalTrack* trk) {  
+      lcio::TrackImpl* lTrk = new lcio::TrackImpl ;
       trk->toLCIOTrack( lTrk  ) ;
       return lTrk ;
     }
@@ -589,7 +623,7 @@ namespace clupatra{
   
     lcio::Track* operator() (GenericCluster<T>* c) {  
     
-      TrackImpl* trk = new TrackImpl ;
+      lcio::TrackImpl* trk = new lcio::TrackImpl ;
     
       double e = 0.0 ;
       int nHit = 0 ;
@@ -612,23 +646,23 @@ namespace clupatra{
 
   // helper for creating lcio header for short printout
   template <class T> 
-  const std::string & myheader(){return header(*(T*)(0)); }
+  const std::string & myheader(){    return lcio::header(*(T*)(0));  }
 
 
-  inline void printTrackShort(const LCObject* o){
-  
-    const Track* trk = dynamic_cast<const Track*> (o) ; 
-  
-    if( o == 0 ) {
+  inline void printTrackShort(const lcio::LCObject* o){
     
+    const lcio::Track* trk = dynamic_cast<const lcio::Track*> (o) ; 
+    
+    if( o == 0 ) {
+      
       streamlog_out( ERROR ) << "  printTrackShort : dynamic_cast<Track*> failed for LCObject : " << o << std::endl ;
       return  ;
     }
-  
-    streamlog_out( MESSAGE ) << myheader<Track>()  
-			     << lcshort( trk ) << std::endl  ;
-  
-  
+    
+    streamlog_out( MESSAGE ) << myheader<lcio::Track>()  
+			     << lcio::lcshort( trk ) << std::endl  ;
+    
+    
     double r0 = 1. / trk->getOmega() ;
     double d0 = trk->getD0() ;
     double p0 = trk->getPhi() ;
@@ -640,9 +674,11 @@ namespace clupatra{
     
   }
 
-  inline void printTrackerHit(const LCObject* o){
+  inline void printTrackerHit(const lcio::LCObject* o){
   
-    TrackerHit* hit = const_cast<TrackerHit*> ( dynamic_cast<const TrackerHit*> (o) ) ; 
+    using namespace UTIL ;
+
+    lcio::TrackerHit* hit = const_cast<lcio::TrackerHit*> ( dynamic_cast<const lcio::TrackerHit*> (o) ) ; 
   
     if( o == 0 ) {
     
@@ -654,7 +690,7 @@ namespace clupatra{
 			     << " err: rPhi" <<  sqrt( hit->getCovMatrix()[0] + hit->getCovMatrix()[2] ) 
 			     << " z :  " <<   hit->getCovMatrix()[5] << std::endl 
 			     << " chi2 residual to best matching track : " << hit->ext<HitInfo>()->chi2Residual << std::endl ;
-
+    
     
   }
 
@@ -662,7 +698,7 @@ namespace clupatra{
   /** Predicate class for track merging with NN clustering.
    */
   class TrackStateDistance{
-    typedef Track HitClass ;
+    typedef lcio::Track HitClass ;
 
   public:
   
@@ -679,8 +715,8 @@ namespace clupatra{
     
       if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
     
-      Track* trk0 = h0->first ;
-      Track* trk1 = h1->first ;
+      lcio::Track* trk0 = h0->first ;
+      lcio::Track* trk1 = h1->first ;
 
       //------- dont' merge complete tracks: ------------------------
       unsigned nh0 = trk0->getTrackerHits().size() ;
@@ -721,7 +757,7 @@ namespace clupatra{
 
   /** helper class for merging track segments, based on circle (and tan lambda) */
   class TrackCircleDistance{
-    typedef Track HitClass ;
+    typedef lcio::Track HitClass ;
 
   public:
   
@@ -741,8 +777,8 @@ namespace clupatra{
 
       if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
     
-      Track* trk0 = h0->first ;
-      Track* trk1 = h1->first ;
+      lcio::Track* trk0 = h0->first ;
+      lcio::Track* trk1 = h1->first ;
 
       // //------- dont' merge complete tracks: ------------------------
       // unsigned nh0 = trk0->getTrackerHits().size() ;
