@@ -73,7 +73,7 @@ public:
   
 
   /** Find the next crossing point for the current Track - step: #layers from last hit used in fit */
-  void findNextXingPoint(gear::Vector3D& v, int& layer, int step=1 )  ;
+  void findNextXingPoint(gear::Vector3D& v, int& layer, int step,  bool backward=false)  ;
   
 
   /** Add a faked hit to get track state at the IP */

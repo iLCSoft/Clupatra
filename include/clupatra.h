@@ -123,7 +123,8 @@ namespace clupatra{
    *  Hits are added if the resulting delta Chi2 is less than dChiMax - a maxStep is the maximum number of steps (layers) w/o 
    *  successfully merging a hit.
    */
-  void addHitsAndFilter( GCluster* clu, GHitListVector& hLV , double dChiMax, unsigned maxStep =  3 ) ; 
+  void addHitsAndFilter( GCluster* clu, GHitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, 
+			 bool backward=false) ; 
 
   //-------------------------------------------------------------------------------------
 
@@ -433,14 +434,32 @@ namespace clupatra{
   // };
 
 
-  struct KalTrack2LCIO{
-    lcio::TrackImpl* operator() (KalTrack* trk) {  
-      lcio::TrackImpl* lTrk = new lcio::TrackImpl ;
-      trk->toLCIOTrack( lTrk  ) ;
-      return lTrk ;
-    }
-  };
+  // struct KalTrack2LCIO{
+  //   lcio::TrackImpl* operator() (KalTrack* trk) {  
+  //     lcio::TrackImpl* lTrk = new lcio::TrackImpl ;
+  //     trk->toLCIOTrack( lTrk  ) ;
+  //     return lTrk ;
+  //   }
+  // };
 
+   struct KalTrack2LCIO{
+     lcio::TrackImpl* operator() (KalTrack* trk) {  
+       lcio::TrackImpl* lTrk = new lcio::TrackImpl ;
+       trk->toLCIOTrack( lTrk  ) ;
+       
+       if( streamlog_level( DEBUG4 ) ){
+	 lTrk->ext<TrackInfo>() = new TrackInfoStruct ;       
+	 
+	 // streamlog_out( DEBUG4 ) <<  "   ---- KalTrack2LCIO : "  <<  trk->getCluster<GCluster>()			     
+	 // 			 <<  " next xing point at layer: "   <<  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextLayer
+	 // 			 << " : " <<  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextXPoint ;
+	 
+	 lTrk->ext<TrackInfo>()->nextLayer   =  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextLayer ;
+	 lTrk->ext<TrackInfo>()->nextXPoint  =  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextXPoint ;
+       }
+       return lTrk ;
+     }
+   };
   //-------------------------------------------------------------------------
   template <class T>
   class RCut {
@@ -650,8 +669,8 @@ namespace clupatra{
 
 
   inline void printTrackShort(const lcio::LCObject* o){
-    
-    const lcio::Track* trk = dynamic_cast<const lcio::Track*> (o) ; 
+
+    lcio::Track* trk = const_cast<lcio::Track*> ( dynamic_cast<const lcio::Track*> (o) ) ; 
     
     if( o == 0 ) {
       
@@ -671,7 +690,12 @@ namespace clupatra{
     double y0 = ( d0 - r0 ) * cos( p0 ) ;
   
     streamlog_out( MESSAGE ) << " circle: r = " << r0 << ", xc = " << x0 << " , yc = " << y0 << std::endl ;
-    
+    //    if( streamlog_level( DEBUG ) ){
+    if( trk->ext<TrackInfo>() )
+      streamlog_out( MESSAGE ) << "  next xing point at layer  "  << trk->ext<TrackInfo>()->nextLayer << " : " 
+			       <<  trk->ext<TrackInfo>()->nextXPoint ;
+      // }
+   
   }
 
   inline void printTrackerHit(const lcio::LCObject* o){
@@ -686,10 +710,16 @@ namespace clupatra{
       return  ;
     }
   
+    // streamlog_out( MESSAGE ) << *hit << std::endl 
+    // 			     << " err: rPhi" <<  sqrt( hit->getCovMatrix()[0] + hit->getCovMatrix()[2] ) 
+    // 			     << " z :  " <<   hit->getCovMatrix()[5] << std::endl 
+    // 			     << " chi2 residual to best matching track : " << hit->ext<HitInfo>()->chi2Residual << std::endl ;
     streamlog_out( MESSAGE ) << *hit << std::endl 
 			     << " err: rPhi" <<  sqrt( hit->getCovMatrix()[0] + hit->getCovMatrix()[2] ) 
 			     << " z :  " <<   hit->getCovMatrix()[5] << std::endl 
-			     << " chi2 residual to best matching track : " << hit->ext<HitInfo>()->chi2Residual << std::endl ;
+			     << " chi2 residual to best matching track : " << hit->ext<HitInfo>()->chi2Residual
+			     << " delta chi2 to best matching track : " << hit->ext<HitInfo>()->deltaChi2
+			     << std::endl ;
     
     
   }

@@ -40,6 +40,8 @@ using namespace marlin ;
 
 #include "clupatra.h"
 
+
+
 using namespace clupatra ;
 
 ClupatraNew aClupatraNew ;
@@ -370,19 +372,6 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
   evt->addCollection( cluCol , "CluTrackSegments" ) ;
 
-
-  // //DEBUG ..... check if there are really no duplicate pad rows ...
-  // ocs.clear() ; 
-  // split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-  // LCCollectionVec* dupCol = new LCCollectionVec( LCIO::TRACK ) ;
-  // std::transform( ocs.begin(), ocs.end(), std::back_inserter( *dupCol ) , converter ) ;
-  // evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
-  // streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.size() : " << dupCol->getNumberOfElements() << std::endl ;
-
-
-  //=============================================================================================================
-
-
   // //DEBUG ..... check if there are really no duplicate pad rows ...
   // ocs.clear() ; 
   // split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
@@ -391,7 +380,6 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   // evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
 
   // streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.size() : " << dupCol->getNumberOfElements() << std::endl ;
-
 
 
   //================================================================================
@@ -430,9 +418,26 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
   
-  std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
+  // std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
   
   
+  if( streamlog_level( DEBUG4 ) ) {
+    for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+      GCluster* clu  = *icv ;
+      KalTrack* trk =  clu->ext<ClusterInfo>()->track ;
+      gear::Vector3D xv ;
+      int  layer ;
+      trk->findNextXingPoint(  xv , layer , 1 ) ;
+      
+      clu->ext<ClusterInfo>()->nextXPoint = xv ;
+      clu->ext<ClusterInfo>()->nextLayer = layer ;
+
+      streamlog_out( DEBUG4 ) <<  "   ----  FINDNEXTXINGPOINT: "  <<  clu
+			      <<  " next xing point at layer: "   <<  clu->ext<ClusterInfo>()->nextLayer
+			      << " : " <<  clu->ext<ClusterInfo>()->nextXPoint ;
+    }
+  }
+
   LCCollectionVec* trksegs = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *trksegs ) , KalTrack2LCIO() ) ;
   evt->addCollection( trksegs , "KalTrackSegments" ) ;
@@ -451,9 +456,12 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   addToHitListVector(  leftOverHits.begin(), leftOverHits.end() , hitsInLayer ,  _kalTest->indexOfFirstLayer( KalTest::DetID::TPC)  ) ;
 
+
   for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
 
-    addHitsAndFilter( *icv , hitsInLayer , 25. ,  3 ) ; 
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
+    const bool backward = true ;
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
   }
 
   //=======================================================================================================  

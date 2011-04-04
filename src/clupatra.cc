@@ -4,11 +4,11 @@
 namespace clupatra{
 
 
-  void addHitsAndFilter( GCluster* clu, GHitListVector& hLV , double dChi2Max, unsigned maxStep  ) {
+  void addHitsAndFilter( GCluster* clu, GHitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, bool backward) {
     
     Chi2_RPhi_Z_Hit ch2rzh ;
 
-    static const double chi2Cut = 100 ;  // FIXME: make parameter
+    //    static const double chi2Cut = 100 ;  // FIXME: make parameter
 
     KalTrack* trk =  clu->ext<ClusterInfo>()->track ;
     
@@ -21,8 +21,11 @@ namespace clupatra{
       
       bool hitAdded = false ;
       
-      trk->findNextXingPoint(  xv , layer , step ) ;
+      trk->findNextXingPoint(  xv , layer , step , backward ) ;
       
+      // clu->ext<ClusterInfo>()->nextXPoint = xv ;
+      // clu->ext<ClusterInfo>()->nextLayer = layer ;
+
       streamlog_out( DEBUG4 ) <<  "  -- addHitsAndFilter(): searching in leftover hits for cluster : " << std::endl 
 			      <<  "  omega : " <<  trk->getOmega()  
 			      <<  "  Step : " << step 
@@ -70,13 +73,17 @@ namespace clupatra{
 	    
 	    bestHit->first->deltaChi2 = deltaChi2 ;
 	    
-	    if(  deltaChi2 < dChi2Max   &&  trk->addAndFilter( bestHit->first->fitHit )  ){
+	    if(   deltaChi2 < dChi2Max   &&  trk->addAndFilter( bestHit->first->fitHit )  ){
 	      
 	      hitAdded = true ;
 	      
 	      hLL.remove(  bestHit ) ;
 	      clu->addHit( bestHit ) ;
 	      
+	      backward = false ; 
+	      // after we add the first (backward) hit, we have effectively switched the 
+	      // direction of the track fit, i.e. the next search is 'forward'
+
 	      streamlog_out( DEBUG ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
 	    }
 	  } // chi2Cut 
@@ -94,7 +101,7 @@ namespace clupatra{
 
   }
   //------------------------------------------------------------------------------------------------------------
-
-
-
+  
+  
+  
 }//namespace

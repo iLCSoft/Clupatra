@@ -698,19 +698,31 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   // ============================================================================================================
 }
 
-void KalTrack::findNextXingPoint(gear::Vector3D& v, int& layer, int step) {
+void KalTrack::findNextXingPoint(gear::Vector3D& v, int& layer, int step, bool backward) {
   
   layer = -1 ; // default return value
   
+  // sanity check - require at least 5 hits
+  if( _trk->GetEntries() < 5 ) 
+    return ;
+
+  // when smoothing backward  the first three sites have a bad cov. matrix and fit 
+  // this might change, if the initial track state is computed from a chi2 fit ...
+  const int firstGoodIndex = 4 ;
+  if( backward )
+    _trk->SmoothBackTo( firstGoodIndex ) ;
+  
+  TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At( firstGoodIndex ) ) ; 
   TKalTrackSite& siteL =  *dynamic_cast<TKalTrackSite*>( _trk->Last() ) ;
-  TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ; 
   
   int  idx0 = site0.GetHit().GetMeasLayer().GetIndex()  ; 
   int  idxL = siteL.GetHit().GetMeasLayer().GetIndex()  ; 
 
-  int idx = idxL ;
 
-  bool isIncoming  = idxL < idx0 ; 
+  int idx = (backward ? idx0 + firstGoodIndex : idxL  ) ;
+  TKalTrackSite* site = (backward ? &site0 : &siteL ) ;
+
+  bool isIncoming  = (backward ? idxL > idx0 :  idxL < idx0  ) ; 
   
   streamlog_out( DEBUG2 ) << " KalTrack::findNextXingPoint : " 
 			  << " index at track site[0] : "  <<  idx0  
@@ -720,7 +732,7 @@ void KalTrack::findNextXingPoint(gear::Vector3D& v, int& layer, int step) {
 			  << "  isIncoming: " << isIncoming 
 			  <<   std::endl ;
   
-  std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( siteL.GetCurState() ).CreateTrack() ); // tmp track
+  std::auto_ptr<TVTrack> help(& static_cast<TKalTrackState &>( site->GetCurState() ).CreateTrack() ); // tmp track
   
   TVector3 xx ;       // expected hit position vector
   double  fid  = 0. ; // deflection angle from the last hit
@@ -751,7 +763,6 @@ void KalTrack::findNextXingPoint(gear::Vector3D& v, int& layer, int step) {
   }
 
 }
-
 
 
 void KalTrack::findXingPoints() {
@@ -785,6 +796,11 @@ void KalTrack::findXingPoints() {
   //TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ; 
   //  TKalTrackSite& site10 =  *dynamic_cast<TKalTrackSite*>( _trk->At( 5 )  ) ; // use the 10-th site to have reasonable fit
   TKalTrackSite& siteL =  *dynamic_cast<TKalTrackSite*>( _trk->Last() ) ;
+
+
+  //FIXME: smoothing back to site 1 does not work if initial cov matrix is just guessed (not fit) 
+  // can only reasonably fit back to site 4 (first three needed for the cov. to 'adjust itself') 
+
   _trk->SmoothBackTo(1);
   TKalTrackSite& site0 =  *dynamic_cast<TKalTrackSite*>( _trk->At(1)  ) ; 
   

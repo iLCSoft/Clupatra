@@ -1168,7 +1168,7 @@ void OuterRimSearch::processEvent( LCEvent * evt ) {
       KalTrack* trk =  clu->ext<ClusterInfo>()->track ;
       gear::Vector3D xv ;
       int  layer ;
-      trk->findNextXingPoint(  xv , layer ) ;
+      trk->findNextXingPoint(  xv , layer , 1  ) ;
       
       clu->ext<ClusterInfo>()->nextXPoint = xv ;
       clu->ext<ClusterInfo>()->nextLayer = layer ;
