@@ -11,6 +11,20 @@
 #include "TVTrackHit.h"
 #include "KalTest.h"
 
+// copy_if (missing from STL)
+template <class In, class Out, class Pred> Out copy_if(In first, In last, Out res, Pred p){
+  
+  while( first != last ){
+    if( p( *first) ){
+ 
+     *res++ = *first ;
+    }
+    ++first ;
+  }
+  return res ;
+}
+
+
 namespace clupatra{
   
   typedef TVTrackHit  FitHit ;
@@ -70,6 +84,7 @@ namespace clupatra{
   inline int z_index( ClupaHit* h) { return h->zIndex ; } 
 
 
+
   // helper class to assign additional parameters to TrackerHit clusters
   struct ClusterInfoStruct{
     ClusterInfoStruct() : track(0){ }
@@ -94,17 +109,24 @@ namespace clupatra{
   typedef GenericCluster<ClupaHit>    GCluster ;
   typedef GenericClusterVec<ClupaHit> GClusterVec ;
 
-  // typedef GenericCluster<TrackerHit> GCluster ;
-  // typedef GenericHit<TrackerHit>     Hit ;
-  // typedef GenericHitVec<TrackerHit>  HitVec ;
-
-  //------------- create vector of left over hits per layer
+  //-------------  vector of left over hits per layer
   typedef std::list<GHit*> GHitList ;
   typedef std::vector< GHitList > GHitListVector ;
 
-
   //-------------------------------------------------------------------------------------
   
+  // helper struct: returns true if |z| index is in ]z0,z1]
+  struct ZIndexInRange{
+    int _z0, _z1 ;
+    ZIndexInRange(int z0, int z1 ) : _z0(z0), _z1(z1) {}
+    bool operator()( GHit* hit ){
+      int z = std::abs( hit->first->zIndex ) ;
+      return  ( _z0 <= z && z < _z1 ) ;
+    }
+  } ;
+
+  //-----------------------------------
+
   /** Add the generic hits from (First,Last) to the GHitListVector - vector needs to be initialized, e.g. with
    *     hLV.resize( KalTest::getMaxLayerIndex() ) 
    */
@@ -117,6 +139,7 @@ namespace clupatra{
       ++first ;
     }
   }
+
   //-------------------------------------------------------------------------------------
 
   /** Try to add hits from hLV (hit lists per layer) to the cluster. The cluster needs to have a fitted KalTrack associated to it.
@@ -719,9 +742,11 @@ namespace clupatra{
 			     << " z :  " <<   hit->getCovMatrix()[5] << std::endl 
 			     << " chi2 residual to best matching track : " << hit->ext<HitInfo>()->chi2Residual
 			     << " delta chi2 to best matching track : " << hit->ext<HitInfo>()->deltaChi2
+			     << " zIndex: " << hit->ext<HitInfo>()->zIndex 
+			     << " layerID: " << hit->ext<HitInfo>()->layerID 
 			     << std::endl ;
     
-    
+
   }
 
 

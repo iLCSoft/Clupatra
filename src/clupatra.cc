@@ -8,8 +8,6 @@ namespace clupatra{
     
     Chi2_RPhi_Z_Hit ch2rzh ;
 
-    //    static const double chi2Cut = 100 ;  // FIXME: make parameter
-
     KalTrack* trk =  clu->ext<ClusterInfo>()->track ;
     
     unsigned step = 0 ;
@@ -23,10 +21,7 @@ namespace clupatra{
       
       trk->findNextXingPoint(  xv , layer , step , backward ) ;
       
-      // clu->ext<ClusterInfo>()->nextXPoint = xv ;
-      // clu->ext<ClusterInfo>()->nextLayer = layer ;
-
-      streamlog_out( DEBUG4 ) <<  "  -- addHitsAndFilter(): searching in leftover hits for cluster : " << std::endl 
+      streamlog_out( DEBUG2 ) <<  "  -- addHitsAndFilter(): searching in leftover hits for cluster : " << std::endl 
 			      <<  "  omega : " <<  trk->getOmega()  
 			      <<  "  Step : " << step 
 			      <<  "  at layer: "   << layer         
@@ -60,7 +55,7 @@ namespace clupatra{
 	  
 	  if( ch2Min  < chi2Cut ) { 
 	    
-	    streamlog_out( DEBUG ) <<   " ---- assigning left over hit : " << hPos << " <-> " << xv
+	    streamlog_out( DEBUG2 ) <<   " ---- assigning left over hit : " << hPos << " <-> " << xv
 				   <<   " dist: " <<  (  hPos - xv ).r()
 				   <<   " chi2: " <<  ch2Min 
 				   <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
@@ -84,7 +79,7 @@ namespace clupatra{
 	      // after we add the first (backward) hit, we have effectively switched the 
 	      // direction of the track fit, i.e. the next search is 'forward'
 
-	      streamlog_out( DEBUG ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
+	      streamlog_out( DEBUG2 ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
 	    }
 	  } // chi2Cut 
 	} // bestHit

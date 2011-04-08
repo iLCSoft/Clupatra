@@ -27,6 +27,7 @@
 #include "UTIL/Operators.h"
 #include "lcio.h"
 
+#include "clupatra.h"
 
 #include "TObjArray.h"
 
@@ -58,7 +59,7 @@ public:
     
     _deltaChi2 = site.GetDeltaChi2();
     
-    streamlog_out( DEBUG3 ) << " KalTrackFilter::IsAccepted called  !  deltaChi2 = "  <<  _deltaChi2  << std::endl;
+    streamlog_out( DEBUG0 ) << " KalTrackFilter::IsAccepted called  !  deltaChi2 = "  <<  _deltaChi2  << std::endl;
 
     return ( _maxDeltaChi2 > -1. ?  _deltaChi2 < _maxDeltaChi2  : true )   ; 
   }
@@ -249,7 +250,12 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
   static TKalMatrix C(kSdim,kSdim);
   for (Int_t i=0; i<kSdim; i++) {
-    C(i,i) = 1.e6;   // dummy error matrix
+    //    C(i,i) = 1.e6;   // dummy error matrix
+
+    // NB: if the error is too large the initial helix parameters might be changed extremely by the first three (or so) hits,
+    //     such that the fit will not work because the helix curls away and does not hit the next layer !!!
+    //     ->  this might need a bit more thought ...
+    C(i,i) = 1.e2;   // dummy error matrix
   }
 
   sited.Add(new TKalTrackState(svd,C,sited,TVKalSite::kPredicted));
@@ -280,15 +286,26 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
   TVTrackHit *hitp = 0;
 
+  KalTrackFilter filter( 35. )   ; //FIXME: make parameter ?
+ 
+  int counter = -1 ;
   while ( (hitp = dynamic_cast<TVTrackHit *>( next() ) ) ) {
-
+    
     TKalTrackSite  &site = *new TKalTrackSite(*hitp); // new site
 
+    ++counter ;
+    if( counter > 4  )   // allow first hits to have large dChi2 ....
+      site.SetFilterCond( &filter ) ;
+    
     streamlog_out( DEBUG0 )  << "Kaltrack::fitTrack :  add site at index : " << hitp->GetMeasLayer().GetIndex() << std::endl ;
 
-    if (!kaltrack.AddAndFilter(site)) {               // filter it
 
-      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" << std::endl;
+    if ( ! kaltrack.AddAndFilter(site)  ) {               // filter it
+
+      streamlog_out( DEBUG4 )  << "Kaltrack::fitTrack :  site discarded!" 
+			       << "  cluster : " << getCluster< clupatra::GCluster >() << " size " << getCluster< clupatra::GCluster >()->size()  
+			       << std::endl;
+      //FIXME:   should we remove the hit from the cluster here ???????
 
       delete &site;                        // delete it if failed
     }
@@ -612,6 +629,8 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   int nHit = kaltrack.GetEntriesFast() ;
 
+  streamlog_out( DEBUG ) <<  " ============================= kaltrack.GetEntriesFast() " << kaltrack.GetEntriesFast()   << std::endl ;
+
   EVENT::TrackerHit* hLast = 0 ; 
 
   for(int i=0 ; i < nHit ; ++i ){
@@ -625,9 +644,24 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
       trk->addHit( h ) ;
       hLast = h ;
+
+    } else {
+      streamlog_out( DEBUG ) <<  " hit [" << i << "] not added to LCIOTrack !!! " << std::endl ;
     }
 
   }
+
+  if( nHit > ( trk->getTrackerHits().size()  + 1 ) )
+    streamlog_out( DEBUG3 ) <<  "  hits not used in KalTest fit : " <<   nHit - trk->getTrackerHits().size() << " from " << nHit << std::endl ;
+
+
+  if(  trk->getTrackerHits().size() < 6 ) {
+
+    streamlog_out( ERROR ) <<  " Small number of hits in lcio Track " <<   trk->getTrackerHits().size() << " out of " << nHit  << std::endl ;
+    
+
+  }
+
 #endif 
 
   //#define ADD_XING_HITS
