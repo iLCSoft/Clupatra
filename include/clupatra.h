@@ -150,7 +150,20 @@ namespace clupatra{
 			 bool backward=false) ; 
 
   //-------------------------------------------------------------------------------------
+  /** Find the nearest neighbor hit in the next and previous layer(s) 
+   */
+  void  findNearestHits( GCluster& clu,  int maxLayerID, int maxStep=1) ;
 
+  //-------------------------------------------------------------------------------------
+
+  /** Force the hits in cluster clu into two clusters - only hits from layers with exactly two clusters are used.
+   *  The algorithm assumes that the cluster consists effectively two tracks - hits are split according to the 'hemisphere' 
+   *  defined by the difference vector of the hit pair in the previous layer. 
+   */
+  //  std::pair<GCluster*, GCluster* > create_two_clusters( GCluster& clu,  GHitVec& hV,  int maxLayerID) ;
+  void create_two_clusters( const GHitVec& hV, GClusterVec& cluVec,  int maxLayerID) ;
+  //-------------------------------------------------------------------------------------
+ 
 
   //----------------  delete helper
   template<class P>  void delete_ptr(P* p) { delete p;}
@@ -314,6 +327,12 @@ namespace clupatra{
   
     KalTrack* operator() (GCluster* clu) {  
     
+      KalTrack* trk = _kt->createKalTrack() ;
+
+
+      if( clu->size() < 3 ) 
+	return trk ;
+
       static HitLayerID tpcLayerID( _kt->indexOfFirstLayer( KalTest::DetID::TPC )  )  ;
     
       clu->sort( LayerSort<HitOrder>() ) ;
@@ -330,8 +349,6 @@ namespace clupatra{
     
       // reverse_order = false ;
 
-
-      KalTrack* trk = _kt->createKalTrack() ;
 
       // store mutual pointers between tracks and 'clusters'
       trk->setCluster<GCluster>( clu ) ;
@@ -470,7 +487,7 @@ namespace clupatra{
        lcio::TrackImpl* lTrk = new lcio::TrackImpl ;
        trk->toLCIOTrack( lTrk  ) ;
        
-       if( streamlog_level( DEBUG4 ) ){
+       if( streamlog_level( DEBUG ) ){
 	 lTrk->ext<TrackInfo>() = new TrackInfoStruct ;       
 	 
 	 // streamlog_out( DEBUG4 ) <<  "   ---- KalTrack2LCIO : "  <<  trk->getCluster<GCluster>()			     
@@ -557,6 +574,58 @@ namespace clupatra{
   };
   //TODO: create a faster predicate for no duplicate pad rows ....
 
+  //---------------------------------------------------------------------------------
+  
+  /** Predicate class for 'distance' of NN clustering based on previous nearest neighbor search.
+   */
+  class NearestHitDistance{
+    typedef ClupaHit HitClass ;
+    typedef double PosType ;
+  public:
+    
+    /** Required typedef for cluster algorithm 
+     */
+    typedef HitClass hit_type ;
+    
+    /** C'tor takes merge distance */
+    NearestHitDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
+    
+    /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
+    inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
+      
+      //      if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
+      
+      int l0 =  h0->first->layerID ;
+      int l1 =  h1->first->layerID ;
+      
+      if(  std::abs( l0 - l1 ) != 1 ) 
+	return false ;
+      
+
+      bool ret = ( l0 < l1 ? 
+		   h0->first->nNNHit ==  h1->first  &&  h1->first->pNNHit ==  h0->first  :
+		   h0->first->pNNHit ==  h1->first  &&  h1->first->nNNHit ==  h0->first  ) ;
+
+      streamlog_out( DEBUG4 ) << "--- NearestHitDistance::mergeHits: "  << std::endl 
+			      << " h0: " << h0->first 
+			      << " h0.pNNHit " << h0->first->pNNHit
+			      << " h0.nNNHit " << h0->first->nNNHit << std::endl 
+			      << " h1: " << h1->first 
+			      << " h1.pNNHit " << h1->first->pNNHit
+			      << " h1.nNNHit " << h1->first->nNNHit 
+			      << "  ---> " <<  ( h0->first->nNNHit ==  h1->first  &&  h1->first->pNNHit ==  h0->first )
+			      << "  , " <<     ( h0->first->pNNHit ==  h1->first  &&  h1->first->nNNHit ==  h0->first )
+			      << std::endl ;
+
+      return ret ;
+    }
+    
+  protected:
+    NearestHitDistance() ;
+    float _dCutSquared ;
+    float _dCut ;
+  } ;
+  
   //---------------------------------------------------------------------------------
 
   /** Predicate class for 'distance' of NN clustering.

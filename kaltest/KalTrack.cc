@@ -487,6 +487,12 @@ double KalTrack::getOmega() {
 
  
 void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
+  
+  if (_kalHits->GetEntries() < 3) {
+    
+    return ; // nothing to do
+  }
+
 
   TKalTrack& kaltrack = *_trk ;
   

@@ -286,8 +286,8 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
       
       // try clustering in pad row ranges to find clear cluster segments...
       
-      int padRowRange = 20 ;  //FIXME: make parameter
-      int outerRow = nPadRows ;
+      int padRowRange = 12 ;  //FIXME: make parameter
+      int outerRow = nPadRows + _kalTest->indexOfFirstLayer( KalTest::DetID::TPC)  ;
       
       while( outerRow > padRowRange ) {
 	
@@ -983,22 +983,26 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   //===============================================================================================
   // recluster in the leftover hits
+  GClusterVec loclu ; // leftover clusters
+ 
   static const bool recluster_left_overs = true ;
   if( recluster_left_overs ) {
 
-    GClusterVec loclu ; // leftover clusters
+    HitDistance dist( 1.5 * _distCut ) ;  // FIXME: make parameter 
+
+
     GHitVec oddHits ;
     
     oddHits.clear() ;
     // add all hits in pad row range to oddHits
-    for(unsigned iRow = 0 ; iRow < nPadRows ; ++iRow ) {
+    for(unsigned iRow = 0 ; iRow <  _kalTest->maxLayerIndex()  ; ++iRow ) {
       
       std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( oddHits )  ) ;
     }
     
     //----- recluster in given pad row range
     loclu.clear() ;
-    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu ), &dist0 , _minCluSize ) ;
+    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu ), &dist , _minCluSize ) ;
     
     LCCollectionVec* leftOverCol = new LCCollectionVec( LCIO::TRACK ) ;
     evt->addCollection( leftOverCol , "LeftOverClusters" ) ;
@@ -1006,9 +1010,111 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     
   }
   //===============================================================================================
-  // recluster in the leftover hits
-  static const bool find_close_tracks = true ;
-  if( find_close_tracks ) {
+  // 
+  GClusterVec reclu ; // leftovers reclustered
+
+  static const bool refit_leftover_hits = true ;
+  if( refit_leftover_hits ) {
+
+    //    NearestHitDistance nnDist(0.) ;
+ 
+    // compute the hit multiplicities in pad rows
+    for( GClusterVec::iterator icv = loclu.begin() ; icv != loclu.end() ; ++ icv ) {
+
+      GCluster* clu = *icv ;
+      
+      GHitListVector hLV( nPadRows )  ;
+      addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
+
+      //      int mult[5] ; for(unisgned i=0;i<5;++i) mult[i] = 0 ;
+      std::vector<int> mult(5) ;
+
+      for( unsigned i=0 ; i < hLV.size() ; ++i ){
+	unsigned m =  hLV[i].size() ;  
+
+	if( m > 2 )  m = 3 ;
+
+	++mult[ m ] ;
+	++mult[ 4] ;
+      }
+
+      float total = (  mult[1] + mult[2] + mult[3] ) ; 
+      float clumu1 = mult[1] / total ;  
+      float clumu2 = mult[2] / total ;
+
+      streamlog_out(  DEBUG3 ) << " leftover cluster multiplicities: (0,1,2,>=3, all) :  [" 
+			       <<  mult[0] << " , " <<  mult[1] << " , " <<  mult[2] << " , "    
+			       <<  mult[3] << " , " <<  mult[4] << "] "  
+			       << " mult_1 = " << clumu1 
+			       << " mult_2 = " << clumu2  
+			       << std::endl ;    
+
+
+
+
+      // findNearestHits( *clu, nPadRows, 1) ;
+
+      
+
+      if( clumu2 > 0.8 ) {   //FIXME - make parameter
+	
+
+	//---- get hits from cluster into a vector
+	GHitVec v ;
+	v.reserve( clu->size() ) ;
+	clu->takeHits( std::back_inserter( v )  ) ;
+	
+	
+	create_two_clusters( v , reclu, nPadRows ) ;
+
+
+	GClusterVec::reverse_iterator iC = reclu.rbegin()  ;
+	GCluster* clu0 = *iC++ ;
+	GCluster* clu1 = *iC   ;
+
+	clu0->ext<ClusterInfo>() = new ClusterInfoStruct ;
+	clu1->ext<ClusterInfo>() = new ClusterInfoStruct ;
+
+	KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
+	
+	KalTrack* trk0 = fitter( clu0 ) ;
+	KalTrack* trk1 = fitter( clu1 ) ; 
+	
+	// try to extend the clusters with leftover hits (from layers that do not have two hits)
+	static const bool backward = true ;
+	
+	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	delete trk0 ;
+	delete trk1 ;
+	
+      } 
+
+      if( clumu1 > 0.9 ) {
+	
+	// add to final clusters directly
+	reclu.push_back( clu ) ;
+
+      } 
+
+    } 
+
+    // for( GClusterVec::iterator icv = reclu.begin() ; icv != reclu.end() ; ++ icv ) {
+    //   (*icv)->ext<ClusterInfo>() = new ClusterInfoStruct ;
+    // }
+    
+    LCCollectionVec* ccol = new LCCollectionVec( LCIO::TRACK ) ;
+    std::transform( reclu.begin(), reclu.end(), std::back_inserter( *ccol ) , converter ) ;
+    evt->addCollection( ccol , "ReclusteredLeftOvers" ) ;
+    
+    
+    // for now just fit the clusters ...
+    cluList.merge( reclu ) ;
+
 
   }
   //================================================================================================================ 
@@ -1039,7 +1145,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   evt->addCollection( kaltracks , _outColName ) ;
   
  
- //================================================================================================================ 
+  //================================================================================================================ 
   //   merge track segments based on track parameters and errors ...
   //
   static const int merge_track_segments = true ;
@@ -1136,7 +1242,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   //FIXME: memory leak - need for debugging....
 
-  //  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
+  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
   //=====================================
 
 
