@@ -264,7 +264,8 @@ void AnaTrack::processEvent( LCEvent * evt ) {
       
       streamlog_out( DEBUG4 ) << " no MCParticle found for track in evt: " << evt->getEventNumber() 
 			      << " run : " << evt->getRunNumber()  << std::endl 
-			      <<  *tr << std::endl ;
+			      <<  tr->id() 
+			      << std::endl ;
     }
     
     bool cut = true ;

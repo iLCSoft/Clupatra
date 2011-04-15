@@ -133,7 +133,8 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   RCut<ClupaHit> rCut( _rCut ) ;
   RCutInverse<ClupaHit> rCutInverse( _rCut ) ;
   
-  ZIndex<TrackerHit,200> zIndex( -2750. , 2750. ) ; 
+  static const int ZBins = 160 ; // with 200 bins we can miss tracks in the very forward region  
+  ZIndex<TrackerHit,ZBins > zIndex( -2750. , 2750. ) ; 
   
   HitDistance dist0( _distCut ) ;
   HitDistance dist( 20. ) ;
@@ -900,7 +901,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     GClusterVec socs ;
 
     int zIndexRange = 10 ;  //FIXME: make parameter
-    int outerZ = 200 ; // fixme: parameter - also used in zIndex above ...
+    int outerZ = ZBins ; 
     
     while( outerZ > 0 ) {
       
@@ -988,7 +989,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   static const bool recluster_left_overs = true ;
   if( recluster_left_overs ) {
 
-    HitDistance dist( 1.5 * _distCut ) ;  // FIXME: make parameter 
+    HitDistance dist(  _distCut ) ;  // FIXME: make parameter 
 
 
     GHitVec oddHits ;
@@ -1019,9 +1020,13 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     //    NearestHitDistance nnDist(0.) ;
  
     // compute the hit multiplicities in pad rows
-    for( GClusterVec::iterator icv = loclu.begin() ; icv != loclu.end() ; ++ icv ) {
+
+    // use a while loop to remove all clusters at the end (erase the pointer) 
+    GClusterVec::iterator icv = loclu.begin() ; 
+    while( icv != loclu.end() ) {
 
       GCluster* clu = *icv ;
+
       
       GHitListVector hLV( nPadRows )  ;
       addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
@@ -1091,17 +1096,20 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 	
 	delete trk0 ;
 	delete trk1 ;
-	
-      } 
 
-      if( clumu1 > 0.9 ) {
+	
+      } else if( clumu1 > 0.9 ) {
 	
 	// add to final clusters directly
 	reclu.push_back( clu ) ;
 
-      } 
+      }  else {
 
-    } 
+	delete clu ;
+      }
+
+      loclu.erase( icv++ ) ;  // erase all clusters from the list (GClusterVec)
+    }
 
     // for( GClusterVec::iterator icv = reclu.begin() ; icv != reclu.end() ; ++ icv ) {
     //   (*icv)->ext<ClusterInfo>() = new ClusterInfoStruct ;
@@ -1115,9 +1123,42 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     // for now just fit the clusters ...
     cluList.merge( reclu ) ;
 
-
   }
   //================================================================================================================ 
+  // recluster in the leftover hits
+  GClusterVec loclu2 ; // leftover clusters
+ 
+  static const bool recluster_left_overs_again = false ;
+  if( recluster_left_overs_again ) {
+    
+    HitDistance distLarge( 3.0 * _distCut ) ;  // FIXME: make parameter 
+    
+    
+    GHitVec oddHits ;
+    oddHits.clear() ;
+
+    // add all hits in pad row range to oddHits
+    for(int iRow = 0 ; iRow <  _kalTest->maxLayerIndex()  ; ++iRow ) {
+      
+      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( oddHits )  ) ;
+    }
+    
+    streamlog_out( DEBUG3 ) <<  " recluster_left_overs_again : oddhits.size() : " << oddHits.size() << std::endl ;
+
+
+    //----- recluster in given pad row range
+    loclu2.clear() ;
+    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu2 ), &distLarge , 3 ) ; //_minCluSize ) ;
+    
+    streamlog_out( DEBUG3 ) <<  " recluster_left_overs_again : loclu2.size() : " << loclu2.size() << std::endl ;
+
+    LCCollectionVec* leftOverCol = new LCCollectionVec( LCIO::TRACK ) ;
+    evt->addCollection( leftOverCol , "LeftOverClustersFinal" ) ;
+    std::transform( loclu2.begin(), loclu2.end(), std::back_inserter( *leftOverCol ) , converter ) ;
+    
+  }
+
+  //===============================================================================================
   //  refit all found tracks 
   //==============================
 
@@ -1289,8 +1330,8 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 void ClupatraNew::check( LCEvent * evt ) { 
   /*************************************************************************************************/
 
-  std::string colName( "MergedKalTracks"  ) ;
-  // std::string colName(  _outColName ) ;
+  //std::string colName( "MergedKalTracks"  ) ;
+  std::string colName(  _outColName ) ;
 
 
   bool checkForDuplicatePadRows =  false ; //true ;

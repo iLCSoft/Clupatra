@@ -352,7 +352,10 @@ namespace clupatra{
 
       // store mutual pointers between tracks and 'clusters'
       trk->setCluster<GCluster>( clu ) ;
-      //      clu->ext<ClusterInfo>() = new ClusterInfoStruct ;
+
+      if( !  clu->ext<ClusterInfo>() )
+       	clu->ext<ClusterInfo>() = new ClusterInfoStruct ;
+
       clu->ext<ClusterInfo>()->track = trk ;
     
 

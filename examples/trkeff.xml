@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<!-- ?xml-stylesheet type="text/xsl" href="http://ilcsoft.desy.de/marlin/marlin.xsl"? -->
+<!-- ?xml-stylesheet type="text/xsl" href="marlin.xsl"? -->
+
+<!-- Loading shared library : /Users/gaede/marlin/clupatra/lib/libclupatra.dylib -->
+<!--##########################################
+    #                                        #
+    #     Example steering file for marlin   #
+    #                                        #
+    ##########################################-->
+
+
+<marlin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ilcsoft.desy.de/marlin/marlin.xsd">
+ <execute>
+  <processor name="MyAIDAProcessor"/>
+  <group name="TrackEfficiency"/>  
+  <processor name="MyCEDViewer"/>
+  <!--processor name="MyAnaTrack"/-->  
+ </execute>
+
+ <global>
+  <parameter name="LCIOInputFiles"> clupa_ana.slcio <!--clupa_mu+.slcio--> </parameter>
+  <!-- limit the number of processed records (run+evt): -->  
+  <parameter name="MaxRecordNumber" value="1000" />  
+  <parameter name="SkipNEvents" value="0" />  
+  <parameter name="SupressCheck" value="false" />  
+  <parameter name="GearXMLFile"> gear_ILD_00.xml </parameter>  
+  <parameter name="Verbosity" options="DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT"> DEBUG3  </parameter> 
+ </global>
+
+ <processor name="MyAIDAProcessor" type="AIDAProcessor">
+ <!--Processor that handles AIDA files. Creates on directory per processor.  Processors only need to create and fill the histograms, clouds and tuples. Needs to be the first ActiveProcessor-->
+  <!-- compression of output file 0: false >0: true (default) -->
+  <parameter name="Compress" type="int">1 </parameter>
+  <!-- filename without extension-->
+  <parameter name="FileName" type="string">trkeff</parameter>
+  <!-- type of output file root (default) or xml )-->
+  <parameter name="FileType" type="string">root </parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
+</processor>
+
+
+<group name="TrackEfficiency">
+  <!--Name of the input collections with Tracks-->
+  <parameter name="TrackCollection" type="string" lcioInType="Track">KalTestTracks </parameter>
+  <!--Name of the input collections with LCRelation Tracks to MCParticles-->
+  <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation">TrackMCTruthLink</parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
+
+  <processor name="tracks_ttbar" type="TrackEfficiency">
+    <parameter name="PtRange" type="FloatVec">0. 100.</parameter>
+  </processor>
+</group>
+
+
+ <processor name="MyCEDViewer" type="CEDViewer">
+ <!--CEDViewer: event display of LCIO objects  - based on CED by A.Zhelezov.-->
+  <!--collection to be displayed ( ColName, marker type[0-2], size)-->
+  <!--parameter name="DrawCollection" type="StringVec">CalorimeterHits 0 3  </parameter-->
+  <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
+  <parameter name="DrawInLayer" type="StringVec">
+    KalTestTracks  0 3 0
+    MCParticleTracks 0 3 1
+    MCParticleTracksFound 2 3 2
+    MCParticlesSkimmed 0 1 3
+    UnUsedTPCCluTrackerHits 0 3 9
+  </parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
+</processor>
+
+
+</marlin>

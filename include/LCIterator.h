@@ -3,6 +3,7 @@
 #define LCIterator_include
 
 #include <string>
+#include <sstream>
 #include "EVENT/LCEvent.h"
 #include "EVENT/LCCollection.h"
 
@@ -21,6 +22,16 @@ public:
     _col = evt->getCollection( name ) ;
     
     _n = _col->getNumberOfElements() ;
+
+    if( _n > 0 ){
+      T* t = dynamic_cast<T*>(  _col->getElementAt(0)  );
+      if( t == 0 ){
+	std::stringstream s ;
+	s << " invalid iterator type  : " << typeid( t ).name() << " for collection " <<  name  << std::endl ; 
+	throw lcio::Exception( s.str() ) ;
+      }
+    }
+
   }
   
   T* next(){
@@ -30,6 +41,8 @@ public:
     else
       return 0 ;
   }
+
+  int size() { return _n ; }
 
 protected:
   int _n, _i ;

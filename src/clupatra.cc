@@ -184,7 +184,7 @@ namespace clupatra{
     cluVec.push_back( clu0 ) ;
     cluVec.push_back( clu1 ) ;
 
-    streamlog_out(  DEBUG3 ) << " create_two_clusters  --- called ! " << std::endl ;
+    streamlog_out(  DEBUG ) << " create_two_clusters  --- called ! " << std::endl ;
 
     gear::Vector3D lastDiffVec(0.,0.,0.) ;
     
@@ -192,7 +192,7 @@ namespace clupatra{
 
       GHitList& hL = hitsInLayer[ l ] ;
 	
-      streamlog_out(  DEBUG3 ) << " create_two_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
+      streamlog_out(  DEBUG ) << " create_two_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
 
       if( hL.size() != 2 ){
 	
@@ -210,14 +210,14 @@ namespace clupatra{
       gear::Vector3D& p1 = h1->first->pos ;
 
 
-      streamlog_out(  DEBUG3 ) << " create_two_clusters  ---  layer " << l 
-			       << "  h0 : " << p0 
-			       << "  h1 : " << p1 ;
+      streamlog_out(  DEBUG ) << " create_two_clusters  ---  layer " << l 
+			      << "  h0 : " << p0 
+			      << "  h1 : " << p1 ;
       //			       << std::endl ;
       
       if( clu0->empty() ){ // first hit pair
 	
-	streamlog_out(  DEBUG3 ) << " create_two_clusters  --- initialize clusters " << std::endl ;
+	streamlog_out(  DEBUG ) << " create_two_clusters  --- initialize clusters " << std::endl ;
 	
 	clu0->addHit( h0 ) ;
 	clu1->addHit( h1 ) ;
@@ -234,7 +234,7 @@ namespace clupatra{
       
       if( s0 > s1 ){  // same orientation, i.e. h0 in this layer belongs to h0 in first layer
 	
-	streamlog_out(  DEBUG3 ) << " create_two_clusters  ---   same orientation " << std::endl ;
+	streamlog_out(  DEBUG ) << " create_two_clusters  ---   same orientation " << std::endl ;
 	clu0->addHit( h0 ) ;
 	clu1->addHit( h1 ) ;
 	
@@ -249,7 +249,7 @@ namespace clupatra{
 
     // clu.freeHits() ;
 
-    streamlog_out(  DEBUG3 ) << " create_two_clusters  --- clu0 " << clu0->size() 
+    streamlog_out(  DEBUG1 ) << " create_two_clusters  --- clu0 " << clu0->size() 
 			     <<  " clu1 " << clu1->size() << std::endl ;
 
     // return std::make_pair( clu0 , clu1 ) ;

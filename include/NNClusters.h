@@ -308,10 +308,17 @@ public :
   ~GenericCluster()  {
 
     typename GenericCluster<T>::iterator it = this->begin() ;
-
+    
     while( it !=  this->end() ){
-      (*it++)->second = 0 ;
+      
+      typename GenericCluster<T>::value_type h = *it++ ; 
+      if( h != 0 && h->second == this )
+        h->second = 0 ;
+      
     }
+    // while( it !=  this->end() ){
+    //   (*it++)->second = 0 ;
+    // }
   }
 
 } ;
