@@ -8,6 +8,7 @@
 #include <map>
 #include <algorithm>
 #include <math.h>
+#include <cmath>
 
 //---- LCIO ---
 #include "EVENT/LCCollection.h"
@@ -222,7 +223,7 @@ void AnaTrack::processEvent( LCEvent * evt ) {
     double om = tr->getOmega() ;
     double z0 = tr->getZ0() ;
     double tL = tr->getTanLambda() ;
-    double pt = alpha / om ;
+    double pt = alpha / std::abs( om ) ;
 
     double ed0 = sqrt( tr->getCovMatrix()[0]  );
     double eph = sqrt( tr->getCovMatrix()[2]  );
@@ -255,7 +256,11 @@ void AnaTrack::processEvent( LCEvent * evt ) {
 
       d0mcp = 0. ;  //fixme: only true for prompt tracks
       phmcp = atan2( py, px) ;
-      ommcp = alpha / ptmcp ; 
+
+      ommcp = alpha / ptmcp  ;
+      if(  mcp->getCharge() < 0. ) 
+	ommcp = -ommcp ;
+
       z0mcp = 0 ;  //fixme: only true for prompt tracks
       tLmcp = pz / ptmcp  ; 
 
@@ -281,6 +286,9 @@ void AnaTrack::processEvent( LCEvent * evt ) {
 
       double dd0 = d0 - d0mcp ;
       double dph = ph - phmcp ; 
+      if( std::abs( dph )  > M_PI )
+	dph = 2.* M_PI - std::abs( dph ) ;
+
       double dom = om - ommcp ; 
       double dz0 = z0 - z0mcp ; 
       double dtL = tL - tLmcp ; 

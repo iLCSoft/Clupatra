@@ -102,7 +102,9 @@ void ClupatraNew::init() {
   _kalTest = new KalTest( *marlin::Global::GEAR ) ;
 
   _kalTest->setOption( KalTest::CFG::ownsHits , false ) ;
-
+  _kalTest->setOption( KalTest::CFG::useQMS   , true ) ;
+  _kalTest->setOption( KalTest::CFG::usedEdx  , true ) ;
+  
   _kalTest->init() ;
 
   _nRun = 0 ;
@@ -1167,10 +1169,10 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
-  //  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
+  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
   //FIXME: DEBUG - non ip fitter
-  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
+  //  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
 

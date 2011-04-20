@@ -13,13 +13,14 @@
 <marlin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ilcsoft.desy.de/marlin/marlin.xsd">
  <execute>
   <processor name="MyAIDAProcessor"/>
+  <processor name="MyRecoMCTruthLinker"/>
   <group name="TrackEfficiency"/>  
   <processor name="MyCEDViewer"/>
   <!--processor name="MyAnaTrack"/-->  
  </execute>
 
  <global>
-  <parameter name="LCIOInputFiles"> clupa_ana.slcio <!--clupa_mu+.slcio--> </parameter>
+  <parameter name="LCIOInputFiles"> ttbar_100evts.slcio <!-- clupa_ana.slcio clupa_mu+.slcio--> </parameter>
   <!-- limit the number of processed records (run+evt): -->  
   <parameter name="MaxRecordNumber" value="1000" />  
   <parameter name="SkipNEvents" value="0" />  
@@ -43,9 +44,7 @@
 
 <group name="TrackEfficiency">
   <!--Name of the input collections with Tracks-->
-  <parameter name="TrackCollection" type="string" lcioInType="Track">KalTestTracks </parameter>
-  <!--Name of the input collections with LCRelation Tracks to MCParticles-->
-  <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation">TrackMCTruthLink</parameter>
+  <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation">TrackMCTruthLink </parameter>
   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
   <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
 
@@ -70,6 +69,49 @@
   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
   <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
 </processor>
+
+
+  <processor name="MyRecoMCTruthLinker" type="RecoMCTruthLinker">
+    <!--Name of the MCParticle input collection-->
+    <parameter name="MCParticleCollection" type="string" lcioInType="MCParticle">MCParticle </parameter>
+    <!--Name of the skimmed MCParticle  output collection-->
+    <parameter name="MCParticlesSkimmedName" type="string" lcioOutType="MCParticle">MCParticlesSkimmedNew </parameter>
+    <!--true: Create TrackMCTruthLink collection, false : dont -->
+    <parameter name="OutputTrackRelation" type="bool">true </parameter>
+    <!--Name of the Tracks input collection-->
+    <parameter name="TrackCollection" type="string" lcioInType="Track">LDCTracks </parameter>
+    <!--Name of the trackMCTruthLink output collection-->
+    <parameter name="TrackMCTruthLinkName" type="string" lcioOutType="LCRelation">TrackMCTruthLinkLDC </parameter>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string">MESSAGE DEBUG3 </parameter>
+
+    <!--links RecontructedParticles to the MCParticle based on number of hits used-->
+    <!--Name of the updated calo-hit MCTruthLink output collection-->
+    <parameter name="CalohitMCTruthLinkName" type="string" lcioOutType="LCRelation">CalohitMCTruthLink </parameter>
+    <!--Name of the Clusters input collection-->
+    <parameter name="ClusterCollection" type="string" lcioInType="Cluster">XXXPandoraClusters </parameter>
+    <!--Name of the clusterMCTruthLink output collection-->
+    <parameter name="ClusterMCTruthLinkName" type="string" lcioOutType="LCRelation">XXXClusterMCTruthLink </parameter>
+    <!--true: All reco <-> true relations are given, with weight = 10000*calo weight+track weight (weights in permill). false: Only highest contributor linked,and only to tracks, not clusters if there are any tr
+	acks-->
+    <parameter name="FullRecoRelation" type="bool">false </parameter>
+    <!--PDG codes of particles of which the daughters will be kept in the skimmmed MCParticle collection-->
+    <parameter name="KeepDaughtersPDG" type="IntVec">22 111 310  </parameter>
+    <!--true: Create CalohitMCTruthLink collection, false : dont -->
+    <parameter name="OutputCalohitRelation" type="bool">false </parameter>
+    <!--true: Create ClusterMCTruthLink collection, false : dont -->
+    <parameter name="OutputClusterRelation" type="bool">false </parameter>
+    <!--Name of the RecoMCTruthLink output collection-->
+    <parameter name="RecoMCTruthLinkName" type="string" lcioOutType="LCRelation">RecoMCTruthLink </parameter>
+    <!--Name of the ReconstructedParticles input collection-->
+    <parameter name="RecoParticleCollection" type="string" lcioInType="ReconstructedParticle">XXXPandoraPFOs </parameter>
+    <!--Name of the  SimCalorimeterHit - CalorimeterHit relation-->
+    <parameter name="SimCalorimeterHitRelationName" type="string" lcioInType="LCRelation">XXXRelationCaloHit </parameter>
+    <!--Name of the  SimTrackerHit - TrackerHit relation-->
+    <parameter name="SimTrackerHitRelationName" type="string" lcioInType="LCRelation">TPCTracksMCP </parameter>
+    <!--energy cut for daughters that are kept from KeepDaughtersPDG-->
+    <parameter name="daughtersECutMeV" type="float">10 </parameter>
+  </processor>
 
 
 </marlin>

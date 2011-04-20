@@ -15,6 +15,7 @@
 #include "EVENT/Track.h"
 #include "UTIL/Operators.h"
 #include "UTIL/LCRelationNavigator.h"
+#include "UTIL/LCTypedVector.h"
 
 //---- GEAR ----
 // #include "marlin/Global.h"
@@ -22,6 +23,11 @@
 // #include "gear/TPCParameters.h"
 // #include "gear/PadRowLayout2D.h"
 // #include "gear/BField.h"
+
+
+//MarlinUtil
+#include "HelixClass.h"
+
 
 //---- ROOT -----
 #include "TH1F.h" 
@@ -78,10 +84,10 @@ using namespace TrackEfficiencyHistos ;
 
 //======================================================================================================
 
-#define APPLY_CUT( LEVEL, Cut, Exp ) Cut &= ( Exp ) ;			\
-  if( ! Cut )  streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp \
-				      <<  " ] in evt: " << evt->getEventNumber() \
-				      << " run: "  << evt->getRunNumber()   << std::endl ;
+#define APPLY_CUT( LEVEL, Cut, Exp )  if( (Exp) == false ) { Cut = false ; \
+  streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp	    \
+  <<  " ] in evt: " << evt->getEventNumber()			    \
+  << " run: "  << evt->getRunNumber()   << std::endl ; }
 
 //======================================================================================================
 
@@ -276,12 +282,36 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     double ptmcp = sqrt( pxmcp*pxmcp + pymcp*pymcp ) ;
     
     double thmcp  = atan2( ptmcp , pzmcp ) ;
+
+    // double d0mcp = 0. ;  //fixme: only true for prompt tracks
+    // double phmcp = atan2( pymcp, pxmcp) ;
+    // double ommcp = alpha / ptmcp ; 
+    // if(  trm->getCharge() < 0. ) 
+    //   ommcp = -ommcp ;
+    // double z0mcp = 0 ;  //fixme: only true for prompt tracks
+    //    double tLmcp = pzmcp / ptmcp  ; 
+
+
+    HelixClass helix ;
+
+    float pos[3] ;
+    pos[0] = trm->getVertex()[0] ;
+    pos[1] = trm->getVertex()[1] ;
+    pos[2] = trm->getVertex()[2] ;
+    float mom[3] ;
+    mom[0] = trm->getMomentum()[0] ;
+    mom[1] = trm->getMomentum()[1] ;
+    mom[2] = trm->getMomentum()[2] ;
+
+    float q = trm->getCharge() ;
     
-    double d0mcp = 0. ;  //fixme: only true for prompt tracks
-    double phmcp = atan2( pymcp, pxmcp) ;
-    double ommcp = alpha / ptmcp ; 
-    double z0mcp = 0 ;  //fixme: only true for prompt tracks
-    double tLmcp = pzmcp / ptmcp  ; 
+    helix.Initialize_VP( pos , mom, q,  3.5 ) ;
+
+    double d0mcp = helix.getD0() ;
+    double phmcp = helix.getPhi0() ;
+    double ommcp = helix.getOmega() ; 
+    double z0mcp = helix.getZ0() ;
+    double tLmcp = helix.getTanLambda() ; 
 
 
     h.fill( hd0mcp,    d0mcp ) ;
@@ -295,21 +325,29 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     
     if( trkV.size() >  0 ){
       
-      //fixme: fill ntrk hist ( split tracks )
+      //      LCUTIL::LCTypedVector<Track*> trks( trkV ) ;
       
-      Track* tr = dynamic_cast<Track*>( trkV.at(0)  ) ; 
-      
+      const FloatVec& wV = nav.getRelatedFromWeights( trm ) ;
+      double wMax = 0.0 ;
+      int iMax = 0 ;
+      for(unsigned i=0 ; i<wV.size() ; ++i ) {
+	  
+	  if( wV[i] > wMax ){
+	    wMax =  wV[i] ;
+	    iMax = i ;
+	  }  
+	} 
 
-      mcpTrksFound->push_back( trm ) ;
+      Track* tr = dynamic_cast<Track*>( trkV.at(iMax)  ) ; 
+
  
-
       double d0 = tr->getD0() ;
       double ph = tr->getPhi() ;
       double om = tr->getOmega() ;
       double z0 = tr->getZ0() ;
       double tL = tr->getTanLambda() ;
       double pt = std::abs( alpha / om ) ;
-      
+
       double ed0 = sqrt( tr->getCovMatrix()[0]  );
       double eph = sqrt( tr->getCovMatrix()[2]  );
       double eom = sqrt( tr->getCovMatrix()[5]  );
@@ -321,6 +359,10 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
       
       double dd0 = d0 - d0mcp ;
       double dph = ph - phmcp ; 
+      if( std::abs(dph) > M_PI )
+	dph = 2.* M_PI - std::abs( dph ) ;
+
+
       double dom = om - ommcp ; 
       double dz0 = z0 - z0mcp ; 
       double dtL = tL - tLmcp ; 
@@ -328,14 +370,20 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
       bool cut = true ;
       
-      //FIXME: cut on parameter errors
-      // APPLY_CUT( cut,  mcpV.size() == 1 ) ;
-      // APPLY_CUT( cut,  tr->getChi2() / tr->getNdf() < 3. ) ;
-      // APPLY_CUT( cut, (ptMin < ptmcp && ptmcp < ptMax ) ) ;
+      //      APPLY_CUT( DEBUG4, cut,  std::abs( dph )  <  (3.*eph)  ) ;
+      APPLY_CUT( DEBUG4, cut,  std::abs( dom )  <  (5.*eom)  ) ;              // require 5 sigma on omega only for now
+      //      APPLY_CUT( DEBUG4, cut,  std::abs( dtL  ) <  (3.*etL)  ) ;
 
+      if( ! cut ) {
+	streamlog_out(DEBUG3) << " phi : " << dph << "  -  " <<  3.*eph << std::endl ;
+	streamlog_out(DEBUG3) << " ome : " << dom << "  -  " <<  3.*eom << std::endl ;
+	streamlog_out(DEBUG3) << " tanL: " << dtL << "  -  " <<  3.*etL << std::endl ;
+	streamlog_out(DEBUG3) << " pt: " << pt <<  " dpt: " << dpt << " ept : " << ept << " theta " <<  180. * atan( 1. / tL ) / M_PI  << std::endl ;
+      }
 
       if( cut == true ){
 	
+	mcpTrksFound->push_back( trm ) ;
 	
 	h.fill( hd0,    d0 ) ;
 	h.fill( hphi,   ph ) ;

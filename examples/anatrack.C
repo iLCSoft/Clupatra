@@ -44,7 +44,7 @@ void anatrack(const char* FILEN, const char* dirName) {
   gROOT->Reset();
   gROOT->SetStyle("Plain");
   //  gStyle->SetOptFit(111);
-  // gStyle->SetOptStat(111111);
+  gStyle->SetOptStat(111111);
   gStyle->SetStatFontSize(.05);
   gStyle->SetStatW(.5);
   gStyle->SetStatH(.15);
