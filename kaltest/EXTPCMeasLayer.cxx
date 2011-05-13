@@ -324,8 +324,8 @@ void  EXTPCMeasLayer::addIPHit(const TVector3   &xx,
   Double_t dmeas[2];
   meas [0] = rphi;
   meas [1] = d;
-  dmeas[0] = 100. ; // large errors - should not change track state
-  dmeas[1] = 100. ; //    
+  dmeas[0] = 1e6 ; // large errors - should not change track state
+  dmeas[1] = 1e6 ; //    
   
   Double_t v = EXTPCKalDetector::GetVdrift();
 

@@ -148,7 +148,7 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   Bool_t dummy  = EXTPCMeasLayer::kDummy;
   
   //FIXME - test:  add a layer inside the beam pipe 
-  Add(new EXTPCMeasLayer(air, air, 1.2 , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , -1 )) ;  // ,ss.str().data()));
+  Add(new EXTPCMeasLayer(air, air, 12. , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , -1 )) ;  // ,ss.str().data()));
 
 
   Add(new EXTPCMeasLayer(air, al , rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));

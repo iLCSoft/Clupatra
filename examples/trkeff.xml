@@ -13,14 +13,14 @@
 <marlin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ilcsoft.desy.de/marlin/marlin.xsd">
  <execute>
   <processor name="MyAIDAProcessor"/>
-  <processor name="MyRecoMCTruthLinker"/>
+  <XXXprocessor name="MyRecoMCTruthLinker"/>
   <group name="TrackEfficiency"/>  
-  <processor name="MyCEDViewer"/>
+  <XXXprocessor name="MyCEDViewer"/>
   <!--processor name="MyAnaTrack"/-->  
  </execute>
 
  <global>
-  <parameter name="LCIOInputFiles"> ttbar_100evts.slcio <!-- clupa_ana.slcio clupa_mu+.slcio--> </parameter>
+  <parameter name="LCIOInputFiles">ttbar_100evts.slcio <!-- ttbar_100evts.slcio clupa_ana.slcio clupa_mu+.slcio--> </parameter>
   <!-- limit the number of processed records (run+evt): -->  
   <parameter name="MaxRecordNumber" value="1000" />  
   <parameter name="SkipNEvents" value="0" />  
@@ -44,11 +44,16 @@
 
 <group name="TrackEfficiency">
   <!--Name of the input collections with Tracks-->
-  <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation">TrackMCTruthLink </parameter>
   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
   <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
 
-  <processor name="tracks_ttbar" type="TrackEfficiency">
+  <processor name="clupa_ttbar" type="TrackEfficiency">
+    <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation"> ClupatraTrackMCTruthLink </parameter>
+    <parameter name="PtRange" type="FloatVec">0. 100.</parameter>
+  </processor>
+
+  <processor name="tpc_ttbar" type="TrackEfficiency">
+    <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation"> TPCTrackMCTruthLink </parameter>
     <parameter name="PtRange" type="FloatVec">0. 100.</parameter>
   </processor>
 </group>
@@ -60,11 +65,15 @@
   <!--parameter name="DrawCollection" type="StringVec">CalorimeterHits 0 3  </parameter-->
   <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
   <parameter name="DrawInLayer" type="StringVec">
-    KalTestTracks  0 3 0
-    MCParticleTracks 0 3 1
-    MCParticleTracksFound 2 3 2
-    MCParticlesSkimmed 0 1 3
-    UnUsedTPCCluTrackerHits 0 3 9
+    ClupatraTracks  0 3 1
+    MCParticleTracks_clupa_ttbar 0 3 2
+    MCParticleTracksFound_clupa_ttbar 2 3 3
+
+    TPCTracks  0 3 11
+    MCParticleTracks_tpc_ttbar 0 3 12
+    MCParticleTracksFound_tpc_ttbar 2 3 13
+
+    MCParticlesSkimmed 0 1 4
   </parameter>
   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
   <!--parameter name="Verbosity" type="string">DEBUG </parameter-->

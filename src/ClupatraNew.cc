@@ -40,7 +40,23 @@ using namespace marlin ;
 
 #include "clupatra.h"
 
+//#include "Operators.icc" 
+inline void printSimTrackerHit(const lcio::LCObject* o){
 
+  lcio::SimTrackerHit* hit = const_cast<lcio::SimTrackerHit*> ( dynamic_cast<const lcio::SimTrackerHit*> (o) ) ; 
+  
+  if( hit == 0 ) {
+    
+    streamlog_out( ERROR ) << "  printSimTrackerHit : dynamic_cast<SimTrackerHit*> failed for LCObject : " << o << std::endl ;
+    return  ;
+  }
+  
+  streamlog_out( MESSAGE ) << *hit 
+			   << " MCParticle id: " << hit->getMCParticle()->id() 
+			   << " MCParticle parent id: " 
+			   << ( hit->getMCParticle()->getParent(0) ? hit->getMCParticle()->getParent(0)->id() : -1 ) 
+			   << std::endl ;
+}
 
 using namespace clupatra ;
 
@@ -109,6 +125,13 @@ void ClupatraNew::init() {
 
   _nRun = 0 ;
   _nEvt = 0 ;
+
+  //------ register some debugging print funtctions for picking in CED :
+
+  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
+  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
+  CEDPickingHandler::getInstance().registerFunction( LCIO::SIMTRACKERHIT , &printSimTrackerHit ) ; 
+
 }
 
 void ClupatraNew::processRunHeader( LCRunHeader* run) { 
@@ -1169,10 +1192,11 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
-  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
+  // adding an IP hit does not work for curler segments - as we fit everything leave out the IP hit
+  //KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
   //FIXME: DEBUG - non ip fitter
-  //  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
+  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
 
@@ -1185,7 +1209,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
   //std::transform( cluList.begin(), cluList.end(), std::back_inserter( *kaltracks ) , converter ) ;
 
-  evt->addCollection( kaltracks , _outColName ) ;
+  evt->addCollection( kaltracks , "ClupatraTrackSegments" ) ; 
   
  
   //================================================================================================================ 
@@ -1201,7 +1225,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   
     addToGenericHitVec( trkVec , kaltracks ,  AllwaysTrue()  ) ;
 
-    //    TrackStateDistance trkMerge( 50. ) ;
+    //    TrackStateDistance trkMerge( 1000. ) ;
     TrackCircleDistance trkMerge( 0.1 ) ; 
 
     cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), &trkMerge  , 2 ) ;
@@ -1226,22 +1250,27 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
       TrackImpl* trk = new TrackImpl ;
       Track* bestTrk = 0 ;
       double chi2Min = 99999999999999999. ;
+      int hitCount = 0 ;
+      int hitsInFit = 0 ;
       for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
 	
 	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
-
 	for(unsigned i=0 ; i < hV.size() ; ++i){
-
 	  trk->addHit( hV[i] ) ;
-	  double chi2ndf = (*itML)->getChi2() / (*itML)->getNdf() ;
-
-	  if( chi2ndf < chi2Min ){
-	    bestTrk = (*itML) ;
-	    chi2Min = chi2ndf ;
-	  }
+	  ++hitCount ;
 	}
+
+	double chi2ndf = (*itML)->getChi2() / (*itML)->getNdf() ;
+	
+	if( chi2ndf < chi2Min ){
+	  bestTrk = (*itML) ;
+	  chi2Min = chi2ndf ;
+	}
+
       }
       if( bestTrk != 0 ){ 
+
+	hitsInFit = trk->getTrackerHits().size() ;
 
 	trk->setD0( bestTrk->getD0() ) ;
 	trk->setOmega( bestTrk->getOmega() ) ;
@@ -1255,28 +1284,30 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
       else{
 	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
       }
-      mergedTracks->addElement( trk )  ;
 
+      trk->subdetectorHitNumbers().push_back( hitCount ) ;  
+      trk->subdetectorHitNumbers().push_back( hitsInFit ) ;  
+
+      mergedTracks->addElement( trk )  ;
     }
 
     // add all tracks that have not been merged :
     for( GenericHitVec<Track>::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
 
       if( (*it)->second == 0 ){
-
-	mergedTracks->addElement(  new TrackImpl( *dynamic_cast<TrackImpl*>( (*it)->first ) ) ) ;
+	
+	TrackImpl* t =   new TrackImpl( *dynamic_cast<TrackImpl*>( (*it)->first ) ) ;
+	
+	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
+	
+	mergedTracks->addElement( t ) ;
       }
     }
-
-
-    evt->addCollection( mergedTracks , "MergedKalTracks" ) ;
+    
+    evt->addCollection( mergedTracks , _outColName ) ;
   }
 
 
-  //------ register some debugging print funtctions for picking in CED :
-
-  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
-  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
   //======================================================================================================
 
  
@@ -1332,15 +1363,13 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 void ClupatraNew::check( LCEvent * evt ) { 
   /*************************************************************************************************/
 
-  //std::string colName( "MergedKalTracks"  ) ;
+  //  std::string colName( "MergedKalTracks"  ) ;
   std::string colName(  _outColName ) ;
 
 
-  bool checkForDuplicatePadRows =  false ; //true ;
-  bool checkForMCTruth =  true ;
-
-  bool checkForSplitTracks =  true ;   // WARNING: DEBUG only - this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
-
+  bool checkForDuplicatePadRows =  false ;
+  bool checkForMCTruth          =  true  ;
+  bool checkForSplitTracks      =  true  ; 
 
   streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
 
@@ -1454,7 +1483,7 @@ void ClupatraNew::check( LCEvent * evt ) {
 	}
       }
 
-      if( double(maxHit) / nHit < 0.99 ){ // What is acceptable here ???
+      if( double(maxHit) / nHit < 0.95 ){ // What is acceptable here ???
 	//if( nDouble  > 0){
 	streamlog_out( MESSAGE ) << " oddTrackCluster found with only "
 				 << 100.*double(maxHit)/nHit 
@@ -1492,7 +1521,7 @@ void ClupatraNew::check( LCEvent * evt ) {
 	    streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
 				   << thisMCPHits << " / " << totalHits << " = " << ratio << std::endl ;
 	    
-	    if( ratio > 0.03 && ratio < 0.95 ){
+	    if( ratio > 0.05 && ratio < 0.95 ){
 	      // split track
 	      
 	      splitCol->addElement( it1->first ) ; 

@@ -12,6 +12,7 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
     <processor name="MyAIDAProcessor" />
     <processor name="MyClupatraProcessor" />
     <processor name="MyRecoMCTruthLinker" />
+    <processor name="TPCRecoMCTruthLinker" />
     <processor name="MyLCIOOutputProcessor" />
   </execute>
   
@@ -31,7 +32,7 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
     <parameter name="HitCollections" type="string" lcioInType="TrackerHit"> UsedTPCTrackerHits </parameter>
     <!--Name of the output collections-->
     <parameter name="OutputCollection" type="string"
-	       lcioOutType="Track"> KalTestTracks </parameter>
+	       lcioOutType="Track"> ClupatraTracks </parameter>
     <!--Cut for distance between hits in mm-->
     <parameter name="DistanceCut" type="float" value="40" />
     <!--fraction of hits in same pad row per track-->
@@ -50,12 +51,56 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
     <!--true: Create TrackMCTruthLink collection, false : dont -->
     <parameter name="OutputTrackRelation" type="bool">true </parameter>
     <!--Name of the Tracks input collection-->
-    <parameter name="TrackCollection" type="string" lcioInType="Track">KalTestTracks </parameter>
+    <parameter name="TrackCollection" type="string" lcioInType="Track">ClupatraTracks </parameter>
     <!--Name of the trackMCTruthLink output collection-->
-    <parameter name="TrackMCTruthLinkName" type="string" lcioOutType="LCRelation">TrackMCTruthLink </parameter>
+    <parameter name="TrackMCTruthLinkName" type="string" lcioOutType="LCRelation">ClupatraTrackMCTruthLink </parameter>
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
     <parameter name="Verbosity" type="string">MESSAGE DEBUG3 </parameter>
+    
+    <!--links RecontructedParticles to the MCParticle based on number of hits used-->
+    <!--Name of the updated calo-hit MCTruthLink output collection-->
+    <parameter name="CalohitMCTruthLinkName" type="string" lcioOutType="LCRelation">CalohitMCTruthLink </parameter>
+    <!--Name of the Clusters input collection-->
+    <parameter name="ClusterCollection" type="string" lcioInType="Cluster">XXXPandoraClusters </parameter>
+    <!--Name of the clusterMCTruthLink output collection-->
+    <parameter name="ClusterMCTruthLinkName" type="string" lcioOutType="LCRelation">XXXClusterMCTruthLink </parameter>
+    <!--true: All reco <-> true relations are given, with weight = 10000*calo weight+track weight (weights in permill). false: Only highest contributor linked,and only to tracks, not clusters if there are any tr
+	acks-->
+    <parameter name="FullRecoRelation" type="bool">false </parameter>
+    <!--PDG codes of particles of which the daughters will be kept in the skimmmed MCParticle collection-->
+    <parameter name="KeepDaughtersPDG" type="IntVec">22 111 310  </parameter>
+    <!--true: Create CalohitMCTruthLink collection, false : dont -->
+    <parameter name="OutputCalohitRelation" type="bool">false </parameter>
+    <!--true: Create ClusterMCTruthLink collection, false : dont -->
+    <parameter name="OutputClusterRelation" type="bool">false </parameter>
+    <!--Name of the RecoMCTruthLink output collection-->
+    <parameter name="RecoMCTruthLinkName" type="string" lcioOutType="LCRelation">RecoMCTruthLink </parameter>
+    <!--Name of the ReconstructedParticles input collection-->
+    <parameter name="RecoParticleCollection" type="string" lcioInType="ReconstructedParticle">XXXPandoraPFOs </parameter>
+    <!--Name of the  SimCalorimeterHit - CalorimeterHit relation-->
+    <parameter name="SimCalorimeterHitRelationName" type="string" lcioInType="LCRelation">XXXRelationCaloHit </parameter>
+    <!--Name of the  SimTrackerHit - TrackerHit relation-->
+    <parameter name="SimTrackerHitRelationName" type="string" lcioInType="LCRelation">TPCTracksMCP </parameter>
+    <!--energy cut for daughters that are kept from KeepDaughtersPDG-->
+    <parameter name="daughtersECutMeV" type="float">10 </parameter>
+  </processor>
 
+
+
+  <processor name="TPCRecoMCTruthLinker" type="RecoMCTruthLinker">
+    <!--Name of the MCParticle input collection-->
+    <parameter name="MCParticleCollection" type="string" lcioInType="MCParticle">MCParticle </parameter>
+    <!--Name of the skimmed MCParticle  output collection-->
+    <parameter name="MCParticlesSkimmedName" type="string" lcioOutType="MCParticle">MCParticlesSkimmedNewTPC </parameter>
+    <!--true: Create TrackMCTruthLink collection, false : dont -->
+    <parameter name="OutputTrackRelation" type="bool">true </parameter>
+    <!--Name of the Tracks input collection-->
+    <parameter name="TrackCollection" type="string" lcioInType="Track">TPCTracks </parameter>
+    <!--Name of the trackMCTruthLink output collection-->
+    <parameter name="TrackMCTruthLinkName" type="string" lcioOutType="LCRelation">TPCTrackMCTruthLink </parameter>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string">MESSAGE DEBUG3 </parameter>
+    
     <!--links RecontructedParticles to the MCParticle based on number of hits used-->
     <!--Name of the updated calo-hit MCTruthLink output collection-->
     <parameter name="CalohitMCTruthLinkName" type="string" lcioOutType="LCRelation">CalohitMCTruthLink </parameter>
@@ -96,19 +141,18 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
 	HCalHits </parameter
     -->
     <!--drops all collections of the given type from the event-->
-    <!--parameter name="DropCollectionTypes" type="StringVec"> 
+    <parameter name="DropCollectionTypes" type="StringVec"> 
       SimTrackerHit
       SimCalorimeterHit 
       TrackerHit
       CalorimeterHit 
       Cluster
-      ReconstructedParticle
       Track
       LCRelation
-      MCParticle
+      ReconstructedParticle
       LCFloatVec
       Vertex
-    </parameter-->
+    </parameter>
     <!--
 	write complete objects in subset collections to the file (i.e. ignore
 	subset flag)
@@ -119,9 +163,11 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
 	(and DropCollectionNames)
     -->
     <parameter name="KeepCollectionNames" type="StringVec">
-      KalTestTracks
-      MCParticlesSkimmed
-      TrackMCTruthLink
+      ClupatraTracks
+      TPCTracks
+      MCParticlesSkimmedNew
+      ClupatraTrackMCTruthLink
+      TPCTrackMCTruthLink
     </parameter>
       
     <!-- name of output file -->

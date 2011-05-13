@@ -122,7 +122,7 @@ void KalTrack::addIPHit(){
   TObject* o =  _det->At( 0 ) ;
   EXTPCMeasLayer* ml = dynamic_cast< EXTPCMeasLayer * >( o ) ;
   
-  ml->addIPHit( TVector3( 1.2, 0., 0.) ,   *_kalHits ) ;
+  ml->addIPHit( TVector3( 12. , 0., 0.) ,   *_kalHits ) ;
 }
 
 void KalTrack::addHit( const TVector3& pos, int layer , EVENT::TrackerHit* hit) {
@@ -442,15 +442,17 @@ double KalTrack::chi2( const KalTrack& t0 , const KalTrack& t1) {
   
   for(int i=0; i<5 ; ++i ) {
     
-    double diff2 = ( std::abs( tp0[i] )- std::abs( tp1[i] )  ) ; 
+    double diff2 = ( std::abs( tp0[i] ) - std::abs( tp1[i] )  ) ; 
     
     diff2 *= diff2 ;
     
     streamlog_out( DEBUG )  << " -------    diff : " << i <<  " : " << tp0[i] <<" - " <<  tp1[i] << " = " <<  diff2  
 			    << " - cov() " << cov(i,i)  <<  " diff2/cov(i,i) " << diff2/cov(i,i)  << std::endl ;
     
-    chi2 +=  ( diff2 / cov( i , i ) )  ;
-    
+    if( i != 3 ) { // don't compare z0 !
+
+      chi2 +=  ( diff2 / cov( i , i ) )  ;
+    }
   } 
   
   return chi2 ;
@@ -551,7 +553,8 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   trk->setZ0( z0  ) ;  
   trk->setTanLambda( tanLambda ) ;  
 
-  trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
+  trk->subdetectorHitNumbers().push_back( _kalHits->GetEntries() ) ;  
+  trk->subdetectorHitNumbers().push_back(  kaltrack.GetEntriesFast() ) ;
 
   trk->setChi2( chi2 ) ;
 

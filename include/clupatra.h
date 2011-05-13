@@ -99,6 +99,10 @@ namespace clupatra{
     TrackInfoStruct() : nextXPoint(0.,0.,0.), nextLayer(-1) {}
     gear::Vector3D nextXPoint ;
     int nextLayer ;
+    float zMin ;
+    float zAvg ;
+    float zMax ;
+
   } ;
   struct TrackInfo : lcrtrel::LCOwnedExtension<TrackInfo, TrackInfoStruct> {} ;
 
@@ -487,19 +491,54 @@ namespace clupatra{
 
    struct KalTrack2LCIO{
      lcio::TrackImpl* operator() (KalTrack* trk) {  
+
        lcio::TrackImpl* lTrk = new lcio::TrackImpl ;
        trk->toLCIOTrack( lTrk  ) ;
        
+       lTrk->ext<TrackInfo>() = new TrackInfoStruct ;       
+       
+       // streamlog_out( DEBUG4 ) <<  "   ---- KalTrack2LCIO : "  <<  trk->getCluster<GCluster>()			     
+       // 			 <<  " next xing point at layer: "   <<  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextLayer
+       // 			 << " : " <<  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextXPoint ;
+       
        if( streamlog_level( DEBUG ) ){
-	 lTrk->ext<TrackInfo>() = new TrackInfoStruct ;       
-	 
-	 // streamlog_out( DEBUG4 ) <<  "   ---- KalTrack2LCIO : "  <<  trk->getCluster<GCluster>()			     
-	 // 			 <<  " next xing point at layer: "   <<  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextLayer
-	 // 			 << " : " <<  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextXPoint ;
-	 
 	 lTrk->ext<TrackInfo>()->nextLayer   =  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextLayer ;
 	 lTrk->ext<TrackInfo>()->nextXPoint  =  trk->getCluster<GCluster>()->ext<ClusterInfo>()->nextXPoint ;
        }
+       
+       
+       // compute z-extend of this track segment
+       const lcio::TrackerHitVec& hv = lTrk->getTrackerHits() ;
+       float zMin =  1e99 ;
+       float zMax = -1e99 ;
+       float zAvg =  0. ;
+       for(unsigned i=0; i < hv.size() ; ++i ){
+	 
+	 float z = hv[i]->getPosition()[2] ;
+	 
+	 if( z < zMin )   zMin = z ;
+	 if( z > zMax )   zMax = z ;
+	 
+	 zAvg += z ;
+       }
+       zAvg /= hv.size() ;
+       
+       // if( hv.size() >  1 ) {
+       // 	 zMin = hv[            0  ]->getPosition()[2] ;
+       // 	 zMax = hv[ hv.size() -1  ]->getPosition()[2] ;
+       // }
+
+       if( zMin > zMax ){ // swap 
+	 float d = zMax ;
+	 zMax = zMin ;
+	 zMin = d  ;
+       }
+
+       lTrk->ext<TrackInfo>()->zMin = zMin ;
+       lTrk->ext<TrackInfo>()->zMax = zMax ;
+       lTrk->ext<TrackInfo>()->zAvg = zAvg ;
+       
+       
        return lTrk ;
      }
    };
@@ -767,7 +806,7 @@ namespace clupatra{
 
     lcio::Track* trk = const_cast<lcio::Track*> ( dynamic_cast<const lcio::Track*> (o) ) ; 
     
-    if( o == 0 ) {
+    if( trk == 0 ) {
       
       streamlog_out( ERROR ) << "  printTrackShort : dynamic_cast<Track*> failed for LCObject : " << o << std::endl ;
       return  ;
@@ -788,7 +827,11 @@ namespace clupatra{
     //    if( streamlog_level( DEBUG ) ){
     if( trk->ext<TrackInfo>() )
       streamlog_out( MESSAGE ) << "  next xing point at layer  "  << trk->ext<TrackInfo>()->nextLayer << " : " 
-			       <<  trk->ext<TrackInfo>()->nextXPoint ;
+			       <<  trk->ext<TrackInfo>()->nextXPoint 
+			       << " zMin " << trk->ext<TrackInfo>()->zMin  
+			       << " zMax " << trk->ext<TrackInfo>()->zMax 
+			       << " zAvg " << trk->ext<TrackInfo>()->zAvg 
+			       <<  std::endl ;
       // }
    
   }
@@ -799,7 +842,7 @@ namespace clupatra{
 
     lcio::TrackerHit* hit = const_cast<lcio::TrackerHit*> ( dynamic_cast<const lcio::TrackerHit*> (o) ) ; 
   
-    if( o == 0 ) {
+    if( hit == 0 ) {
     
       streamlog_out( ERROR ) << "  printTrackerHit : dynamic_cast<TrackerHit*> failed for LCObject : " << o << std::endl ;
       return  ;
@@ -881,9 +924,12 @@ namespace clupatra{
   } ;
 
 
+  //=======================================================================================
 
   /** helper class for merging track segments, based on circle (and tan lambda) */
+
   class TrackCircleDistance{
+
     typedef lcio::Track HitClass ;
 
   public:
@@ -901,36 +947,65 @@ namespace clupatra{
     
       static const double DRMAX = 0.1 ; // make parameter
       static const double DTANLMAX = 0.2 ; //   " 
-
-      if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-    
+      
+      // if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
+      
       lcio::Track* trk0 = h0->first ;
       lcio::Track* trk1 = h1->first ;
-
+      
+      const TrackInfoStruct* ti0 =  trk0->ext<TrackInfo>() ;
+      const TrackInfoStruct* ti1 =  trk1->ext<TrackInfo>() ;
+      
+      
+      // don't allow  overlaps in z
+      float epsilon = 0. ; 
+      if(  ti0->zAvg > ti1->zAvg ){
+	
+      	if( ti1->zMax > ( ti0->zMin + epsilon )  )
+      	  return false ;
+	
+      } else {
+	
+      	if( ti0->zMax > ( ti1->zMin + epsilon ) )
+      	  return false ;
+	
+      }
       // //------- dont' merge complete tracks: ------------------------
       // unsigned nh0 = trk0->getTrackerHits().size() ;
       // unsigned nh1 = trk1->getTrackerHits().size() ;
       // if( nh0 > 220 ) return false ;
       // if( nh1 > 220 ) return false ;
       // //------------------------------------------------------
-
+      
       // KalTrack* ktrk0 = h0->first->ext<KalTrackLink>() ; 
       // KalTrack* ktrk1 = h1->first->ext<KalTrackLink>() ; 
+      
+      double tl0 = std::abs( trk0->getTanLambda() ) ;
+      double tl1 = std::abs( trk1->getTanLambda() ) ;
 
-      double tl0 = trk0->getTanLambda() ;
-      double tl1 = trk1->getTanLambda() ;
+      double dtl = 2. * std::abs( tl0 - tl1 ) / ( tl0 + tl1 ) ;
+      if(  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  )
+      	return false ;
+      // for very steep tracks (tanL < 0.001 ) tanL might differ largely for curlers due to multiple scattering
 
-      double dtl = 2. * ( tl0 - tl1 ) / ( tl0 + tl1 ) ;
-      dtl *= dtl ;
-      if(  dtl >  DTANLMAX * DTANLMAX ) 
-	return false ;
-
-      double r0 = 1. / trk0->getOmega()  ;
+      double r0 = 1. / trk0->getOmega()   ;
       double r1 = 1. / trk1->getOmega()  ;
+
+      double r0abs = std::abs( r0 ) ; 
+      double r1abs = std::abs( r1 ) ; 
 
 
       double d0 = trk0->getD0() ;
       double d1 = trk1->getD0() ;
+
+      double z0 = trk0->getZ0() ;
+      double z1 = trk1->getZ0() ;
+
+      double rIP = 20. ; 
+      // don't merge tracks that come from an area of 20 mm around the IP
+      if(  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  &&
+      	   std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     )
+      	return false ;
 
       double p0 = trk0->getPhi() ;
       double p1 = trk1->getPhi() ;
@@ -941,12 +1016,13 @@ namespace clupatra{
       double y0 = ( d0 - r0 ) * cos( p0 ) ;
       double y1 = ( d1 - r1 ) * cos( p1 ) ;
     
-      double dr = 2. * std::abs( ( r0 -r1 ) / (r0 + r1 ) ) ;
+      double dr = 2. * std::abs( r0abs - r1abs )  / (r0abs + r1abs )  ;
 
       double distMS = sqrt ( ( x0 - x1 ) * ( x0 - x1 ) + ( y0 - y1 ) * ( y0 - y1 )  ) ;
     
     
-      return ( dr < DRMAX && distMS < _dCut*r0 ) ;
+      //      return ( dr < DRMAX && distMS < _dCut * std::abs( r0 )  ) ;
+      return ( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) ;
 
     }
   

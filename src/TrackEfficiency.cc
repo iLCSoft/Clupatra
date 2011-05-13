@@ -232,12 +232,19 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   LCCollectionVec* mcpTracks = new LCCollectionVec( LCIO::MCPARTICLE )  ;
   mcpTracks->setSubset( true ) ;
   mcpTracks->reserve(  mcpIt.size() ) ;
-  evt->addCollection( mcpTracks , "MCParticleTracks"   ) ;
+
+  std::string name = "MCParticleTracks_" ;
+  name += this->name() ;
+
+  evt->addCollection( mcpTracks , name  ) ;
 
   LCCollectionVec* mcpTrksFound = new LCCollectionVec( LCIO::MCPARTICLE )  ;
   mcpTrksFound->setSubset( true ) ;
   mcpTrksFound->reserve(  mcpIt.size() ) ;
-  evt->addCollection( mcpTrksFound , "MCParticleTracksFound"   ) ;
+
+  name = "MCParticleTracksFound_" ;
+  name += this->name() ;
+  evt->addCollection( mcpTrksFound ,  name  ) ;
 
 
 
@@ -269,8 +276,10 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   }
   
  
+  name = "MCParticleTracks_" ;
+  name += this->name() ;
 
-  LCIterator<MCParticle> trmIt( evt,  "MCParticleTracks" ) ;
+  LCIterator<MCParticle> trmIt( evt, name ) ;
 
   while( MCParticle* trm = trmIt.next()  ){
     
@@ -371,7 +380,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
       bool cut = true ;
       
       //      APPLY_CUT( DEBUG4, cut,  std::abs( dph )  <  (3.*eph)  ) ;
-      APPLY_CUT( DEBUG4, cut,  std::abs( dom )  <  (5.*eom)  ) ;              // require 5 sigma on omega only for now
+      //      APPLY_CUT( DEBUG4, cut,  std::abs( dom )  <  (5.*eom)  ) ;              // require 5 sigma on omega only for now
       //      APPLY_CUT( DEBUG4, cut,  std::abs( dtL  ) <  (3.*etL)  ) ;
 
       if( ! cut ) {
