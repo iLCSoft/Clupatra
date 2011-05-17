@@ -439,8 +439,6 @@ namespace clupatra{
 			    << std::endl ;
 
 
-    // need to fit the cluster and re-assign false hits ....
-
 
 
     return ;

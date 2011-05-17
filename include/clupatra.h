@@ -341,9 +341,18 @@ namespace clupatra{
       KalTrack* trk = _kt->createKalTrack() ;
 
 
+      // store mutual pointers between tracks and 'clusters'
+      trk->setCluster<GCluster>( clu ) ;
+      
+      if( !  clu->ext<ClusterInfo>() )
+       	clu->ext<ClusterInfo>() = new ClusterInfoStruct ;
+      
+      clu->ext<ClusterInfo>()->track = trk ;
+      
+
       if( clu->size() < 3 ) 
 	return trk ;
-
+      
       static HitLayerID tpcLayerID( _kt->indexOfFirstLayer( KalTest::DetID::TPC )  )  ;
     
       clu->sort( LayerSort<HitOrder>() ) ;
@@ -361,15 +370,7 @@ namespace clupatra{
       // reverse_order = false ;
 
 
-      // store mutual pointers between tracks and 'clusters'
-      trk->setCluster<GCluster>( clu ) ;
-
-      if( !  clu->ext<ClusterInfo>() )
-       	clu->ext<ClusterInfo>() = new ClusterInfoStruct ;
-
-      clu->ext<ClusterInfo>()->track = trk ;
-    
-
+   
       if( PropagateIP  && HitOrder == KalTest::OrderOutgoing ) {
       
 	trk->addIPHit() ;
