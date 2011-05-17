@@ -1086,7 +1086,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
       
 
-      if( clumu3 > 0.7 ) {   //FIXME - make parameter
+      if( clumu3 >= 0.5 ) {   //FIXME - make parameter
 	
 
 	//---- get hits from cluster into a vector
@@ -1129,7 +1129,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 	delete trk2 ;
 
 	
-      } if( clumu2 > 0.8 ) {   //FIXME - make parameter
+      } if( clumu2 > 0.5 ) {   //FIXME - make parameter
 	
 
 	//---- get hits from cluster into a vector
@@ -1166,7 +1166,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 	delete trk1 ;
 
 	
-      } else if( clumu1 > 0.9 ) {
+      } else if( clumu1 > 0.5 ) {
 	
 	// add to final clusters directly
 	reclu.push_back( clu ) ;
