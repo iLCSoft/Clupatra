@@ -161,14 +161,21 @@ namespace clupatra{
   //-------------------------------------------------------------------------------------
 
   /** Force the hits in cluster clu into two clusters - only hits from layers with exactly two clusters are used.
-   *  The algorithm assumes that the cluster consists effectively two tracks - hits are split according to the 'hemisphere' 
+   *  The algorithm assumes that the cluster consists of effectively two tracks - hits are split according to the 'hemisphere' 
    *  defined by the difference vector of the hit pair in the previous layer. 
    */
   //  std::pair<GCluster*, GCluster* > create_two_clusters( GCluster& clu,  GHitVec& hV,  int maxLayerID) ;
   void create_two_clusters( const GHitVec& hV, GClusterVec& cluVec,  int maxLayerID) ;
+  
+  
+  /** Split the hits in this cluster up into three clusters. Hits are merged according to the smallest angle between the last hit in 
+   *  the cluster and the new hits (as seen from the IP). Works for three prong tau decays in fwd. direction - might not for curved tracks 
+   *  in central region ...
+   */
+  void create_three_clusters( const GHitVec& hV, GClusterVec& cluVec,  int maxLayerID) ;
   //-------------------------------------------------------------------------------------
- 
-
+  
+  
   //----------------  delete helper
   template<class P>  void delete_ptr(P* p) { delete p;}
   //-------------------

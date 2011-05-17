@@ -15,12 +15,12 @@
   <processor name="MyAIDAProcessor"/>
   <XXXprocessor name="MyRecoMCTruthLinker"/>
   <group name="TrackEfficiency"/>  
-  <XXXprocessor name="MyCEDViewer"/>
+  <processor name="MyCEDViewer"/>
   <!--processor name="MyAnaTrack"/-->  
  </execute>
 
  <global>
-  <parameter name="LCIOInputFiles">ttbar_100evts.slcio <!-- ttbar_100evts.slcio clupa_ana.slcio clupa_mu+.slcio--> </parameter>
+  <parameter name="LCIOInputFiles">ttbar_trkeff.slcio <!-- ttbar_100evts.slcio clupa_ana.slcio clupa_mu+.slcio--> </parameter>
   <!-- limit the number of processed records (run+evt): -->  
   <parameter name="MaxRecordNumber" value="1000" />  
   <parameter name="SkipNEvents" value="0" />  
@@ -74,8 +74,12 @@
     MCParticleTracksFound_tpc_ttbar 2 3 13
 
     MCParticlesSkimmed 0 1 4
+
+    TPCCollection  0 3 5
   </parameter>
-  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <!--    UsedTPCTrackerHits 0 3 5
+
+     verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
   <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
 </processor>
 

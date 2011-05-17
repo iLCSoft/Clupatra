@@ -6,14 +6,17 @@
 
 
 	<execute>
-		<processor name="MyAIDAProcessor" />
-		<Xprocessor name="MyMaterialDB" />
-		<processor name="MyClupatraProcessor" />
-		<Xprocessor name="MyFullLDCTracking" />
-		<Xprocessor name="MyMyProcessor" />
-		<processor name="MyGenericViewer" />
-		<processor name="MyCEDViewer" />
-		<Xprocessor name="MyLCIOOutputProcessor" />
+	        <processor name="MyEventSelector"/>
+                <if condition="MyEventSelector">
+		  <processor name="MyAIDAProcessor" />
+		  <Xprocessor name="MyMaterialDB" />
+		  <processor name="MyClupatraProcessor" />
+		  <Xprocessor name="MyFullLDCTracking" />
+		  <Xprocessor name="MyMyProcessor" />
+		  <processor name="MyGenericViewer" />
+		  <processor name="MyCEDViewer" />
+		  <Xprocessor name="MyLCIOOutputProcessor" />
+		</if>
 	</execute>
 
 	<global>
@@ -24,6 +27,25 @@
 		<parameter name="SupressCheck" value="false true false" />
 		<parameter name="Verbosity" value="DEBUG MESSAGE" />
 	</global>
+
+ 	<processor name="MyEventSelector" type="EventSelector">
+	  <!--EventSelector returns true if given event was specified in EvenList-->
+	  <!--event list - pairs of Eventnumber RunNumber-->
+	  <parameter name="EventList" type="IntVec">
+              67   0
+              96   0
+             130   0 
+             137   0 
+             175   0
+             244   0 
+             250   0
+             277   0
+             309   0
+             322   0
+             324   0
+             358   0 
+	  </parameter>
+	</processor>
 
 	<processor name="MyClupatraProcessor" type="ClupatraNew">
 		<parameter name="Verbosity" value="DEBUG3 MESSAGE DEBUG" />
@@ -150,6 +172,7 @@
 		  LDCTracks 0 3 11
 		  LDCTracksClupa 0 3 12
 
+		  LeftOverClustersFinal 0 3 13
 		  OddMCPTracks 0 3 14
 
 		  KalTrackSegments 0 3 15

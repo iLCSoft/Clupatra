@@ -1056,25 +1056,25 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
       GHitListVector hLV( nPadRows )  ;
       addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
 
-      //      int mult[5] ; for(unisgned i=0;i<5;++i) mult[i] = 0 ;
-      std::vector<int> mult(5) ;
+      std::vector<int> mult(6) ;
 
       for( unsigned i=0 ; i < hLV.size() ; ++i ){
 	unsigned m =  hLV[i].size() ;  
 
-	if( m > 2 )  m = 3 ;
+	if( m >= 4 )  m = 4 ;
 
 	++mult[ m ] ;
-	++mult[ 4] ;
+	++mult[ 5 ] ;
       }
 
-      float total = (  mult[1] + mult[2] + mult[3] ) ; 
+      float total = (  mult[1] + mult[2] + mult[3] + mult[4] ) ; 
       float clumu1 = mult[1] / total ;  
       float clumu2 = mult[2] / total ;
+      float clumu3 = mult[3] / total ;
 
-      streamlog_out(  DEBUG3 ) << " leftover cluster multiplicities: (0,1,2,>=3, all) :  [" 
+      streamlog_out(  DEBUG3 ) << " leftover cluster multiplicities: (0,1,2,3,>=4, all) :  [" 
 			       <<  mult[0] << " , " <<  mult[1] << " , " <<  mult[2] << " , "    
-			       <<  mult[3] << " , " <<  mult[4] << "] "  
+			       <<  mult[3] << " , " <<  mult[4] << mult[5] << "] "  
 			       << " mult_1 = " << clumu1 
 			       << " mult_2 = " << clumu2  
 			       << std::endl ;    
@@ -1086,7 +1086,50 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
       
 
-      if( clumu2 > 0.8 ) {   //FIXME - make parameter
+      if( clumu3 > 0.7 ) {   //FIXME - make parameter
+	
+
+	//---- get hits from cluster into a vector
+	GHitVec v ;
+	v.reserve( clu->size() ) ;
+	clu->takeHits( std::back_inserter( v )  ) ;
+	
+	
+	create_three_clusters( v , reclu, nPadRows ) ;
+
+	GClusterVec::reverse_iterator iC = reclu.rbegin()  ;
+	GCluster* clu0 = *iC++ ;
+	GCluster* clu1 = *iC++ ;
+	GCluster* clu2 = *iC   ;
+
+	clu0->ext<ClusterInfo>() = new ClusterInfoStruct ;
+	clu1->ext<ClusterInfo>() = new ClusterInfoStruct ;
+	clu2->ext<ClusterInfo>() = new ClusterInfoStruct ;
+
+	KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
+	
+	KalTrack* trk0 = fitter( clu0 ) ;
+	KalTrack* trk1 = fitter( clu1 ) ; 
+	KalTrack* trk2 = fitter( clu2 ) ; 
+	
+	// try to extend the clusters with leftover hits (from layers that do not have two hits)
+	static const bool backward = true ;
+	
+	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	delete trk0 ;
+	delete trk1 ;
+	delete trk2 ;
+
+	
+      } if( clumu2 > 0.8 ) {   //FIXME - make parameter
 	
 
 	//---- get hits from cluster into a vector
@@ -1130,6 +1173,11 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
       }  else {
 
+	//*********************************************************
+	//FIXME: need treatment for leftover clusters with 'undefined' multicplicity .....
+	//*********************************************************
+
+
 	delete clu ;
       }
 
@@ -1156,7 +1204,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   static const bool recluster_left_overs_again = false ;
   if( recluster_left_overs_again ) {
     
-    HitDistance distLarge( 3.0 * _distCut ) ;  // FIXME: make parameter 
+    HitDistance distLarge( 2. * _distCut ) ; // *3. !?  // FIXME: make parameter 
     
     
     GHitVec oddHits ;
