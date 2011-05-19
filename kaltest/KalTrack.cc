@@ -1,5 +1,6 @@
 #include "KalTrack.h"
 
+
 //#include "LCIOTTree.h" 
 
 #include "kaltest/TKalTrackState.h"
@@ -666,7 +667,7 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
 
   if(  trk->getTrackerHits().size() < 6 ) {
 
-    streamlog_out( ERROR ) <<  " Small number of hits in lcio Track " <<   trk->getTrackerHits().size() << " out of " << nHit  << std::endl ;
+    streamlog_out( DEBUG4 ) <<  " Small number of hits in lcio Track " <<   trk->getTrackerHits().size() << " out of " << nHit  << std::endl ;
     
 
   }

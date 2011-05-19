@@ -13,6 +13,7 @@
 //---- LCIO ---
 #include "IMPL/LCCollectionVec.h"
 #include "EVENT/Track.h"
+#include "EVENT/SimTrackerHit.h"
 #include "UTIL/Operators.h"
 #include "UTIL/LCRelationNavigator.h"
 #include "UTIL/LCTypedVector.h"
@@ -49,6 +50,7 @@ namespace TrackEfficiencyHistos {
     hpd0,  hpphi,    hpomega, hpz0, hptanL, hppt, 
     hd0mcp,hphimcp,  homegamcp, hz0mcp, htanLmcp, hptmcp,
     hdptp2,
+    hpt_f,hcosth_f, hpt_t, hcosth_t, hacth_t, hacth_f,
     //-----  keep Size as last :
     Size   
   }; 
@@ -61,10 +63,18 @@ public:
   void create(int idx, const char* n, int nBin=100, double min=0., double max=0. ){
     create( idx , n , n , nBin, min , max ) ; 
   }
+
   void create(int idx, const char* n, const char* t,  int nBin=100, double min=0., double max=0. ){
 
     //    _h->resize( idx+1 ) ;
     _h->at( idx ) = new TH1D( n, t , nBin , min, max ) ;
+
+    streamlog_out( DEBUG ) << " create histo " <<  n << " at index " << idx << std::endl ;
+  }
+
+  void create(int idx, const char* n, const char* t,  int nBin , double* bins ){
+
+    _h->at( idx ) = new TH1D( n, t , nBin , bins ) ;
 
     streamlog_out( DEBUG ) << " create histo " <<  n << " at index " << idx << std::endl ;
   }
@@ -107,12 +117,26 @@ TrackEfficiency::TrackEfficiency() : Processor("TrackEfficiency") {
 			   _mcpColName ,
 			   std::string("MCParticlesSkimmed" ) ) ;
 
+  registerInputCollection( LCIO::SIMTRACKERHIT,
+			   "SimTrackerHitCollection" , 
+			   "Name of the input collections with SimTrackerHits"  ,
+			   _sthColName ,
+			   std::string("TPCCollection" ) ) ;
+
   registerInputCollection( LCIO::LCRELATION,
 			   "TrackMCPRelation" , 
 			   "Name of the input collections with LCRelation Tracks to MCParticles"  ,
 			   _relColName ,
 			   std::string("TrackRelation" ) ) ;
   
+  registerInputCollection( LCIO::TRACK,
+			   "TrackCollection" , 
+			   "Name of the input collections with  Tracks"  ,
+			   _trkColName ,
+			   std::string("TrackCollection" ) ) ;
+
+
+
   FloatVec ptRange ;
   ptRange.push_back( 0. ) ;
   ptRange.push_back( 1000. ) ;
@@ -177,7 +201,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     //  define binning for pt and omega
     // double ptBinL  = ptMin - ( ptMax - ptMin ) / 10.  ;
     // double ptBinH  = ptMax + ( ptMax - ptMin ) / 10.  ;
-    double ptBinL  = 0. ; 
+    double ptBinL  = 0.01 ; 
     double ptBinH  = 20. ;
     double omBinL  = alpha / ptBinH ;
     double omBinH  = alpha / ptBinL ;
@@ -220,22 +244,66 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
     h.create( hdptp2,    "hdptp2"  ) ; 
 
+    h.create( hcosth_t,    "hcosth_t"    , "cos theta - true    ", 21 , -1. , 1. ) ; 
+    h.create( hcosth_f,    "hcosth_f"    , "cos theta - found   ", 21 , -1. , 1. ) ; 
+
+    h.create( hacth_t,    "hacth_t"    , "|cos theta| - true    ", 10 , 0. , 1. ) ; 
+    h.create( hacth_f,    "hacth_f"    , "|cos theta| - found   ", 10 , 0. , 1. ) ; 
+
+    //  void create(int idx, const char* n, const char* t,  int nBin=100, double min=0., double max=0. ){
+
+    // variable  bin size histogram for pt
+    static const int nBins = 9 ;
+    double bins[nBins+1] = { 0.1, 0.2, 0.5 , 1.0 , 2., 5.0 , 10. , 20. , 50. , 100. } ;
+
+    h.create( hpt_t, "hpt_t", "pt - true ", nBins , bins ) ;
+    h.create( hpt_f, "hpt_f", "pt - found ", nBins , bins ) ;
+    
   }
   //=========================================================================================================================
 
 
-  LCRelationNavigator nav( evt->getCollection( _relColName )  ) ;
+  LCCollection* relCol = 0 ;
+  try{
+    
+    relCol = evt->getCollection( _relColName ) ;
+  }
+  catch( lcio::DataNotAvailableException& e){
+
+    return ; // nothing to do in this event (no tracks)
+    
+  }
+
+  LCCollection* trkCol = 0 ;
+  try{
+    
+    trkCol = evt->getCollection( _trkColName ) ;
+  }
+  catch( lcio::DataNotAvailableException& e){
+
+    return ; // nothing to do in this event (no tracks)
+    
+  }
+  if( trkCol->getNumberOfElements() < 1 ) {
+
+    streamlog_out( ERROR ) << " not tracks in collection " << _trkColName << " evt : " << evt->getEventNumber()
+			   << " run : " << evt->getRunNumber() << std::endl ;
+    return ;
+  }
+
+
+  LCRelationNavigator nav( relCol  ) ;
   
 
   LCIterator<MCParticle> mcpIt( evt, _mcpColName ) ;
-
+  
   LCCollectionVec* mcpTracks = new LCCollectionVec( LCIO::MCPARTICLE )  ;
   mcpTracks->setSubset( true ) ;
   mcpTracks->reserve(  mcpIt.size() ) ;
-
+  
   std::string name = "MCParticleTracks_" ;
   name += this->name() ;
-
+  
   evt->addCollection( mcpTracks , name  ) ;
 
   LCCollectionVec* mcpTrksFound = new LCCollectionVec( LCIO::MCPARTICLE )  ;
@@ -247,11 +315,27 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   evt->addCollection( mcpTrksFound ,  name  ) ;
 
 
+  //------ count sim hits from every MCParticle
+  typedef std::map< MCParticle* , int > HITMAP ;
+  HITMAP hitMap ;
+  try{
+    LCIterator<SimTrackerHit> sthIt( evt, _sthColName ) ;
+    
+    while( SimTrackerHit* sth = sthIt.next()  ){
+      
+      hitMap[ sth->getMCParticle() ]++ ;
+    }
+  }catch( lcio::DataNotAvailableException& e){
+
+  }
+
+  //--- check if we hav any tracks in the relation (not always for LEP trk)
+
+
+  //---------------------------
 
   while( MCParticle* mcp = mcpIt.next()  ){
     
-    // streamlog_out( DEBUG ) << " ... huhu " << std::endl ;
-
     bool cut = true ;
     APPLY_CUT( DEBUG, cut,  std::abs( mcp->getCharge() )  > 0.5  ) ;
     
@@ -263,11 +347,22 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
     APPLY_CUT( DEBUG, cut, v.r() < 100.   ) ;   // start at IP+/-10cm
 
+    // ==== vzeros =========
+    // APPLY_CUT( DEBUG, cut, v.rho() > 100.   ) ;   // non prompt track
+    // bool isVzero = false ;
+    // if(   mcp->getParents().size() > 0  ) {
+    //   isVzero =  ( std::abs( mcp->getParents()[0]->getCharge() )  < 0.1   ) ;
+    // }
+    // APPLY_CUT( DEBUG, cut,  isVzero    ) ;   // start at IP+/-10cm
+    // ==== vzeros =========
+
     APPLY_CUT( DEBUG, cut, e.rho()==0.0  || e.rho() > 400.   ) ; // end at rho > 40 cm
 
     APPLY_CUT( DEBUG, cut, p.rho() > 0.1  ) ; // pt> 100 MeV
 
     APPLY_CUT( DEBUG, cut, std::abs( cos( p.theta() ) )  < 0.99  ) ; //  | cos( theta ) | > 0.99
+
+    APPLY_CUT( DEBUG, cut, hitMap[ mcp ]  > 5 ) ; //  require at least 10 TPC hits (particle actually made it to the TPC)
 
     //....
 
@@ -276,6 +371,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   }
   
  
+
   name = "MCParticleTracks_" ;
   name += this->name() ;
 
@@ -312,6 +408,9 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     mom[1] = trm->getMomentum()[1] ;
     mom[2] = trm->getMomentum()[2] ;
 
+    gear::Vector3D p( trm->getMomentum()[0], trm->getMomentum()[1], trm->getMomentum()[2] );
+    double costhmcp  = cos( p.theta() ) ;
+
     float q = trm->getCharge() ;
     
     helix.Initialize_VP( pos , mom, q,  3.5 ) ;
@@ -329,6 +428,11 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     h.fill( hz0mcp,    z0mcp ) ;
     h.fill( htanLmcp,  tLmcp ) ;
     h.fill( hptmcp,    ptmcp ) ;
+    
+
+    h.fill( hpt_t , ptmcp ) ;
+    h.fill( hcosth_t , costhmcp ) ;
+    h.fill( hacth_t , std::abs( costhmcp) ) ;
     
     const EVENT::LCObjectVec& trkV = nav.getRelatedFromObjects( trm ) ;
     
@@ -425,6 +529,12 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 	h.fill( hppt,    dpt / ept ) ;
 
 	h.fill( hdptp2,    dpt / (pt*pt) ) ;
+
+
+	h.fill( hpt_f , ptmcp ) ;
+	h.fill( hcosth_f , costhmcp ) ;
+	h.fill( hacth_f , std::abs( costhmcp) ) ;
+
       }
 
     }

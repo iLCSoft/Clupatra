@@ -51,7 +51,9 @@ class TrackEfficiency : public Processor {
    */
 
   std::string _mcpColName ;
+  std::string _sthColName ;
   std::string _relColName ;
+  std::string _trkColName ;
 
   std::vector< TH1* > _h1 ;
   

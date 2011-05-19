@@ -1270,6 +1270,9 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     GenericHitVec<Track> trkVec ;
     GenericClusterVec<Track> trkCluVec ;
     LCCollectionVec* mergedTracks = new LCCollectionVec( LCIO::TRACK ) ;
+    LCFlagImpl trkFlag(0) ;
+    trkFlag.setBit( LCIO::TRBIT_HITS ) ;
+    mergedTracks->setFlag( trkFlag.getFlag()  ) ;
   
     addToGenericHitVec( trkVec , kaltracks ,  AllwaysTrue()  ) ;
 
