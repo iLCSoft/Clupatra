@@ -5,8 +5,8 @@
 #include <map>
 #include <algorithm>
 
-//---- MarlinUtil 
-#include "NNClusters.h"
+
+#include "NNClusters_clupa.h"
 // #include "ClusterShapes.h"
 
 //---- LCIO ---

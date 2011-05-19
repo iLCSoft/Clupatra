@@ -10,7 +10,7 @@
 #include <cmath>
 
 //---- MarlinUtil 
-#include "NNClusters.h"
+#include "NNClusters_clupa.h"
 #include "ClusterShapes.h"
 #include "MarlinCED.h"
 

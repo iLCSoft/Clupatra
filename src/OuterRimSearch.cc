@@ -9,8 +9,8 @@
 #include <math.h>
 #include <cmath>
 
+#include "NNClusters_clupa.h"
 //---- MarlinUtil 
-#include "NNClusters.h"
 #include "ClusterShapes.h"
 #include "MarlinCED.h"
 

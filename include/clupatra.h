@@ -3,7 +3,7 @@
 
 #include "assert.h"
 
-#include "NNClusters.h"
+#include "NNClusters_clupa.h"
 #include "lcio.h"
 #include "EVENT/TrackerHit.h"
 #include "IMPL/TrackImpl.h"

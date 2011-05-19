@@ -149,27 +149,27 @@ EXTPCKalDetector::EXTPCKalDetector(const gear::TPCParameters& tpcParams ) :
   
   //FIXME - test:  add a layer inside the beam pipe 
   Add(new EXTPCMeasLayer(air, air, 12. , lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , -1 )) ;  // ,ss.str().data()));
-
-
+  
+  
   Add(new EXTPCMeasLayer(air, al , rtub, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, dummy, -1 ));
   Add(new EXTPCMeasLayer(al , gas, rtub+inthick, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1,dummy, -1 ));
   
   // create measurement layers
   Double_t r = rmin;
-
+  
   static const double gasdEdx  =  tpcParams.getDoubleVal("TPCGasProperties_dEdx")  ; 
   
   streamlog_out( DEBUG ) << " using dEdx for TPC gas : " << gasdEdx << " Gev/mm " << std::endl ;
-
-
+  
+  
   for (Int_t layer = 0; layer < nlayers; layer++) {
     
     int layerID = KalTest::DetID::TPC * KalTest::DetID::Factor  + layer ;
     
     EXTPCMeasLayer* tpcL =  new EXTPCMeasLayer(gas, gas, r, lhalf, sigmax0, sigmax1, sigmaz0, sigmaz1, active , layerID ) ;
-
+    
     tpcL->setdEdx_GeV_mm(  gasdEdx  ) ;
-
+    
     Add( tpcL ) ;  
     
     //    if( streamlog_level( DEBUG0 ) &&

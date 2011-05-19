@@ -1,0 +1,53 @@
+############################################################################################################
+#
+#    Clupatra
+#
+#    topological pattern recognition (for the TPC)
+#
+#    F.Gaede, DESY, 2011
+#
+#
+############################################################################################################
+
+  ==== This is still Work in Progress  ! =======
+
+
+------------------------------------------------------------
+ - current version of algorithm ( May, 2011)
+
+   ClupatraNew.cc
+
+ - fill histos for track finding efficiencies
+   TrackEfficiency.cc
+   
+    
+
+  steering files in ./examples
+ 
+   clupaNew.xml
+      - do patrec and display result in CED
+
+   clupa_ana.xml 
+      - pattern recognition in batch
+      - creates ClupatraTrackSegments
+                ClupatraTracks
+                
+   trkeff.xml
+     - create root file with histos fro track finding efficiencies
+   
+  
+   trkeff.C
+     - make nice plots for Clupatra, LEPTracking and FullLDCTracking
+
+
+ =============================================================================================================
+
+  --------
+ | v00-01 |
+  -------- 
+        *  first tagged version 
+
+        -  first properly working of the algorithm ( ClupatraNew ) 
+
+        -  status of ILD Metting, Orsay 2011
+ 
