@@ -1,6 +1,8 @@
 #ifndef ClupatraNew_h
 #define ClupatraNew_h 1
 
+#include "assert.h"
+
 #include "marlin/Processor.h"
 #include "lcio.h"
 #include <string>

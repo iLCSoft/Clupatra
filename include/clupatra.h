@@ -1,15 +1,18 @@
 #ifndef clupatra_h
 #define clupatra_h
 
+#include "assert.h"
+
 #include "NNClusters.h"
 #include "lcio.h"
 #include "EVENT/TrackerHit.h"
 #include "IMPL/TrackImpl.h"
 #include "UTIL/Operators.h"
 #include "LCRTRelations.h"
-#include "GEAR.h"
 #include "TVTrackHit.h"
 #include "KalTest.h"
+
+#include "GEAR.h"
 
 // copy_if (missing from STL)
 template <class In, class Out, class Pred> Out copy_if(In first, In last, Out res, Pred p){
