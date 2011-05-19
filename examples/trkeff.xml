@@ -86,6 +86,8 @@ ttbar_100evts.slcio clupa_ana.slcio clupa_mu+.slcio--> </parameter>
     MCParticleTracks_tpc_ttbar 0 3 12
     MCParticleTracksFound_tpc_ttbar 2 3 13
 
+    LDCTracks 0 3 15    
+
     MCParticlesSkimmed 0 1 4
   </parameter>
   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->

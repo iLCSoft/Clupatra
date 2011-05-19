@@ -23,7 +23,7 @@
 		<parameter name="LCIOInputFiles"> recfile.slcio </parameter>
 		<parameter name="GearXMLFile" value="gear_ILD_00.xml" />
 		<parameter name="MaxRecordNumber" value="0" />
-		<parameter name="SkipNEvents" value="7" />
+		<parameter name="SkipNEvents" value="4" />
 		<parameter name="SupressCheck" value="false true false" />
 		<parameter name="Verbosity" value="DEBUG MESSAGE" />
 	</global>
@@ -152,6 +152,7 @@
 		  CluTracks 0 1 5 
 
 		  OddClu_4 0 3  4
+		  LDCTracksClupa 0 3 12
 		  -->
 		<parameter name="DrawInLayer"> 
 		  TPCTracks 0 3 0
@@ -161,7 +162,7 @@
 
 		  ReclusteredLeftOvers 0 3 5
 
-		  ClupatraTrackSegments 0 3 6
+		  ClupatraTrackSegments 0 2 6
 		  CluTrackSegments 0 3 7 
 
 		  UsedTPCCluTrackerHits   1 3  8
@@ -170,7 +171,8 @@
 		  SplitTracks 0 3 10
 
 		  LDCTracks 0 3 11
-		  LDCTracksClupa 0 3 12
+
+		  UsedTPCCluTrackerHits   1 3 12
 
 		  LeftOverClustersFinal 0 3 13
 		  OddMCPTracks 0 3 14
@@ -179,9 +181,9 @@
 
 		  TrueTracks 0 3 16
 		  UsedTPCTrackerHits 0 3 17
-		  ClupatraTracks 5 1 19
-		  AllTrackClusters 0 3 18
+ 		  AllTrackClusters 0 3 18
 
+		  ClupatraTracks 5 1 19
 		</parameter>
 	</processor>
 	<processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
