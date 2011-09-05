@@ -6,24 +6,24 @@
 
 
 	<execute>
+                <XXif condition="MyEventSelector">
 	        <processor name="MyEventSelector"/>
-                <if condition="MyEventSelector">
+		</XXif>
 		  <processor name="MyAIDAProcessor" />
-		  <Xprocessor name="MyMaterialDB" />
+		    <Xprocessor name="MyMaterialDB" />
 		  <processor name="MyClupatraProcessor" />
-		  <Xprocessor name="MyFullLDCTracking" />
-		  <Xprocessor name="MyMyProcessor" />
-		  <processor name="MyGenericViewer" />
+		    <Xprocessor name="MyFullLDCTracking" />
+		    <Xprocessor name="MyMyProcessor" />
+		    <Xprocessor name="MyGenericViewer" />
 		  <processor name="MyCEDViewer" />
-		  <Xprocessor name="MyLCIOOutputProcessor" />
-		</if>
+		  <processor name="MyLCIOOutputProcessor" />
 	</execute>
 
 	<global>
 		<parameter name="LCIOInputFiles"> recfile.slcio </parameter>
 		<parameter name="GearXMLFile" value="gear_ILD_00.xml" />
-		<parameter name="MaxRecordNumber" value="0" />
-		<parameter name="SkipNEvents" value="4" />
+		<parameter name="MaxRecordNumber" value="10" />
+		<parameter name="SkipNEvents" value="8" />
 		<parameter name="SupressCheck" value="false true false" />
 		<parameter name="Verbosity" value="DEBUG MESSAGE" />
 	</global>
@@ -48,7 +48,7 @@
 	</processor>
 
 	<processor name="MyClupatraProcessor" type="ClupatraNew">
-		<parameter name="Verbosity" value="DEBUG3 MESSAGE DEBUG" />
+		<parameter name="Verbosity" value="DEBUG MESSAGE DEBUG" />
 		<!--ClupatraProcessor : simple nearest neighbour clustering-->
 		<!--Name of the input collections-->
 		<parameter name="HitCollections" type="string" lcioInType="TrackerHit"> UsedTPCTrackerHits </parameter>
@@ -121,7 +121,13 @@
 	</processor>
 
 	<processor name="MyCEDViewer" type="CEDViewer">
-		<!--collection to be displayed ( ColName, marker type[0-2], size)-->
+	  <!--draw a helix for Track objects-->
+	  <parameter name="DrawHelixForTrack" type="bool"> false </parameter>
+
+	  <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
+	  <parameter name="DrawDetectorID" type="int">0 </parameter>
+
+	  <!--collection to be displayed ( ColName, marker type[0-2], size)-->
 		  <!--
 		  OddClu_1 0 3  1 
 		  OddClu_2 0 3  2
@@ -162,7 +168,7 @@
 
 		  ReclusteredLeftOvers 0 3 5
 
-		  ClupatraTrackSegments 0 2 6
+		  ClupatraTrackSegments 0 4 6
 		  CluTrackSegments 0 3 7 
 
 		  UsedTPCCluTrackerHits   1 3  8
@@ -170,7 +176,7 @@
 
 		  SplitTracks 0 3 10
 
-		  LDCTracks 0 3 11
+		  LDCTracks 0 5 11
 
 		  UsedTPCCluTrackerHits   1 3 12
 
@@ -183,7 +189,7 @@
 		  UsedTPCTrackerHits 0 3 17
  		  AllTrackClusters 0 3 18
 
-		  ClupatraTracks 5 1 19
+		  ClupatraTracks 5 4 19
 		</parameter>
 	</processor>
 	<processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">

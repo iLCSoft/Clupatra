@@ -501,8 +501,13 @@ struct LCIOTrack{
 } ;
 
 // helper for creating lcio header for short printout
-template <class T> 
+template <class T>
+#if LCIO_VERSION_GE( 1 , 60 )
+const std::string & myheader(){return lcio::header<T>(); }
+#else
 const std::string & myheader(){return header(*(T*)(0)); }
+#endif
+
 
 
 void printTrackShort(const LCObject* o){

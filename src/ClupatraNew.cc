@@ -40,6 +40,8 @@ using namespace marlin ;
 
 #include "clupatra.h"
 
+
+
 //#include "Operators.icc" 
 inline void printSimTrackerHit(const lcio::LCObject* o){
 
@@ -163,7 +165,6 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   
   HitDistance dist0( _distCut ) ;
   HitDistance dist( 20. ) ;
-  //  HitDistance_2 dist_2( 20. ) ;
   
 
   LCIOTrack<ClupaHit> converter ;
@@ -325,7 +326,9 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 	}
 	
 	//----- recluster in given pad row range
-	cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+	//cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+	std::sort( oddHits.begin(), oddHits.end() , ZSortGH() ) ;
+	cluster_sorted( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
 	
 	split_list( sclu, std::back_inserter(socs),  DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
 	
@@ -1115,15 +1118,21 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 	// try to extend the clusters with leftover hits (from layers that do not have two hits)
 	static const bool backward = true ;
 	
-	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
-	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	
-	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
-	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	
-	addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 ) ; 
-	addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	
+	if( trk0->getNHits() > 3 ) {
+	  addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
+	  addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	}
+
+	if( trk1->getNHits() > 3 ) {
+	  addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
+	  addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	}
+
+	if( trk2->getNHits() > 3 ) {
+	  addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 ) ; 
+	  addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	}
+
 	delete trk0 ;
 	delete trk1 ;
 	delete trk2 ;
@@ -1366,7 +1375,6 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
 
   //FIXME: memory leak - need for debugging....
-
   std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
   //=====================================
 

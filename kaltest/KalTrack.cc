@@ -627,7 +627,11 @@ void KalTrack::toLCIOTrack( IMPL::TrackImpl* trk) {
   trk->setNdf( ndf ) ;
 
 
+#if LCIO_VERSION_GE( 1 , 60 )
+  streamlog_out( DEBUG ) << lcio::header( trk ) << std::endl ;
+#else
   streamlog_out( DEBUG ) << lcio::header( *trk ) << std::endl ;
+#endif
   streamlog_out( DEBUG ) << lcio::lcshort( (lcio::Track*)trk ) << std::endl ;
 
 

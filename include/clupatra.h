@@ -321,6 +321,12 @@ namespace clupatra{
     //   return ( l->getPosition()[2] < r->getPosition()[2] );
     //}
   };
+
+  struct ZSortGH { 
+    bool operator()( const GHit* l, const GHit* r) {
+      return ( l->first->pos.z() < r->first->pos.z() ); 
+    }
+  };
   
 
 
@@ -809,8 +815,13 @@ namespace clupatra{
   } ;
 
   // helper for creating lcio header for short printout
-  template <class T> 
-  const std::string & myheader(){    return lcio::header(*(T*)(0));  }
+  // helper for creating lcio header for short printout
+  template <class T>
+  #if LCIO_VERSION_GE( 1 , 60 )
+  const std::string & myheader(){return lcio::header<T>(); }
+  #else
+  const std::string & myheader(){return lcio::header(*(T*)(0)); }
+  #endif
 
 
   inline void printTrackShort(const lcio::LCObject* o){
