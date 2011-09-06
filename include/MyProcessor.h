@@ -24,7 +24,7 @@ using namespace marlin ;
  * @param CollectionName Name of the MCParticle collection
  * 
  * @author F. Gaede, DESY
- * @version $Id: MyProcessor.h,v 1.4 2005-10-11 12:57:39 gaede Exp $ 
+ * @version $Id$ 
  */
 
 class MyProcessor : public Processor {

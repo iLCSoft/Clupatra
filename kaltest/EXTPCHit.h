@@ -19,7 +19,7 @@
 //*   2009/11/23  K.Ikematsu   Added data member *fHitPtr
 //*                            as a pointer to raw Hit object
 //*
-//* $Id: EXTPCHit.h,v 1.1.1.1 2009/11/24 00:13:59 ikematsu Exp $
+//* $Id$
 //*************************************************************************
 //
 #include "kaltest/KalTrackDim.h"

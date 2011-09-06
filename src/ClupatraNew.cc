@@ -172,8 +172,8 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
   const gear::PadRowLayout2D& padLayout = gearTPC.getPadLayout() ;
   unsigned nPadRows = padLayout.getNRows() ;
-
-
+  
+  
   //------ create clupa hits for the lcio hits with additional parameters
   //note: there are 3 additional hit objects for created for every  lcio::TrackerHit:
   //   - ClupaHit
@@ -365,111 +365,111 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
     //---------------------------------------------------------------------------------------------------------------------------------
 
-    const bool recluster_in_pad_rows = false ;
+    // const bool recluster_in_pad_rows = false ;
 
-    if( recluster_in_pad_rows ) {
+    // if( recluster_in_pad_rows ) {
       
-      //========================== first iteration ================================================
+    //   //========================== first iteration ================================================
       
-      // reset the hits index to row ranges for reclustering
-       for(unsigned i=0 ; i< nOddHits ; ++i){
-	int layer =  oddHits[i]->first->layerID  ;
-	oddHits[i]->Index0 =   2 * int( layer / _nRowForSplitting ) ;
-      }
+    //   // reset the hits index to row ranges for reclustering
+    //    for(unsigned i=0 ; i< nOddHits ; ++i){
+    // 	int layer =  oddHits[i]->first->layerID  ;
+    // 	oddHits[i]->Index0 =   2 * int( layer / _nRowForSplitting ) ;
+    //   }
       
-      //----- recluster in pad row ranges
-      cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+    //   //----- recluster in pad row ranges
+    //   cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
       
-      std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2 ) , converter ) ;
+    //   std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2 ) , converter ) ;
       
-      streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size()   << std::endl ; 
+    //   streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size()   << std::endl ; 
       
-      //--------- remove pad row range clusters where merge occured 
-      split_list( sclu, std::back_inserter(socs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-      
-      
-      std::transform( socs.begin(), socs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
+    //   //--------- remove pad row range clusters where merge occured 
+    //   split_list( sclu, std::back_inserter(socs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
       
       
-      for( GCVI it = socs.begin() ; it != socs.end() ; ++it ){
-	//      (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-	(*it)->freeHits() ;
-	delete (*it) ;
-      }
-      socs.clear() ;
+    //   std::transform( socs.begin(), socs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
       
       
-      //========================== second iteration in shifted pad row ranges ================================================
+    //   for( GCVI it = socs.begin() ; it != socs.end() ; ++it ){
+    // 	//      (*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    // 	(*it)->freeHits() ;
+    // 	delete (*it) ;
+    //   }
+    //   socs.clear() ;
       
       
-      oddHits.clear() ;
-      for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
-	(*it)->takeHits( std::back_inserter( oddHits )  ) ;
-	delete (*it) ;
-      }
-      sclu.clear() ;
-      
-      // reset the hits index to row ranges for reclustering
-      nOddHits = oddHits.size() ;
-      
-      streamlog_out( DEBUG ) << "   left over odd hits for second iteration of pad row range clustering " << nOddHits << std::endl ;
-      
-      for(unsigned i=0 ; i< nOddHits ; ++i){
-	int layer =  oddHits[i]->first->layerID  ;
-	oddHits[i]->Index0 =  2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
-      }
-      
-      //----- recluster in pad row ranges
-      cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
-      
-      std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2_1 ) , converter ) ;
-      
-      streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
-			     << std::endl ; 
-      
-      //--------- remove pad row range clusters where merge occured 
-      split_list( sclu, std::back_inserter(socs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+    //   //========================== second iteration in shifted pad row ranges ================================================
       
       
-      std::transform( socs.begin(), socs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
+    //   oddHits.clear() ;
+    //   for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
+    // 	(*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    // 	delete (*it) ;
+    //   }
+    //   sclu.clear() ;
       
-      //----------------end  split up cluster with duplicate rows 
+    //   // reset the hits index to row ranges for reclustering
+    //   nOddHits = oddHits.size() ;
       
-      for( GCVI it = socs.begin() ; it != socs.end() ; ++it ){
-	(*it)->takeHits( std::back_inserter( oddHits )  ) ;
-	delete (*it) ;
-      }
-      socs.clear() ;
+    //   streamlog_out( DEBUG ) << "   left over odd hits for second iteration of pad row range clustering " << nOddHits << std::endl ;
       
-      //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    //   for(unsigned i=0 ; i< nOddHits ; ++i){
+    // 	int layer =  oddHits[i]->first->layerID  ;
+    // 	oddHits[i]->Index0 =  2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
+    //   }
+      
+    //   //----- recluster in pad row ranges
+    //   cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+      
+    //   std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2_1 ) , converter ) ;
+      
+    //   streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
+    // 			     << std::endl ; 
+      
+    //   //--------- remove pad row range clusters where merge occured 
+    //   split_list( sclu, std::back_inserter(socs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
       
       
-      // --- recluster the good clusters w/ all pad rows
+    //   std::transform( socs.begin(), socs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
       
-      oddHits.clear() ;
-      for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
-	(*it)->takeHits( std::back_inserter( oddHits )  ) ;
-	delete (*it) ;
-      }
-      sclu.clear() ;
+    //   //----------------end  split up cluster with duplicate rows 
       
-      //   reset the index for 'good' hits coordinate again...
-      nOddHits = oddHits.size() ;
-      for(unsigned i=0 ; i< nOddHits ; ++i){
-	oddHits[i]->Index0 = oddHits[i]->first->zIndex ; //z_index ( oddHits[i]->first ) ;
-      }
+    //   for( GCVI it = socs.begin() ; it != socs.end() ; ++it ){
+    // 	(*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    // 	delete (*it) ;
+    //   }
+    //   socs.clear() ;
       
-      cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+    //   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       
-      std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol4 ) , converter ) ;
       
-      // --- end recluster the good clusters w/ all pad rows
+    //   // --- recluster the good clusters w/ all pad rows
+      
+    //   oddHits.clear() ;
+    //   for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
+    // 	(*it)->takeHits( std::back_inserter( oddHits )  ) ;
+    // 	delete (*it) ;
+    //   }
+    //   sclu.clear() ;
+      
+    //   //   reset the index for 'good' hits coordinate again...
+    //   nOddHits = oddHits.size() ;
+    //   for(unsigned i=0 ; i< nOddHits ; ++i){
+    // 	oddHits[i]->Index0 = oddHits[i]->first->zIndex ; //z_index ( oddHits[i]->first ) ;
+    //   }
+      
+    //   cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
+      
+    //   std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol4 ) , converter ) ;
+      
+    //   // --- end recluster the good clusters w/ all pad rows
 
-      // merge the good clusters to final list
-      cluList.merge( sclu ) ;
+    //   // merge the good clusters to final list
+    //   cluList.merge( sclu ) ;
 
-    } // recluster_in_pad_rows
-    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // } // recluster_in_pad_rows
+    // //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     
 
@@ -575,353 +575,353 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   }
 
   //=======================================================================================================  
-  static const bool use_best_track = false ;
-  static const bool use_best_hit = false ;
+  // static const bool use_best_track = false ;
+  // static const bool use_best_hit = false ;
   
-  if( use_best_track ) {
+  // if( use_best_track ) {
 
-    streamlog_out( DEBUG ) << "  ------ assign left over hits - best matching track for every hit ..."  << std::endl ;
+  //   streamlog_out( DEBUG ) << "  ------ assign left over hits - best matching track for every hit ..."  << std::endl ;
 
-    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
-    Chi2_RPhi_Z_Hit ch2rzh ;
+  //   Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
+  //   Chi2_RPhi_Z_Hit ch2rzh ;
 
 
-    HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
+  //   HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
     
-    for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
+  //   for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
       
-      GHit* hit = *ih ;
-      const gear::Vector3D& hPos =  hit->first->pos ;
+  //     GHit* hit = *ih ;
+  //     const gear::Vector3D& hPos =  hit->first->pos ;
       
-      double ch2Min = 999999999999999. ;
-      KalTrack* bestTrk = 0 ;
+  //     double ch2Min = 999999999999999. ;
+  //     KalTrack* bestTrk = 0 ;
       
-      for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+  //     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
 	
-	const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
+  // 	const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
 	
-	// double rh  =  hPos.rho() ;
-	// double rk  =  kPos->rho() ;
-	// if( std::abs( rh - rk ) > 0.1 ) {
-	// 	streamlog_out( WARNING ) << " --- different radii for hit and crossing point : " <<  tpcLayerID( hit ) << ": " << rh << " - " << rk 
-	// 				 <<  *kPos  << std::endl ;
-	// } 
+  // 	// double rh  =  hPos.rho() ;
+  // 	// double rk  =  kPos->rho() ;
+  // 	// if( std::abs( rh - rk ) > 0.1 ) {
+  // 	// 	streamlog_out( WARNING ) << " --- different radii for hit and crossing point : " <<  tpcLayerID( hit ) << ": " << rh << " - " << rk 
+  // 	// 				 <<  *kPos  << std::endl ;
+  // 	// } 
 	
-	if( kPos != 0 ){
+  // 	if( kPos != 0 ){
 	  
-	  //	  double ch2 = ch2rz( hPos , *kPos )  ;
-	  double ch2 = ch2rzh( hit->first , *kPos )  ;
+  // 	  //	  double ch2 = ch2rz( hPos , *kPos )  ;
+  // 	  double ch2 = ch2rzh( hit->first , *kPos )  ;
 	  
-	  if( ch2 < ch2Min ){
+  // 	  if( ch2 < ch2Min ){
 	    
-	    ch2Min = ch2 ;
-	    bestTrk = *it ;
-	  }
+  // 	    ch2Min = ch2 ;
+  // 	    bestTrk = *it ;
+  // 	  }
 	  
-	}
+  // 	}
 	
-	// else {
-	// 	streamlog_out( MESSAGE ) << " --- no crossing point found for layer : " <<  tpcLayerID( hit ) << ": " << hPos << std::endl ;
-	// }
+  // 	// else {
+  // 	// 	streamlog_out( MESSAGE ) << " --- no crossing point found for layer : " <<  tpcLayerID( hit ) << ": " << hPos << std::endl ;
+  // 	// }
 	
-      }
-      if( bestTrk ) {
+  //     }
+  //     if( bestTrk ) {
 	
-	const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
+  // 	const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
 	
-	// double rh  =  hPos.rho() ;
-	// double rk  =  kPos->rho() ;
-	// if( std::abs( rh - rk ) > 0.1 ) {
-	// 	streamlog_out( WARNING ) << "  different radii for hit and crossing point : " << rh << " - " << rk << std::endl ;
-	// } 
+  // 	// double rh  =  hPos.rho() ;
+  // 	// double rk  =  kPos->rho() ;
+  // 	// if( std::abs( rh - rk ) > 0.1 ) {
+  // 	// 	streamlog_out( WARNING ) << "  different radii for hit and crossing point : " << rh << " - " << rk << std::endl ;
+  // 	// } 
 	
-	//      if( std::abs( hPos.rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.z() - kPos->z() ) < 5. ) {
+  // 	//      if( std::abs( hPos.rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.z() - kPos->z() ) < 5. ) {
 	
-	if(  (  hPos - *kPos ).r()  < 3. ) {   // check for bad outliers... FIXME: need proper criterion here .....
+  // 	if(  (  hPos - *kPos ).r()  < 3. ) {   // check for bad outliers... FIXME: need proper criterion here .....
 	  
 	  
-	  GCluster* clu = bestTrk->getCluster< GCluster >() ;
+  // 	  GCluster* clu = bestTrk->getCluster< GCluster >() ;
 	  
-	  streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos << " <-> " << *kPos  
-				 <<   " dist: " <<  (  hPos - *kPos ).r()  << std::endl ;
+  // 	  streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos << " <-> " << *kPos  
+  // 				 <<   " dist: " <<  (  hPos - *kPos ).r()  << std::endl ;
 	  
-	  clu->addHit( hit ) ;
-	}	
-	else 
-	  streamlog_out( DEBUG ) << " ---- NOT assigning left over hit : " << hPos << " <-> " << *kPos << std::endl ;
-      }
-      else
-	streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
+  // 	  clu->addHit( hit ) ;
+  // 	}	
+  // 	else 
+  // 	  streamlog_out( DEBUG ) << " ---- NOT assigning left over hit : " << hPos << " <-> " << *kPos << std::endl ;
+  //     }
+  //     else
+  // 	streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
       
-    }
+  //   }
     
-  }
-  //        ==========================================================================================
-  //} else { // ================== use best matching hit for every track segment =========================
-  //        ==========================================================================================
-  if( use_best_hit ) {
+  // }
+  // //        ==========================================================================================
+  // //} else { // ================== use best matching hit for every track segment =========================
+  // //        ==========================================================================================
+  // if( use_best_hit ) {
 
 
-    streamlog_out( DEBUG1 ) << "  ------ assign left over hits - best matching hit for every track ..."  << std::endl ;
+  //   streamlog_out( DEBUG1 ) << "  ------ assign left over hits - best matching hit for every track ..."  << std::endl ;
     
-    HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
+  //   HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
     
 
-    //------------- create vector of left over hits per layer
-    typedef std::list<GHit*> HitList ;
-    typedef std::vector< HitList > HitListVector ;
-    HitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
+  //   //------------- create vector of left over hits per layer
+  //   typedef std::list<GHit*> HitList ;
+  //   typedef std::vector< HitList > HitListVector ;
+  //   HitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
     
     
-    for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ) {
+  //   for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ) {
       
-      GHit* hit = *ih ;
-      //      std::cout << " ++++++  layerId: " << tpcLayerID( hit ) << " max layer index : " <<  _kalTest->maxLayerIndex() << std::endl  ;
-      hitsInLayer[ tpcLayerID( hit ) ].push_back( hit )  ;
-    }
-    //-----------------------------
+  //     GHit* hit = *ih ;
+  //     //      std::cout << " ++++++  layerId: " << tpcLayerID( hit ) << " max layer index : " <<  _kalTest->maxLayerIndex() << std::endl  ;
+  //     hitsInLayer[ tpcLayerID( hit ) ].push_back( hit )  ;
+  //   }
+  //   //-----------------------------
     
-    std::map< GCluster* , KalTrack* > clu2trkMap ;
+  //   std::map< GCluster* , KalTrack* > clu2trkMap ;
 
-    const bool use_segment_hits = false ; //true ;
+  //   const bool use_segment_hits = false ; //true ;
     
-    if( use_segment_hits  ){
+  //   if( use_segment_hits  ){
       
-      // store first and last hit of every segment in map with leftover hits in this layer
+  //     // store first and last hit of every segment in map with leftover hits in this layer
       
-      for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+  //     for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
 	
-	GHit* h0 = (*icv)->front() ;
-	GHit* h1 = (*icv)->back() ;
+  // 	GHit* h0 = (*icv)->front() ;
+  // 	GHit* h1 = (*icv)->back() ;
 	
-	hitsInLayer[ tpcLayerID( h0 ) ].push_back( h0 )  ;
-	hitsInLayer[ tpcLayerID( h1 ) ].push_back( h1 )  ;
-      }
+  // 	hitsInLayer[ tpcLayerID( h0 ) ].push_back( h0 )  ;
+  // 	hitsInLayer[ tpcLayerID( h1 ) ].push_back( h1 )  ;
+  //     }
       
-      // sort the tracks wrt. lenghts (#hits)
-      ktracks.sort( KalTrackLengthSort() ) ;
+  //     // sort the tracks wrt. lenghts (#hits)
+  //     ktracks.sort( KalTrackLengthSort() ) ;
 
-      // store assoaciation between cluster and track 
-      for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
-	GCluster* c = (*it)->getCluster< GCluster >() ;
-	clu2trkMap[ c ] = *it ;
-      }	   
-    }
-    //-------------------------------
+  //     // store assoaciation between cluster and track 
+  //     for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+  // 	GCluster* c = (*it)->getCluster< GCluster >() ;
+  // 	clu2trkMap[ c ] = *it ;
+  //     }	   
+  //   }
+  //   //-------------------------------
     
 
-    //    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
-    Chi2_RPhi_Z_Hit  ch2rzh ;
+  //   //    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
+  //   Chi2_RPhi_Z_Hit  ch2rzh ;
     
 
-    for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
+  //   for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
       
-      KalTrack* theTrack = *it ;
-      if( theTrack == 0 ) 
-	continue ;
+  //     KalTrack* theTrack = *it ;
+  //     if( theTrack == 0 ) 
+  // 	continue ;
       
       
-      // ----- define chi2 cut    ~15 for 1 GeV pt 
-      double chi2Cut = 100000. / ( std::log(1.) - std::log( std::abs(theTrack->getOmega()) ) ) ;
+  //     // ----- define chi2 cut    ~15 for 1 GeV pt 
+  //     double chi2Cut = 100000. / ( std::log(1.) - std::log( std::abs(theTrack->getOmega()) ) ) ;
 
 
-      streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack 
-			      << "   chi2 cut : " << chi2Cut  << " -  omega : " << theTrack->getOmega() <<  std::endl ;
+  //     streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack 
+  // 			      << "   chi2 cut : " << chi2Cut  << " -  omega : " << theTrack->getOmega() <<  std::endl ;
       
-      int xpLayer = 0 ;
+  //     int xpLayer = 0 ;
       
-      // const PointList& xptList = theTrack->getXingPoints() ;
-      // for(PointList::const_iterator itXP = xptList.begin() ; itXP != xptList.end() ; ++itXP , xpLayer++ ) {
-      // 	const gear::Vector3D* kPos =  *itXP ;
+  //     // const PointList& xptList = theTrack->getXingPoints() ;
+  //     // for(PointList::const_iterator itXP = xptList.begin() ; itXP != xptList.end() ; ++itXP , xpLayer++ ) {
+  //     // 	const gear::Vector3D* kPos =  *itXP ;
       
-      PointList& xpVec = theTrack->getXingPoints() ;
-      for( unsigned ixp=0 ; ixp < xpVec.size() ; ++ixp, xpLayer++  ) {
-      	const gear::Vector3D* kPos =  xpVec[ixp]  ;
+  //     PointList& xpVec = theTrack->getXingPoints() ;
+  //     for( unsigned ixp=0 ; ixp < xpVec.size() ; ++ixp, xpLayer++  ) {
+  //     	const gear::Vector3D* kPos =  xpVec[ixp]  ;
 	
-	if( kPos == 0 ) {   // we don't have a xing point
-	  continue ;
-	}
+  // 	if( kPos == 0 ) {   // we don't have a xing point
+  // 	  continue ;
+  // 	}
 	
-       	double ch2Min = 10e99 ;
-	GHit* bestHit = 0 ;
+  //      	double ch2Min = 10e99 ;
+  // 	GHit* bestHit = 0 ;
 	
-	HitList& hLL = hitsInLayer.at( xpLayer ) ;
+  // 	HitList& hLL = hitsInLayer.at( xpLayer ) ;
 	
-	for( HitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){
+  // 	for( HitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){
 	  
-	  GHit* hit = *ih ;
+  // 	  GHit* hit = *ih ;
 	  
-	  //VecFromArray hPos(  hit->first->getPosition() ) ;
-	  //double ch2 = ch2rz( hPos.v() , *kPos )  ;
-	  double ch2 = ch2rzh( hit->first , *kPos )  ;
+  // 	  //VecFromArray hPos(  hit->first->getPosition() ) ;
+  // 	  //double ch2 = ch2rz( hPos.v() , *kPos )  ;
+  // 	  double ch2 = ch2rzh( hit->first , *kPos )  ;
 
-	  if( ch2 < ch2Min ){
+  // 	  if( ch2 < ch2Min ){
 	    
-	    ch2Min = ch2 ;
-	    bestHit = hit ;
-	  }
-	}
+  // 	    ch2Min = ch2 ;
+  // 	    bestHit = hit ;
+  // 	  }
+  // 	}
 	
-	if( bestHit != 0 ) {
+  // 	if( bestHit != 0 ) {
 	  
-	  const gear::Vector3D& hPos = bestHit->first->pos  ;
+  // 	  const gear::Vector3D& hPos = bestHit->first->pos  ;
 	  
-	  //	  if( ch2Min  <  6. ) { // Sum( pdf(ch2,ndf==2) )_0^6 ~ 95% )
-	  //	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 99.x% ?? ) // FIXME: need steering parameter and optimize value
+  // 	  //	  if( ch2Min  <  6. ) { // Sum( pdf(ch2,ndf==2) )_0^6 ~ 95% )
+  // 	  //	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 99.x% ?? ) // FIXME: need steering parameter and optimize value
 	  
 	  
-	  bestHit->first->chi2Residual = ch2Min ;
+  // 	  bestHit->first->chi2Residual = ch2Min ;
 
 
-	  if( ch2Min  < chi2Cut ) { 
+  // 	  if( ch2Min  < chi2Cut ) { 
 	    
-	    streamlog_out( DEBUG1 ) <<   " ---- assigning left over hit : " << hPos << " <-> " << *kPos
-				    <<   " dist: " <<  (  hPos - *kPos ).r()
-				    <<   " chi2: " <<  ch2Min 
-				    <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
-									   + bestHit->first->lcioHit->getCovMatrix()[2] ) 
-				    <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
-				    << std::endl ;
+  // 	    streamlog_out( DEBUG1 ) <<   " ---- assigning left over hit : " << hPos << " <-> " << *kPos
+  // 				    <<   " dist: " <<  (  hPos - *kPos ).r()
+  // 				    <<   " chi2: " <<  ch2Min 
+  // 				    <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
+  // 									   + bestHit->first->lcioHit->getCovMatrix()[2] ) 
+  // 				    <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
+  // 				    << std::endl ;
 	    
 	    
-	    if( bestHit->second != 0 ) { //--------------------------------------------------------------------------------
+  // 	    if( bestHit->second != 0 ) { //--------------------------------------------------------------------------------
 	      
-	      // hit is already part of a track segment 
+  // 	      // hit is already part of a track segment 
 	      
 	      
-	      GCluster* c = bestHit->second  ;
-	      KalTrack* trk = clu2trkMap[ c ] ;
+  // 	      GCluster* c = bestHit->second  ;
+  // 	      KalTrack* trk = clu2trkMap[ c ] ;
 	      
 
-	      if( trk == theTrack ) {
-		streamlog_out( ERROR ) << " =======================  found best matching hit from track itself: " 
-				       << *bestHit->first->lcioHit
-				       <<     std::endl  
-				       <<  "      track has  " << trk->getNHits()  << " hits " << std::endl ;
+  // 	      if( trk == theTrack ) {
+  // 		streamlog_out( ERROR ) << " =======================  found best matching hit from track itself: " 
+  // 				       << *bestHit->first->lcioHit
+  // 				       <<     std::endl  
+  // 				       <<  "      track has  " << trk->getNHits()  << " hits " << std::endl ;
 
-		for( unsigned ii=0 ; ii < xpVec.size() ; ++ii) {
-		  if( xpVec[ii] ) 
-		    streamlog_out( ERROR ) << "  xing pt : "  << ii << " - " << *xpVec[ii]  ;
-		}
+  // 		for( unsigned ii=0 ; ii < xpVec.size() ; ++ii) {
+  // 		  if( xpVec[ii] ) 
+  // 		    streamlog_out( ERROR ) << "  xing pt : "  << ii << " - " << *xpVec[ii]  ;
+  // 		}
 		
 		
-		for( GCluster::iterator its = c->begin(); its != c->end() ; ++its ){
-		  GHit* hit = *its ;
-		  const gear::Vector3D& hPos = hit->first->pos  ;
-		  streamlog_out( ERROR ) << "  hit  : layer: "  <<   tpcLayerID( hit )   << " - " << hPos  ;
-		}
+  // 		for( GCluster::iterator its = c->begin(); its != c->end() ; ++its ){
+  // 		  GHit* hit = *its ;
+  // 		  const gear::Vector3D& hPos = hit->first->pos  ;
+  // 		  streamlog_out( ERROR ) << "  hit  : layer: "  <<   tpcLayerID( hit )   << " - " << hPos  ;
+  // 		}
 		
 
-	      } else {
+  // 	      } else {
 
 		
-		streamlog_out( DEBUG3 ) << " +++++++++ found best hit already part of a track segment !!!!!! " 
-					<< " trk : " << trk  << " #hits: " << trk->getNHits() 
-					<< " cluster " << c << c->size() 
-					<< std::endl ;   
+  // 		streamlog_out( DEBUG3 ) << " +++++++++ found best hit already part of a track segment !!!!!! " 
+  // 					<< " trk : " << trk  << " #hits: " << trk->getNHits() 
+  // 					<< " cluster " << c << c->size() 
+  // 					<< std::endl ;   
 		
 		
-		unsigned goodHits(0), allHits(0) ;
+  // 		unsigned goodHits(0), allHits(0) ;
 		
-		double chi2Max = 10. ; // fixme parameter
+  // 		double chi2Max = 10. ; // fixme parameter
 		
-		for( GCluster::iterator its = c->begin(); its != c->end() ; ++its ){
+  // 		for( GCluster::iterator its = c->begin(); its != c->end() ; ++its ){
 		  
-		  ++allHits ;
+  // 		  ++allHits ;
 		  
-		  GHit* hit = *its ;
-		  const gear::Vector3D& hPos = hit->first->pos ;
+  // 		  GHit* hit = *its ;
+  // 		  const gear::Vector3D& hPos = hit->first->pos ;
 		  
-		  const gear::Vector3D& kPos = *theTrack->getXingPointForLayer( tpcLayerID( hit ) ) ;
+  // 		  const gear::Vector3D& kPos = *theTrack->getXingPointForLayer( tpcLayerID( hit ) ) ;
 		  
-		  if( &kPos != 0 ) {
+  // 		  if( &kPos != 0 ) {
 		    
-		    //double chi2 = ch2rz( hPos , *kPos )  ;
-		    double chi2 = ch2rzh( hit->first , kPos )  ;
+  // 		    //double chi2 = ch2rz( hPos , *kPos )  ;
+  // 		    double chi2 = ch2rzh( hit->first , kPos )  ;
 
-		    streamlog_out( DEBUG3 ) << " +++++++++ chi2 : " << chi2 << ", " << hPos 
-					    << " +++++++++        " << kPos 
-					    << " +++++++++  hit id " << std::hex << hit->first->lcioHit->id() << std::dec 
-					    << std::endl ;
+  // 		    streamlog_out( DEBUG3 ) << " +++++++++ chi2 : " << chi2 << ", " << hPos 
+  // 					    << " +++++++++        " << kPos 
+  // 					    << " +++++++++  hit id " << std::hex << hit->first->lcioHit->id() << std::dec 
+  // 					    << std::endl ;
 		    
-		    if( chi2 < chi2Max ){
+  // 		    if( chi2 < chi2Max ){
 		      
-		      ++goodHits ;
-		    }
-		  }
-		}
+  // 		      ++goodHits ;
+  // 		    }
+  // 		  }
+  // 		}
 		
-		double goodFraction = double( goodHits ) / double(  allHits ) ;
+  // 		double goodFraction = double( goodHits ) / double(  allHits ) ;
 		
-		streamlog_out( DEBUG3 ) << " +++++++++ fraction of matching hits : " << goodFraction 
-					<< std::endl ;   
+  // 		streamlog_out( DEBUG3 ) << " +++++++++ fraction of matching hits : " << goodFraction 
+  // 					<< std::endl ;   
 		
 		
-		// ---------------------  merge the track segements -------------------------
+  // 		// ---------------------  merge the track segements -------------------------
 		
-		if( goodFraction > 0.5  ) { // fixme: what is reasonable here - make parameter ...
+  // 		if( goodFraction > 0.5  ) { // fixme: what is reasonable here - make parameter ...
 		  
 		  
-		  for( GCluster::iterator its = c->begin(); its != c->end() ; ++its ){
+  // 		  for( GCluster::iterator its = c->begin(); its != c->end() ; ++its ){
 
-		    delete  xpVec[  tpcLayerID( *its ) ] ; // erase crossing points for these hit
-		    xpVec[  tpcLayerID( *its ) ]  = 0 ;   
-		  }
-		  GCluster* clu = theTrack->getCluster< GCluster >() ;
+  // 		    delete  xpVec[  tpcLayerID( *its ) ] ; // erase crossing points for these hit
+  // 		    xpVec[  tpcLayerID( *its ) ]  = 0 ;   
+  // 		  }
+  // 		  GCluster* clu = theTrack->getCluster< GCluster >() ;
 		  
-		  // merge the cluster into the larger one and delete it - remove the hits from the hitsinlayer vector first
+  // 		  // merge the cluster into the larger one and delete it - remove the hits from the hitsinlayer vector first
 		  
-		  GHit* h0 = c->front() ;
-		  GHit* h1 = c->back() ;
+  // 		  GHit* h0 = c->front() ;
+  // 		  GHit* h1 = c->back() ;
 		  
-		  hitsInLayer[ tpcLayerID( h0 ) ].remove( h0 )  ;
-		  hitsInLayer[ tpcLayerID( h1 ) ].remove( h1 )  ;
+  // 		  hitsInLayer[ tpcLayerID( h0 ) ].remove( h0 )  ;
+  // 		  hitsInLayer[ tpcLayerID( h1 ) ].remove( h1 )  ;
 		  
-		  clu->mergeClusters( c ) ;
+  // 		  clu->mergeClusters( c ) ;
 		  
-		  cluList.remove( c  ) ;
+  // 		  cluList.remove( c  ) ;
 		  
 		  
-		  streamlog_out( DEBUG3) << " ************ found matching segment, merged all hits: delete cluster : " << c 
-					 << " and track : " << trk << std::endl ;
+  // 		  streamlog_out( DEBUG3) << " ************ found matching segment, merged all hits: delete cluster : " << c 
+  // 					 << " and track : " << trk << std::endl ;
 		  
-		  delete c ;
+  // 		  delete c ;
 		  
-		  ktracks.remove( trk ) ;
+  // 		  ktracks.remove( trk ) ;
 		  
-		} //-------------------------------------------------------------
+  // 		} //-------------------------------------------------------------
 
-	      }
+  // 	      }
 
 		
-	    }  else  {  //--------------------------------------------------------------------------------
+  // 	    }  else  {  //--------------------------------------------------------------------------------
 	      
-	      hLL.remove(  bestHit ) ;
+  // 	      hLL.remove(  bestHit ) ;
 	      
-	      GCluster* clu = theTrack->getCluster< GCluster >() ;
+  // 	      GCluster* clu = theTrack->getCluster< GCluster >() ;
 	      
-	      streamlog_out( DEBUG3) << "    ************ found matching hit, add to  cluster : " << clu  << std::endl ;
+  // 	      streamlog_out( DEBUG3) << "    ************ found matching hit, add to  cluster : " << clu  << std::endl ;
 	      
-	      clu->addHit( bestHit ) ;
-	    }
+  // 	      clu->addHit( bestHit ) ;
+  // 	    }
 
 
-	  }
-	} 
-          // else {
-	  //	  streamlog_out( DEBUG1 ) << "????????????????????? no best Hit found xing pnt  : chi2  " << *xpVec[ixp]  << " : " << ch2Min << std::endl ;
-	  //	}
+  // 	  }
+  // 	} 
+  //         // else {
+  // 	  //	  streamlog_out( DEBUG1 ) << "????????????????????? no best Hit found xing pnt  : chi2  " << *xpVec[ixp]  << " : " << ch2Min << std::endl ;
+  // 	  //	}
 
-      }
-    }
+  //     }
+  //   }
     
-  }
+  // }
 
 
   //================================================================================================================ 
   // try to create some z stubs in order to get very forward tracks
   
-  const bool use_z_stub_merger = true ;
+  const bool use_z_stub_merger = false ;
   if( use_z_stub_merger ) {
     
     GHitVec oddHits ;
@@ -1210,35 +1210,35 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   // recluster in the leftover hits
   GClusterVec loclu2 ; // leftover clusters
  
-  static const bool recluster_left_overs_again = false ;
-  if( recluster_left_overs_again ) {
+  // static const bool recluster_left_overs_again = false ;
+  // if( recluster_left_overs_again ) {
     
-    HitDistance distLarge( 2. * _distCut ) ; // *3. !?  // FIXME: make parameter 
+  //   HitDistance distLarge( 2. * _distCut ) ; // *3. !?  // FIXME: make parameter 
     
     
-    GHitVec oddHits ;
-    oddHits.clear() ;
+  //   GHitVec oddHits ;
+  //   oddHits.clear() ;
 
-    // add all hits in pad row range to oddHits
-    for(int iRow = 0 ; iRow <  _kalTest->maxLayerIndex()  ; ++iRow ) {
+  //   // add all hits in pad row range to oddHits
+  //   for(int iRow = 0 ; iRow <  _kalTest->maxLayerIndex()  ; ++iRow ) {
       
-      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( oddHits )  ) ;
-    }
+  //     std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( oddHits )  ) ;
+  //   }
     
-    streamlog_out( DEBUG3 ) <<  " recluster_left_overs_again : oddhits.size() : " << oddHits.size() << std::endl ;
+  //   streamlog_out( DEBUG3 ) <<  " recluster_left_overs_again : oddhits.size() : " << oddHits.size() << std::endl ;
 
 
-    //----- recluster in given pad row range
-    loclu2.clear() ;
-    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu2 ), &distLarge , 3 ) ; //_minCluSize ) ;
+  //   //----- recluster in given pad row range
+  //   loclu2.clear() ;
+  //   cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu2 ), &distLarge , 3 ) ; //_minCluSize ) ;
     
-    streamlog_out( DEBUG3 ) <<  " recluster_left_overs_again : loclu2.size() : " << loclu2.size() << std::endl ;
+  //   streamlog_out( DEBUG3 ) <<  " recluster_left_overs_again : loclu2.size() : " << loclu2.size() << std::endl ;
 
-    LCCollectionVec* leftOverCol = new LCCollectionVec( LCIO::TRACK ) ;
-    evt->addCollection( leftOverCol , "LeftOverClustersFinal" ) ;
-    std::transform( loclu2.begin(), loclu2.end(), std::back_inserter( *leftOverCol ) , converter ) ;
+  //   LCCollectionVec* leftOverCol = new LCCollectionVec( LCIO::TRACK ) ;
+  //   evt->addCollection( leftOverCol , "LeftOverClustersFinal" ) ;
+  //   std::transform( loclu2.begin(), loclu2.end(), std::back_inserter( *leftOverCol ) , converter ) ;
     
-  }
+  // }
 
   //===============================================================================================
   //  refit all found tracks 

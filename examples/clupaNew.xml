@@ -22,8 +22,8 @@
 	<global>
 		<parameter name="LCIOInputFiles"> recfile.slcio </parameter>
 		<parameter name="GearXMLFile" value="gear_ILD_00.xml" />
-		<parameter name="MaxRecordNumber" value="10" />
-		<parameter name="SkipNEvents" value="8" />
+		<parameter name="MaxRecordNumber" value="0" />
+		<parameter name="SkipNEvents" value="0" />
 		<parameter name="SupressCheck" value="false true false" />
 		<parameter name="Verbosity" value="DEBUG MESSAGE" />
 	</global>

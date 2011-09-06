@@ -15,7 +15,7 @@
 //*   2009/11/23  K.Ikematsu   Derived from KalTest/examples/kaltest/
 //*                                         hybrid/tpc/EXTPCMeasLayer.h
 //*
-//* $Id: EXTPCMeasLayer.h,v 1.1.1.1 2009/11/24 00:13:59 ikematsu Exp $
+//* $Id$
 //*************************************************************************
 //
 #include "TVector3.h"

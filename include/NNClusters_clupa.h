@@ -5,7 +5,7 @@
 /** File with various classes for a generic nearest neighbour type clustering.
  *
  *  @author F.Gaede (DESY)
- *  @version $Id: NNClusters.h,v 1.5 2007-06-05 15:35:49 engels Exp $
+ *  @version $Id$
  */
 
 #include <list>
@@ -52,7 +52,7 @@ inline unsigned notInRange( int i){   return ( (unsigned int) ( i - Min )  > (un
  *  @see NNDistance
  * 
  *  @author F.Gaede (DESY)
- *  @version $Id: NNClusters.h,v 1.5 2007-06-05 15:35:49 engels Exp $
+ *  @version $Id$
  */
 
 template <class In, class Out, class Pred > 
@@ -203,7 +203,7 @@ void cluster_sorted( In first, In last, Out result, Pred* pred , const unsigned 
  *
  *  @see GenericCluster
  *  @author F.Gaede (DESY)
- *  @version $Id: NNClusters.h,v 1.5 2007-06-05 15:35:49 engels Exp $
+ *  @version $Id$
  */
 template <class T>
 class GenericHit : public  std::pair< T*, GenericCluster<T>* >{
@@ -245,7 +245,7 @@ protected:
  * 
  *  @see GenericHit
  *  @author F.Gaede (DESY)
- *  @version $Id: NNClusters.h,v 1.5 2007-06-05 15:35:49 engels Exp $
+ *  @version $Id$
  */
 template <class T >
 class GenericCluster : public std::list< GenericHit<T> * >, public lcrtrel::LCRTRelations {
