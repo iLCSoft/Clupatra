@@ -1,9 +1,9 @@
-#ifndef ClupatraProcessor_h
-#define ClupatraProcessor_h 1
-
-#include "assert.h"
+#ifndef FixCellIDs_h
+#define FixCellIDs_h 1
 
 #include "marlin/Processor.h"
+#include "marlin/EventModifier.h"
+
 #include "lcio.h"
 #include <string>
 
@@ -11,21 +11,26 @@
 using namespace lcio ;
 using namespace marlin ;
 
-namespace MarlinTrk{
-  class IMarlinTrkSystem ;
-}
 
-/** Clustering based pattern recognition for a TPC...
+/** Fix CellID0s for TPC TrackerHits from old data files  according to ILDCellID0::encoder_string.
+ *
+ * @param CollectionName Name of the TrackerHit collection
+ * 
+ * @author F. Gaede, DESY
+ * @version $Id:$
  */
-class ClupatraProcessor : public Processor {
+
+class FixCellIDs : public Processor, public EventModifier {
   
  public:
   
-  virtual Processor*  newProcessor() { return new ClupatraProcessor ; }
+  virtual Processor*  newProcessor() { return new FixCellIDs ; }
   
   
-  ClupatraProcessor() ;
+  FixCellIDs() ;
   
+  virtual const std::string & name() const { return Processor::name() ; }
+ 
   /** Called at the begin of the job before anything is read.
    * Use to initialize the processor, e.g. book histograms.
    */
@@ -37,9 +42,7 @@ class ClupatraProcessor : public Processor {
   
   /** Called for every event - the working horse.
    */
-  virtual void processEvent( LCEvent * evt ) ;
-
-  //  void doBLA() ;
+  virtual void modifyEvent( LCEvent * evt ) ; 
   
   
   virtual void check( LCEvent * evt ) ; 
@@ -55,25 +58,9 @@ class ClupatraProcessor : public Processor {
   /** Input collection name.
    */
   std::string _colName ;
-  std::string _outColName ;
-
-  float _distCut ;
-  float _rCut ;
-  float _duplicatePadRowFraction ;
-  int   _minCluSize ;
-  int   _padRowRange ; 
-
-  bool _MSOn ;
-  bool _ElossOn ;
-  bool _SmoothOn ;
 
   int _nRun ;
   int _nEvt ;
-
-  MarlinTrk::IMarlinTrkSystem* _trksystem ;
-
-//   NNClusterer* _clusterer ;
-
 } ;
 
 #endif

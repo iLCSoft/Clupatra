@@ -10,8 +10,6 @@
 #include <cmath>
 
 //---- MarlinUtil 
-#include "NNClusters_clupa.h"
-#include "ClusterShapes.h"
 #include "MarlinCED.h"
 
 //---- LCIO ---
@@ -23,6 +21,11 @@
 #include "UTIL/Operators.h"
 #include "UTIL/LCTOOLS.h"
 
+#include "UTIL/CellIDDecoder.h"
+#include "UTIL/ILDConf.h"
+
+#include "LCIterator.h"
+
 
 //---- GEAR ----
 #include "marlin/Global.h"
@@ -31,661 +34,28 @@
 #include "gear/PadRowLayout2D.h"
 #include "gear/BField.h"
 
-#include "LCIterator.h"
 
-#include "KalTest.h"
+#include "MarlinTrk/Factory.h"
+#include "MarlinTrk/IMarlinTrack.h"
+#include "MarlinTrk/IMarlinTrkSystem.h"
+
 
 using namespace lcio ;
 using namespace marlin ;
+using namespace MarlinTrk ;
 
 
-typedef GenericCluster<TrackerHit> HitCluster ;
-typedef GenericHit<TrackerHit>     Hit ;
-typedef GenericHitVec<TrackerHit>  HitVec ;
+#include "clupatra_new.h"
+using namespace clupatra_new ;
 
 
-// copy_if (missing from STL)
-template <class In, class Out, class Pred> Out copy_if(In first, In last, Out res, Pred p){
-  
-  while( first != last ){
+inline void printSimTrackerHit(const lcio::LCObject* o) ;
 
-    if( p( *first) ){
-
-      *res++ = first ;
-      ++first ;
-    }
-  }
-  return res ;
+inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt ){
+  LCCollectionVec* col = new LCCollectionVec( LCIO::TRACK ) ;  
+  evt->addCollection( col , name ) ;
+  return col ;
 }
-
-
-// delete helper
-template<class P>  void delete_ptr(P* p) { delete p;}
-
-/** helper class that maps array to gear::Vector3D */
-struct VecFromArray{
-  gear::Vector3D _v ;
-  VecFromArray( const double* v) : _v( v[0] , v[1] , v[2] ) {}
-  VecFromArray( const float* v) : _v( v[0] , v[1] , v[2] ) {}
-  const gear::Vector3D& v(){ return _v ; }
-} ;
-
-/** helper function to restrict the range of the azimuthal angle to ]-pi,pi]*/
-inline double toBaseRange( double phi){
-  while( phi <= -M_PI ){  phi += 2. * M_PI ; }
-  while( phi >   M_PI ){  phi -= 2. * M_PI ; }
-  return phi ;
-}
-
-/** helper class to compute the chisquared of two points in rho and z coordinate */
-class Chi2_RPhi_Z{
-  double _sigsr, _sigsz ;
-public :
-  Chi2_RPhi_Z(double sigr, double sigz) : _sigsr( sigr * sigr ) , _sigsz( sigz * sigz ){}
-  double operator()( const gear::Vector3D& v0, const gear::Vector3D& v1) {
-
-    //    return (v0 - v1 ).r() ;
-
-    //double dRPhi = v0.rho() * v0.phi() - v1.rho() * v1.phi() ;
-
-    double dPhi = std::abs(  v0.phi() - v1.phi() )  ;
-    if( dPhi > M_PI )
-      dPhi = 2.* M_PI - dPhi ;
-
-    double dRPhi =  dPhi *  v0.rho() ; 
-
-    double dZ = v0.z() - v1.z() ;
-
-    return  dRPhi * dRPhi / _sigsr + dZ * dZ / _sigsz  ;
-  }
-};
-
-/** helper class to compute the chisquared of two points in rho and z coordinate */
-struct Chi2_RPhi_Z_Hit{
-  double operator()( const TrackerHit* h, const gear::Vector3D& v1) {
-
-
-    gear::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
-
-    double sigsr =  sqrt( h->getCovMatrix()[0] + h->getCovMatrix()[2] ) ;
-    double sigsz =  h->getCovMatrix()[5] ;
-    // double sigsr =  0.01 ; 
-    // double sigsz =  0.1 ;
-    
-
-    double dPhi = std::abs(  v0.phi() - v1.phi() )  ;
-    if( dPhi > M_PI )
-      dPhi = 2.* M_PI - dPhi ;
-
-    double dRPhi =  dPhi *  v0.rho() ; 
-
-    double dZ = v0.z() - v1.z() ;
-
-    return  dRPhi * dRPhi / sigsr + dZ * dZ / sigsz  ;
-  }
-};
-
-// helper class to assign additional parameters to TrackerHits
-struct HitInfoStruct{
-  HitInfoStruct() :layerID(-1), usedInTrack(false) {}
-  int layerID ;
-  bool usedInTrack ;
-  double chi2Residual ;
-} ;
-struct HitInfo : LCOwnedExtension<HitInfo, HitInfoStruct> {} ;
-
-
-//------------------------------------------------------
-// function to extract position for Kaltest:
-TVector3 hitPosition( Hit* h)  { 
-  return TVector3( h->first->getPosition()[0],   
-  		   h->first->getPosition()[1],
-  		   h->first->getPosition()[2]  ) ; 
-}   
-
-// function to extract layerID from generic Hit:
-int hitLayerID( const Hit* h, int offset=0) { return  h->first->ext<HitInfo>()->layerID + offset  ; } 
-
-// functor for layer ID
-class HitLayerID{
-  int _off ;
-  HitLayerID(){}
-public:
-  HitLayerID( int off) : _off(off) {}
-  int operator()(const Hit* h){ return hitLayerID( h, _off) ; } 
-} ;
-
-struct LCIOTrackerHit{ EVENT::TrackerHit* operator()( Hit* h) { return h->first ; }   } ;
-
-
-//---------------------------------------------------
-// helper for sorting cluster wrt layerID
-template <bool SortDirection>
-struct LayerSort{
-  bool operator()( const Hit* l, const Hit* r) {
-    return hitLayerID( l ) < hitLayerID( r ) ; 
-  }
-} ;
-template<>
-struct LayerSort<KalTest::OrderIncoming>{
-  bool operator()( const Hit* l, const Hit* r) {
-    return hitLayerID( r ) < hitLayerID( l ) ; 
-  }
-} ;
-
-//------ ordering of KalTracks 
-struct KalTrackLengthSort {
-  bool operator()( const KalTrack* t0, const KalTrack* t1) {
-    return ( t0->getNHits() >= t1->getNHits() );
-  }
-};
-
-
-
-//------------------------------
-//helpers for z ordering of hits
-struct TrackerHitCast{
-  TrackerHit* operator()(LCObject* o) { return (TrackerHit*) o ; }
-};
-
-struct ZSort {
-  bool operator()( const TrackerHit* l, const TrackerHit* r) {
-    return ( l->getPosition()[2] < r->getPosition()[2] );
-  }
-};
-
-
-
-void printZ(TrackerHit* h) { 
-  std::cout << h->getPosition()[2] << ", " ;
-  if(!( h->id() % 30 )) std::cout << std::endl ;
-}
-
-
-
-//-------------------------------
-template <class T>
-void delete_elements(T* t) { delete t ; }
-
-//-------------------------------
-
-//-------------------------------------------------------------------------
-template <bool HitOrder, bool FitOrder, bool PropagateIP=false>
-
-struct KalTestFitter{
-
-  KalTest* _kt ; 
-  
-  KalTestFitter(KalTest* k) : _kt( k ) {}
-  
-  KalTrack* operator() (HitCluster* clu) {  
-    
-    static HitLayerID tpcLayerID( _kt->indexOfFirstLayer( KalTest::DetID::TPC )  )  ;
-    
-    clu->sort( LayerSort<HitOrder>() ) ;
-    
-    
-    // need to reverse the order for incomming track segments (curlers)
-    // assume particle comes from IP
-    Hit* hf = clu->front() ;
-    Hit* hb = clu->back() ;
-
-    bool reverse_order = ( ( HitOrder ==  KalTest::OrderOutgoing ) ?    
-			   ( std::abs( hf->first->getPosition()[2] ) > std::abs( hb->first->getPosition()[2]) + 3. )   :   
-			   ( std::abs( hf->first->getPosition()[2] ) < std::abs( hb->first->getPosition()[2]) + 3. )   ) ;
-    
-    // reverse_order = false ;
-
-
-    KalTrack* trk = _kt->createKalTrack() ;
-
-    trk->setCluster<HitCluster>( clu ) ;
-    
-
-    if( PropagateIP  && HitOrder == KalTest::OrderOutgoing ) {
-      
-      trk->addIPHit() ;
-    }  
-    
-    // // ----- debug ----
-    // std::set<int> layers ;
-    // for( HitCluster::iterator it=clu->begin() ; it != clu->end() ; ++it){
-    //   if( layers.find( tpcLayerID( *it ) ) != layers.end()  )
-    // 	std::cout << " +++++++++++++++++++ duplicate layerID in addHits : " <<  tpcLayerID( *it ) << std::endl ;
-    //   layers.insert( tpcLayerID( *it ) ) ;
-    // }
-    // // ---- end debug ----------
-    
-    if( reverse_order )
-      trk->addHits( clu->rbegin() , clu->rend() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
-    else
-      trk->addHits( clu->begin() , clu->end() , hitPosition, tpcLayerID , LCIOTrackerHit() ) ; 
-    
-
-    if( PropagateIP  && HitOrder == KalTest::OrderIncoming ) {
-      
-      trk->addIPHit() ;
-    }  
-
-    trk->fitTrack( FitOrder  ) ;
-    
-    return trk;
-  }
-};
-
-
-struct KalTrack2LCIO{
-  TrackImpl* operator() (KalTrack* trk) {  
-    TrackImpl* lTrk = new TrackImpl ;
-    trk->toLCIOTrack( lTrk  ) ;
-    return lTrk ;
-  }
-};
-
-//-------------------------------------------------------------------------
-template <class T>
-class RCut {
-public:
-  RCut( double rcut ) : _rcut( rcut ) {}  
-  
-  // bool operator() (T* hit) {  // DEBUG ....
-  //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
-  bool operator() (T* hit) {  
-    return  ( (std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-			  hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut )   ||
-	      ( std::abs( hit->getPosition()[2] ) > (500. + _rcut ) )
-	      ); 
-  }
-protected:
-  RCut() {} ;
-  double _rcut ;
-} ;
-
-template <class T>
-class RCutInverse {
-public:
-  RCutInverse( double rcut ) : _rcut( rcut ) {}  
-  
-  bool operator() (T* hit) {  
-    return (  ( std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-			   hit->getPosition()[1]*hit->getPosition()[1] )   <= _rcut )   &&
-	      (  std::abs( hit->getPosition()[2] ) <= (500. + _rcut ) )
-	      ) ;
-
-  }
-protected:
-  RCutInverse() {} ;
-  double _rcut ;
-} ;
-
-// template <class T>
-// class RCut {
-// public:
-//   RCut( double rcut ) : _rcut( rcut ) {}  
-  
-//   // bool operator() (T* hit) {  // DEBUG ....
-//   //   return   std::abs( hit->getPosition()[2] ) > 2000. ;
-//   bool operator() (T* hit) {  
-//     return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-// 			hit->getPosition()[1]*hit->getPosition()[1] )   > _rcut ; 
-//   }
-// protected:
-//   RCut() {} ;
-//   double _rcut ;
-// } ;
-
-// template <class T>
-// class RCutInverse {
-// public:
-//   RCutInverse( double rcut ) : _rcut( rcut ) {}  
-  
-//   bool operator() (T* hit) {  
-//     return   std::sqrt( hit->getPosition()[0]*hit->getPosition()[0] +
-// 			hit->getPosition()[1]*hit->getPosition()[1] )   <= _rcut ; 
-//   }
-// protected:
-//   RCutInverse() {} ;
-//   double _rcut ;
-// } ;
-
-//---------------------------------------------------------------------------------
-
-/** Predicate class for identifying clusters with duplicate pad rows - returns true
- * if the fraction of duplicate hits is larger than 'fraction'.
- */
-struct DuplicatePadRows{
-
-  unsigned _N ;
-  float _f ; 
-  DuplicatePadRows(unsigned nPadRows, float fraction) : _N( nPadRows), _f( fraction )  {}
-
-  bool operator()(const HitCluster* cl) const {
- 
-    // check for duplicate layer numbers
-    std::vector<int> hLayer( _N )  ; 
-    typedef HitCluster::const_iterator IT ;
-
-    unsigned nHit = 0 ;
-    for(IT it=cl->begin() ; it != cl->end() ; ++it ) {
-      TrackerHit* th = (*it)->first ;
-      ++ hLayer[ th->ext<HitInfo>()->layerID ]   ;
-      ++ nHit ;
-    } 
-    unsigned nDuplicate = 0 ;
-    for(unsigned i=0 ; i < _N ; ++i ) {
-      if( hLayer[i] > 1 ) 
-     	nDuplicate += hLayer[i] ;
-    }
-    return double(nDuplicate)/nHit > _f ;
-  }
-};
-//TODO: create a faster predicate for no duplicate pad rows ....
-
-//---------------------------------------------------------------------------------
-
-/** Predicate class for 'distance' of NN clustering.
- */
-//template <class HitClass, typename PosType > 
-class HitDistance{
-  typedef TrackerHit HitClass ;
-  typedef double PosType ;
-public:
-
-  /** Required typedef for cluster algorithm 
-   */
-  typedef HitClass hit_type ;
-
-  /** C'tor takes merge distance */
-  HitDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
-
-
-  /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
-  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
-    
-    if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-    
-    //     int l0 =  h0->first->ext<HitInfo>()->layerID ;
-    //     int l1 =  h1->first->ext<HitInfo>()->layerID ;
-
-    //     //------- don't merge hits from same layer !
-    //     if( l0 == l1 )
-    //       return false ;
-
-    if( h0->first->ext<HitInfo>()->layerID == h1->first->ext<HitInfo>()->layerID )
-      return false ;
-
-    const PosType* pos0 =  h0->first->getPosition() ;
-    const PosType* pos1 =  h1->first->getPosition() ;
-    
-    return 
-      ( pos0[0] - pos1[0] ) * ( pos0[0] - pos1[0] ) +
-      ( pos0[1] - pos1[1] ) * ( pos0[1] - pos1[1] ) +
-      ( pos0[2] - pos1[2] ) * ( pos0[2] - pos1[2] )   
-      < _dCutSquared ;
-  }
-  
-protected:
-  HitDistance() ;
-  float _dCutSquared ;
-  float _dCut ;
-} ;
-
-class HitDistance_2{
-  typedef TrackerHit HitClass ;
-  typedef double PosType ;
-public:
-
-  /** Required typedef for cluster algorithm 
-   */
-  typedef HitClass hit_type ;
-
-  /** C'tor takes merge distance */
-  HitDistance_2(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
-
-
-  /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
-  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
-    
-    //if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-
-    int l0 =  h0->first->ext<HitInfo>()->layerID ;
-    int l1 =  h1->first->ext<HitInfo>()->layerID ;
-
-
-    //------- don't merge hits from same layer !
-    if( l0 == l1 )
-      return false ;
-
-
-    const PosType* pos0 =  h0->first->getPosition() ;
-    const PosType* pos1 =  h1->first->getPosition() ;
-    
-    return inRange<-2,2>(  l0 - l1 )  &&  
-      ( pos0[0] - pos1[0] ) * ( pos0[0] - pos1[0] ) +
-      ( pos0[1] - pos1[1] ) * ( pos0[1] - pos1[1] ) +
-      ( pos0[2] - pos1[2] ) * ( pos0[2] - pos1[2] )   
-      < _dCutSquared ;
-  }
-  
-protected:
-  HitDistance_2() ;
-  float _dCutSquared ;
-  float _dCut ;
-} ;
-
-
-template <class T>
-struct LCIOTrack{
-  
-  lcio::Track* operator() (GenericCluster<T>* c) {  
-    
-    TrackImpl* trk = new TrackImpl ;
-    
-    double e = 0.0 ;
-    int nHit = 0 ;
-    for( typename GenericCluster<T>::iterator hi = c->begin(); hi != c->end() ; hi++) {
-      
-      trk->addHit(  (*hi)->first ) ;
-      e += (*hi)->first->getEDep() ;
-      nHit++ ;
-    }
-
-   
-    trk->setdEdx( e/nHit ) ;
-    trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
- 
-    // FIXME - these are no meaningfull tracks - just a test for clustering tracker hits
-    return trk ;
-  }
-
-} ;
-
-// helper for creating lcio header for short printout
-template <class T>
-#if LCIO_VERSION_GE( 1 , 60 )
-const std::string & myheader(){return lcio::header<T>(); }
-#else
-const std::string & myheader(){return header(*(T*)(0)); }
-#endif
-
-
-
-void printTrackShort(const LCObject* o){
-  
-  const Track* trk = dynamic_cast<const Track*> (o) ; 
-  
-  if( o == 0 ) {
-    
-    streamlog_out( ERROR ) << "  printTrackShort : dynamic_cast<Track*> failed for LCObject : " << o << std::endl ;
-    return  ;
-  }
-  
-  streamlog_out( MESSAGE ) << myheader<Track>()  
-			   << lcshort( trk ) << std::endl  ;
-  
-  
-  double r0 = 1. / trk->getOmega() ;
-  double d0 = trk->getD0() ;
-  double p0 = trk->getPhi() ;
-  
-  double x0 = ( r0 - d0 ) * sin( p0 ) ;
-  double y0 = ( d0 - r0 ) * cos( p0 ) ;
-  
-  streamlog_out( MESSAGE ) << " circle: r = " << r0 << ", xc = " << x0 << " , yc = " << y0 << std::endl ;
-    
-}
-
-void printTrackerHit(const LCObject* o){
-  
-  TrackerHit* trk = const_cast<TrackerHit*> ( dynamic_cast<const TrackerHit*> (o) ) ; 
-  
-  if( o == 0 ) {
-    
-    streamlog_out( ERROR ) << "  printTrackerHit : dynamic_cast<TrackerHit*> failed for LCObject : " << o << std::endl ;
-    return  ;
-  }
-  
-  streamlog_out( MESSAGE ) << *trk << std::endl 
-			   << " err: rPhi" <<  sqrt( trk->getCovMatrix()[0] + trk->getCovMatrix()[2] ) 
-			   << " z :  " <<   trk->getCovMatrix()[5] << std::endl 
-			   << " chi2 residual to best matching track : " << trk->ext<HitInfo>()->chi2Residual << std::endl ;
-
-    
-}
-
-
-/** Predicate class for track merging with NN clustering.
- */
-class TrackStateDistance{
-  typedef Track HitClass ;
-
-public:
-  
-  /** Required typedef for cluster algorithm 
-   */
-  typedef HitClass hit_type ;
-  
-  /** C'tor takes merge distance */
-  TrackStateDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
-
-
-  /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
-  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
-    
-    if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-    
-    Track* trk0 = h0->first ;
-    Track* trk1 = h1->first ;
-
-    //------- dont' merge complete tracks: ------------------------
-    unsigned nh0 = trk0->getTrackerHits().size() ;
-    unsigned nh1 = trk1->getTrackerHits().size() ;
-    if( nh0 > 220 ) return false ;
-    if( nh1 > 220 ) return false ;
-    //------------------------------------------------------
-
-
-    KalTrack* ktrk0 = h0->first->ext<KalTrackLink>() ; 
-    KalTrack* ktrk1 = h1->first->ext<KalTrackLink>() ; 
-
-    //---- sanity check on radii-------------------
-    double r0 = 1. / trk0->getOmega() ;
-    double r1 = 1. / trk1->getOmega() ;
-
-    if( r0 < 300. || r1 < 300. )
-      return false ;
-
-    if( std::abs( r0 - r1 ) / std::abs( r0 + r1 )  > 0.02 )  // relative difference larger than 1%
-      return false ;
-    //---------------------------------------------
-
-
-    double chi2  = KalTrack::chi2( *ktrk0 , *ktrk1 ) ; 	   
-
-    return chi2  < _dCut ;
-      
-  }
-  
-protected:
-  TrackStateDistance() ;
-  float _dCutSquared ;
-  float _dCut ;
-} ;
-
-
-
-/** helper class for merging track segments, based on circle (and tan lambda) */
-class TrackCircleDistance{
-  typedef Track HitClass ;
-
-public:
-  
-  /** Required typedef for cluster algorithm
-   */
-  typedef HitClass hit_type ;
-  
-  
-  /** C'tor takes merge distance */
-  TrackCircleDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut){}
-  
-  /** Merge condition: ... */
-  inline bool mergeHits( GenericHit<HitClass>* h0, GenericHit<HitClass>* h1){
-    
-    static const double DRMAX = 0.1 ; // make parameter
-    static const double DTANLMAX = 0.2 ; //   " 
-
-    if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-    
-    Track* trk0 = h0->first ;
-    Track* trk1 = h1->first ;
-
-    // //------- dont' merge complete tracks: ------------------------
-    // unsigned nh0 = trk0->getTrackerHits().size() ;
-    // unsigned nh1 = trk1->getTrackerHits().size() ;
-    // if( nh0 > 220 ) return false ;
-    // if( nh1 > 220 ) return false ;
-    // //------------------------------------------------------
-
-    // KalTrack* ktrk0 = h0->first->ext<KalTrackLink>() ; 
-    // KalTrack* ktrk1 = h1->first->ext<KalTrackLink>() ; 
-
-    double tl0 = trk0->getTanLambda() ;
-    double tl1 = trk1->getTanLambda() ;
-
-    double dtl = 2. * ( tl0 - tl1 ) / ( tl0 + tl1 ) ;
-    dtl *= dtl ;
-    if(  dtl >  DTANLMAX * DTANLMAX ) 
-      return false ;
-
-    double r0 = 1. / trk0->getOmega()  ;
-    double r1 = 1. / trk1->getOmega()  ;
-
-
-    double d0 = trk0->getD0() ;
-    double d1 = trk1->getD0() ;
-
-    double p0 = trk0->getPhi() ;
-    double p1 = trk1->getPhi() ;
-
-    double x0 = ( r0 - d0 ) * sin( p0 ) ;
-    double x1 = ( r1 - d1 ) * sin( p1 ) ;
-
-    double y0 = ( d0 - r0 ) * cos( p0 ) ;
-    double y1 = ( d1 - r1 ) * cos( p1 ) ;
-    
-    double dr = 2. * std::abs( ( r0 -r1 ) / (r0 + r1 ) ) ;
-
-    double distMS = sqrt ( ( x0 - x1 ) * ( x0 - x1 ) + ( y0 - y1 ) * ( y0 - y1 )  ) ;
-    
-    
-    return ( dr < DRMAX && distMS < _dCut*r0 ) ;
-
-  }
-  
-protected:
-  float _dCutSquared ;
-  float _dCut ;
-} ; 
 
 
 ClupatraProcessor aClupatraProcessor ;
@@ -694,23 +64,22 @@ ClupatraProcessor aClupatraProcessor ;
 ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
   
   // modify processor description
-  _description = "ClupatraProcessor : simple nearest neighbour clustering" ;
+  _description = "ClupatraProcessor : nearest neighbour clustering seeded pattern recognition" ;
   
   
-  StringVec colDefault ;
-  colDefault.push_back("AllTPCTrackerHits" ) ;
-
-  registerInputCollections( LCIO::TRACKERHIT,
-			    "HitCollections" , 
-			    "Name of the input collections"  ,
-			    _colNames ,
-			    colDefault ) ;
+  
+  registerInputCollection( LCIO::TRACKERHIT,
+			   "TPCHitCollection" , 
+			   "Name of the tpc hit input collections"  ,
+			   _colName ,
+			   "AllTPCTrackerHits"  ) ;
+  
   
   registerOutputCollection( LCIO::TRACK,
 			    "OutputCollection" , 
-			    "Name of the output collections"  ,
+			    "Name of the output collection"  ,
 			    _outColName ,
-			    std::string("CluTracks" ) ) ;
+			    std::string("ClupatraTracks" ) ) ;
   
   
   registerProcessorParameter( "DistanceCut" , 
@@ -718,21 +87,45 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			      _distCut ,
 			      (float) 40.0 ) ;
   
+  
   registerProcessorParameter( "MinimumClusterSize" , 
 			      "minimum number of hits per cluster"  ,
 			      _minCluSize ,
 			      (int) 3) ;
   
-
+  
   registerProcessorParameter( "DuplicatePadRowFraction" , 
 			      "allowed fraction of hits in same pad row per track"  ,
 			      _duplicatePadRowFraction,
 			      (float) 0.01 ) ;
-
+  
+  
   registerProcessorParameter( "RCut" , 
  			      "Cut for r_min in mm"  ,
  			      _rCut ,
  			      (float) 0.0 ) ;
+  
+
+  registerProcessorParameter( "PadRowRange" , 
+			      "number of pad rows used in initial seed clustering"  ,
+			      _padRowRange ,
+			      (int) 12) ;
+ 
+  registerProcessorParameter("MultipleScatteringOn",
+			     "Use MultipleScattering in Fit",
+			     _MSOn,
+			     bool(true));
+  
+  registerProcessorParameter("EnergyLossOn",
+			     "Use Energy Loss in Fit",
+			     _ElossOn,
+			     bool(true));
+  
+  registerProcessorParameter("SmoothOn",
+			     "Smooth All Mesurement Sites in Fit",
+			     _SmoothOn,
+			     bool(false));
+  
   
 }
 
@@ -741,16 +134,22 @@ void ClupatraProcessor::init() {
 
   // usually a good idea to
   printParameters() ;
-
-
-  _kalTest = new KalTest( *marlin::Global::GEAR ) ;
-
-  _kalTest->setOption( KalTest::CFG::ownsHits , true ) ;
-
-  _kalTest->init() ;
-
+  
+  _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( "KalTest" , marlin::Global::GEAR , "" ) ;
+  
+  _trksystem->setOption( IMarlinTrkSystem::CFG::useQMS,        _MSOn ) ;
+  _trksystem->setOption( IMarlinTrkSystem::CFG::usedEdx,       _ElossOn) ;
+  _trksystem->setOption( IMarlinTrkSystem::CFG::useSmoothing,  _SmoothOn) ;
+  _trksystem->init() ;  
+  
   _nRun = 0 ;
   _nEvt = 0 ;
+  
+  // //------ register some debugging print functions for picking in CED :
+  // CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
+  // CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
+  // CEDPickingHandler::getInstance().registerFunction( LCIO::SIMTRACKERHIT , &printSimTrackerHit ) ; 
+  
 }
 
 void ClupatraProcessor::processRunHeader( LCRunHeader* run) { 
@@ -758,278 +157,253 @@ void ClupatraProcessor::processRunHeader( LCRunHeader* run) {
   _nRun++ ;
 } 
 
+
 void ClupatraProcessor::processEvent( LCEvent * evt ) { 
-
+  
   clock_t start =  clock() ; 
+  
+  // the clupa wrapper hits that hold pointers to LCIO hits plus some additional parameters
+  // create them in a vector for convenient memeory mgmt 
+  std::vector<ClupaHit> clupaHits ;
+  
+  // on top of the clupahits we need the tiny wrappers for clustering - they are created on the heap
+  // and we put them in a vector of pointers that takes ownership (i.e. deletes them at the end)
+  HitVec nncluHits ;        
+  nncluHits.setOwner( true ) ;
 
-  GenericHitVec<TrackerHit> h ;
-  GenericHitVec<TrackerHit> hSmallR ; 
+
+  // this is the final list of cluster tracks
+  Clusterer::cluster_list cluList ;    
+  cluList.setOwner() ;
   
-  GenericClusterVec<TrackerHit> cluList ;
+  //FIXME: parameter !
+  static const int ZBins = 160 ; // with 200 bins we can miss tracks in the very forward region  
+  ZIndex zIndex( -2750. , 2750. ,ZBins  ) ; 
   
-  RCut<TrackerHit> rCut( _rCut ) ;
-  RCutInverse<TrackerHit> rCutInverse( _rCut ) ;
+  HitDistance dist( _distCut ) ;
+  // HitDistance dist( 20. ) ;
   
-  ZIndex<TrackerHit,200> zIndex( -2750. , 2750. ) ; 
+  LCIOTrackConverter converter ;
   
-  //  NNDistance< TrackerHit, double> dist( _distCut )  ;
-  HitDistance dist0( _distCut ) ;
-  HitDistance dist( 20. ) ;
-  //  HitDistance_2 dist_2( 20. ) ;
-  
-  LCIOTrack<TrackerHit> converter ;
   
   const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
   const gear::PadRowLayout2D& padLayout = gearTPC.getPadLayout() ;
-  unsigned nPadRows = padLayout.getNRows() ;
 
-  // create a vector of generic hits from the collection applying a cut on r_min
-  for( StringVec::iterator it = _colNames.begin() ; it !=  _colNames.end() ; it++ ){  
-    
-    LCCollectionVec* col =  dynamic_cast<LCCollectionVec*> (evt->getCollection( *it )  ); 
-    
-    
-    //--- assign the layer number to the TrackerHits
-    
-    int nHit = col->getNumberOfElements() ;
-    for(int i=0 ; i < nHit ; ++i ) {
-      
-      TrackerHitImpl* th = (TrackerHitImpl*) col->getElementAt(i) ;
-      gear::Vector3D v( th->getPosition()[0],th->getPosition()[1], 0 ) ; 
-      int padIndex = padLayout.getNearestPad( v.rho() , v.phi() ) ;
-      
-      th->ext<HitInfo>() = new HitInfoStruct ;
-
-      th->ext<HitInfo>()->layerID = padLayout.getRowNumber( padIndex ) ;
-      
-
-      //      std::cout << " layer ID " <<  th->ext<HitInfo>()->layerID << " ..... " << th->getType() << std::endl ;
-
-      //       //--- for fixed sized rows this would also work...
-      //       float rMin = padLayout.getPlaneExtent()[0] ;
-      //       float rMax = padLayout.getPlaneExtent()[1] ;
-      //       float nRow  = padLayout.getNRows() ;
-      //       int lCheck =  ( v.rho() - rMin ) / ((rMax - rMin ) /nRow ) ;
-
-      //       streamlog_out( DEBUG ) << " layerID : " << th->ext<HitInfo>()->layerID 
-      // 			     << " r: " << v.rho() 
-      // 			     << " lCheck : " << lCheck 
-      // 			     << " phi : " << v.phi()
-      // 			     << " rMin : " << rMin 
-      // 			     << " rMax : " << rMax 
-      // 			     << std::endl ;
-
-    } //-------------------- end assign layernumber ---------
-    
-    //addToGenericHitVec( h , col , rCut , zIndex ) ;
-    std::list< TrackerHit*> hitList ;
-    TrackerHitCast cast ;
-    ZSort zsort ;
-    std::transform(  col->begin(), col->end(), std::back_inserter( hitList ), cast ) ;
-
-    hitList.sort( zsort ) ;
-    //    std::for_each( hitList.begin() , hitList.end() , printZ ) ;
-
-    addToGenericHitVec( h, hitList.begin() , hitList.end() , rCut ,  zIndex ) ;
-
-    // create a vector with the hits at smaller R
-    addToGenericHitVec( hSmallR, hitList.begin() , hitList.end() , rCutInverse ,  zIndex ) ;
-  }  
+  unsigned maxTPCLayers =  padLayout.getNRows() ;
   
-  // cluster the sorted hits  ( if |diff(z_index)|>1 the loop is stopped)
-  cluster_sorted( h.begin() , h.end() , std::back_inserter( cluList )  , &dist0 , _minCluSize ) ;
-  //cluster( h.begin() , h.end() , std::back_inserter( cluList )  , &dist , _minCluSize ) ;
+
+  LCCollectionVec* col = 0 ;
+
+  try{   col =  dynamic_cast<LCCollectionVec*> (evt->getCollection( _colName )  ); 
+    
+  } catch( lcio::DataNotAvailableException& e) { 
+    
+    streamlog_out( WARNING ) <<  " input collection not in event : " << _colName << "   - nothing to do  !!! " << std::endl ;  
+    
+    return ;
+  } 
+      
+  //------ create clupa and clustering hits for every lcio hit -------------------------------------------------
+
+  CellIDDecoder<TrackerHit> idDec( col ) ;
+
+  int nHit = col->getNumberOfElements() ;
   
-  streamlog_out( DEBUG ) << "   ***** clusters: " << cluList.size() << std::endl ; 
-
-  LCCollectionVec* allClu = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform(cluList.begin(), cluList.end(), std::back_inserter( *allClu ) , converter ) ;
-  evt->addCollection( allClu , "AllTrackClusters" ) ;
+  clupaHits.resize( nHit ) ;       // creates clupa hits (w/ default c'tor)
+  nncluHits.reserve( nHit ) ;
 
 
+  for(int i=0 ; i < nHit ; ++i ) {
+    
+    //------
+    
+    TrackerHit* th = (TrackerHit*) col->getElementAt(i) ;
+    
+    ClupaHit* ch  = & clupaHits[i] ; 
+    
+    Hit* gh =  new Hit( ch ) ;
+    
+    nncluHits.push_back( gh ) ;
+    
+    //-------
+    // th->ext<HitInfo>() = ch ;  // assign the clupa hit to the LCIO hit for memory mgmt
+    
+    ch->lcioHit = th ; 
+    
+    ch->pos = gear::Vector3D(  th->getPosition() ) ;
+    
+    //  int padIndex = padLayout.getNearestPad( ch->pos.rho() , ch->pos.phi() ) ;
+    //    ch->layer = padLayout.getRowNumber( padIndex ) ;
+    ch->layer = idDec( th )[ ILDCellID0::layer ] ;
 
-  // find 'odd' clusters that have duplicate hits in pad rows
-  GenericClusterVec<TrackerHit> ocs ;
+    ch->zIndex = zIndex( th ) ;
+    
+    //ch->phiIndex = ....
+    
+  } 
 
-  split_list( cluList, std::back_inserter(ocs),  DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+  //--------------------------------------------------------------------------------------------------------- 
+  
+  std::sort( nncluHits.begin(), nncluHits.end() , ZSort() ) ;
+  
+  //--------------------------------------------------------------------------------------------------------- 
+  
+  HitListVector hitsInLayer( maxTPCLayers ) ;
+  addToHitListVector(  nncluHits.begin(), nncluHits.end() , hitsInLayer  ) ;
+  
+  //---------------------------------------------------------------------------------------------------------
 
+  static const bool writeSeedCluster = true ;
+  static const bool writeCluTrackSegments = true ;
+  
+  LCCollectionVec* seedCol =  ( writeSeedCluster      ?  newTrkCol( "SeedCluster"      , evt )  :   0   )  ; 
 
-  LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol ) , converter ) ;
-  evt->addCollection( oddCol , "OddClu_1" ) ;
+  LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "CluTrackSegments" , evt )  :   0   )  ; 
+  
+  
+  LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
+  
+  //---------------------------------------------------------------------------------------------------------
+  
+  // cluster in pad row ranges to find clean cluster segments, statirng from the outside
+  // and then moving in to the next more inside pad row range...
+  
+  Clusterer nncl ;
+  
+  int outerRow = maxTPCLayers - 1 ;
+  
+  while( outerRow > _padRowRange ) {
+    
+    HitVec hits ;
+    
+    
+    // add all hits in pad row range to hits
+    for(int iRow = outerRow ; iRow > ( outerRow - _padRowRange) ; --iRow ) {
+      
+      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+    }
+    
+    //-----  cluster in given pad row range  -----------------------------
+    Clusterer::cluster_list sclu ;    
+    sclu.setOwner() ;  
 
+    nncl.cluster( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
+    
+    if( writeSeedCluster ) {
+      std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
+    }
 
-  streamlog_out( DEBUG ) << "   ***** clusters: " << cluList.size() 
-			 << "   ****** oddClusters " << ocs.size() 
-			 << std::endl ; 
+    // remove clusters whith too many duplicate hits per pad row
+    Clusterer::cluster_list bclu ;    // bad clusters  
+    bclu.setOwner() ;      
 
+    split_list( sclu, std::back_inserter(bclu),  DuplicatePadRows( maxTPCLayers, _duplicatePadRowFraction  ) ) ;
 
+    // free hits from these clusters 
+    std::for_each( bclu.begin(), bclu.end(), std::mem_fun( &CluTrack::freeElements ) ) ;
+   
 
-  //-------------------- split up cluster with duplicate rows 
+    // now fit seed cluster tracks
+    nnclu::PtrVector<IMarlinTrack> seedTrks ;
+    seedTrks.setOwner() ;
 
-  GenericClusterVec<TrackerHit> sclu ; // new split clusters
+    IMarlinTrkFitter fitter( _trksystem ) ;
+    std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
 
-  std::vector< GenericHit<TrackerHit>* > oddHits ;
-  oddHits.reserve( h.size() ) ;
+    for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
+      
+      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
+      
+      static const bool backward = true ;
+      addHitsAndFilter( *icv , hitsInLayer , 60. , 300.,  3 , backward ) ; 
+    } 
 
-  typedef GenericClusterVec<TrackerHit>::iterator GCVI ;
+    // merge the good clusters to final list
+    cluList.merge( sclu ) ;
 
-
-  //========================== first iteration ================================================
-  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  ocs.clear() ;
-
-  int _nRowForSplitting = 10 ; //FIXME:  make proc param
-  // reset the hits index to row ranges for reclustering
-  unsigned nOddHits = oddHits.size() ;
-  for(unsigned i=0 ; i< nOddHits ; ++i){
-    int layer =  oddHits[i]->first->ext<HitInfo>()->layerID  ;
-    oddHits[i]->Index0 =   2 * int( layer / _nRowForSplitting ) ;
-  }
-
-  //----- recluster in pad row ranges
-  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
-
-  LCCollectionVec* oddCol2 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2 ) , converter ) ;
-  evt->addCollection( oddCol2 , "OddClu_2" ) ;
-
-
-  streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
-			 << std::endl ; 
+    outerRow -= _padRowRange ;
+    
+  } //while outerRow > padRowRange 
+  
  
-  //--------- remove pad row range clusters where merge occured 
-  split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+  //---------------------------------------------------------------------------------------------------------
+
+  //  ---- here we have almost complete track segments from the main clupatra algorithm -----  
+  if( writeCluTrackSegments )
+    std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
+
+  //---------------------------------------------------------------------------------------------------------
+  
 
 
-  LCCollectionVec* oddCol3 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3 ) , converter ) ;
-  evt->addCollection( oddCol3 , "OddClu_3" ) ;
-
-
-  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  ocs.clear() ;
-
-
-  //   //========================== second iteration in shifted pad row ranges ================================================
-
-
-  oddHits.clear() ;
-  for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  sclu.clear() ;
-
-  //  int _nRowForSplitting = 10 ; //FIXME:  make proc param
-  // reset the hits index to row ranges for reclustering
-  nOddHits = oddHits.size() ;
-
-  streamlog_out( DEBUG ) << "   left over odd hits for second iteration of pad row range clustering " << nOddHits << std::endl ;
-
-  for(unsigned i=0 ; i< nOddHits ; ++i){
-    int layer =  oddHits[i]->first->ext<HitInfo>()->layerID  ;
-    oddHits[i]->Index0 =  2 * int( 0.5 +  ( (float) layer / (float) _nRowForSplitting ) ) ;
+  //========  create collections of used and unused TPC hits ===========================================
+  
+  LCCollectionVec* usedHits   = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+  LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+  evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits"   ) ;
+  evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
+  usedHits->setSubset() ;
+  unUsedHits->setSubset() ;
+  usedHits->reserve(   nncluHits.size() ) ;
+  unUsedHits->reserve( nncluHits.size() ) ;
+  
+  for( HitVec::iterator it = nncluHits.begin(), end = nncluHits.end(); it!=end;++it ){
+    
+    if( (*it)->second != 0 ){   usedHits->push_back( (*it)->first->lcioHit ) ;
+    } else {                  unUsedHits->push_back( (*it)->first->lcioHit ) ;          
+    }
   }
   
-  //----- recluster in pad row ranges
-  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
 
-  LCCollectionVec* oddCol2_1 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol2_1 ) , converter ) ;
-  evt->addCollection( oddCol2_1 , "OddClu_2_1" ) ;
+  //---------------------------------------------------------------------------------------------------------
 
-
-  streamlog_out( DEBUG ) << "   ****** oddClusters fixed" << sclu.size() 
-			 << std::endl ; 
+  
+  
+  //---------------------------------------------------------------------------------------------------------
+  // the final track collection:
  
-  //--------- remove pad row range clusters where merge occured 
-  split_list( sclu, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
+  // now fit the tracks again
+  nnclu::PtrVector<IMarlinTrack> finalTrks ;
+  finalTrks.setOwner() ;
+  finalTrks.reserve( 256 ) ;
 
-
-  LCCollectionVec* oddCol3_1 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *oddCol3_1 ) , converter ) ;
-  evt->addCollection( oddCol3_1 , "OddClu_3_1" ) ;
-
-  //----------------end  split up cluster with duplicate rows 
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
   
-  for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  ocs.clear() ;
+  //FIXME:   need to merge segments ....
+
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *outCol ) , converter ) ;
   
-
-  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  //---------------------------------------------------------------------------------------------------------
 
 
-  // --- recluster the good clusters w/ all pad rows
-
-  oddHits.clear() ;
-  for( GCVI it = sclu.begin() ; it != sclu.end() ; ++it ){
-    (*it)->takeHits( std::back_inserter( oddHits )  ) ;
-    delete (*it) ;
-  }
-  sclu.clear() ;
-
-  //   reset the index for 'good' hits coordinate again...
-  nOddHits = oddHits.size() ;
-  for(unsigned i=0 ; i< nOddHits ; ++i){
-    oddHits[i]->Index0 = zIndex ( oddHits[i]->first ) ;
-  }
-
-  cluster( oddHits.begin(), oddHits.end() , std::back_inserter( sclu ), &dist , _minCluSize ) ;
-
-  LCCollectionVec* oddCol4 = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( sclu.begin(), sclu.end(), std::back_inserter( *oddCol4 ) , converter ) ;
-  evt->addCollection( oddCol4 , "OddClu_4" ) ;
-
-  // --- end recluster the good clusters w/ all pad rows
-
-  // merge the good clusters to final list
-  cluList.merge( sclu ) ;
-  
-  LCCollectionVec* cluCol = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
-  evt->addCollection( cluCol , "CluTrackSegments" ) ;
 
 
-  //DEBUG ..... check if there are really no duplicate pad rows ...
-  ocs.clear() ; 
-  split_list( cluList, std::back_inserter(ocs), DuplicatePadRows( nPadRows, _duplicatePadRowFraction  ) ) ;
-  LCCollectionVec* dupCol = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ocs.begin(), ocs.end(), std::back_inserter( *dupCol ) , converter ) ;
-  evt->addCollection( dupCol , "DuplicatePadRowCluster" ) ;
 
-  streamlog_out( DEBUG ) << "   DuplicatePadRowCluster.sizE() : " << dupCol->getNumberOfElements() << std::endl ;
+
+
+
+
+#ifdef IGNORE_THIS_CODE  //===========================================================================================================
+
 
   //================================================================================
-   
+  
   // create vector with left over hits
-  std::vector< Hit* > leftOverHits ;
+  GHitVec leftOverHits ;
   leftOverHits.reserve(  h.size() ) ;
-
-  typedef HitVec::const_iterator GHVI ;
-
+  
+  typedef GHitVec::const_iterator GHVI ;
+  
   for( GHVI it = h.begin(); it != h.end() ; ++it ){
-
+    
     if ( (*it)->second == 0 ) leftOverHits.push_back( *it ) ;
   }
-
+  
   // add all hits that failed the rcut 
   std::copy( hSmallR.begin() , hSmallR.end() , std::back_inserter( leftOverHits )  ) ;
-
-
-  //  GenericClusterVec<TrackerHit> mergedClusters ; // new split clusters
-
-
+  
+  
   //*********************************************************
   //   run KalTest on track segments (clusters)
   //*********************************************************
@@ -1038,379 +412,277 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 			 << std::endl ;
 
 
-  std::list< KalTrack* > ktracks ;
+  for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+    (*icv)->ext<ClusterInfo>() = new ClusterInfoStruct ;
+  }
 
+  std::list< KalTrack* > ktracks ;
+  
   //  KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward > fitter( _kalTest ) ;
   KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
     
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
   
-  std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
+  // std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
   
   
+  if( streamlog_level( DEBUG4 ) ) {
+    for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+      GCluster* clu  = *icv ;
+      KalTrack* trk =  clu->ext<ClusterInfo>()->track ;
+      gear::Vector3D xv ;
+      int  layer ;
+      trk->findNextXingPoint(  xv , layer , 1 ) ;
+      
+      clu->ext<ClusterInfo>()->nextXPoint = xv ;
+      clu->ext<ClusterInfo>()->nextLayer = layer ;
+      
+      streamlog_out( DEBUG ) <<  "   ----  FINDNEXTXINGPOINT: "  <<  clu
+			     <<  " next xing point at layer: "   <<  clu->ext<ClusterInfo>()->nextLayer
+			     << " : " <<  clu->ext<ClusterInfo>()->nextXPoint ;
+    }
+  }
+
   LCCollectionVec* trksegs = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *trksegs ) , KalTrack2LCIO() ) ;
   evt->addCollection( trksegs , "KalTrackSegments" ) ;
 
   
-
+  
   //===========  merge track segments based on xing points ==================================================
-
-
-
+  
+  
+  
   //=========== assign left over hits ... ==================================================================
   
-  static const bool use_best_track = false ;
 
-  if( use_best_track ) {
+  //------------- create vector of left over hits per layer
+  GHitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
 
-    streamlog_out( DEBUG ) << "  ------ assign left over hits - best matching track for every hit ..."  << std::endl ;
-
-    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors ....
-    Chi2_RPhi_Z_Hit ch2rzh ;
+  addToHitListVector(  leftOverHits.begin(), leftOverHits.end() , hitsInLayer ,  _kalTest->indexOfFirstLayer( KalTest::DetID::TPC)  ) ;
 
 
-    HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
-    
-    for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ){
-      
-      Hit* hit = *ih ;
-      VecFromArray hPos(  hit->first->getPosition() ) ;
-      
-      double ch2Min = 999999999999999. ;
-      KalTrack* bestTrk = 0 ;
-      
-      for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
-	
-	const gear::Vector3D* kPos = (*it)->getXingPointForLayer( tpcLayerID( hit ) ) ;
-	
-	// double rh  =  hPos.v().rho() ;
-	// double rk  =  kPos->rho() ;
-	// if( std::abs( rh - rk ) > 0.1 ) {
-	// 	streamlog_out( WARNING ) << " --- different radii for hit and crossing point : " <<  tpcLayerID( hit ) << ": " << rh << " - " << rk 
-	// 				 <<  *kPos  << std::endl ;
-	// } 
-	
-	if( kPos != 0 ){
-	  
-	  //	  double ch2 = ch2rz( hPos.v() , *kPos )  ;
-	  double ch2 = ch2rzh( hit->first , *kPos )  ;
-	  
-	  if( ch2 < ch2Min ){
-	    
-	    ch2Min = ch2 ;
-	    bestTrk = *it ;
-	  }
-	  
-	}
-	
-	// else {
-	// 	streamlog_out( MESSAGE ) << " --- no crossing point found for layer : " <<  tpcLayerID( hit ) << ": " << hPos.v() << std::endl ;
-	// }
-	
-      }
-      if( bestTrk ) {
-	
-	const gear::Vector3D* kPos = bestTrk->getXingPointForLayer( tpcLayerID( hit ) ) ;
-	
-	// double rh  =  hPos.v().rho() ;
-	// double rk  =  kPos->rho() ;
-	// if( std::abs( rh - rk ) > 0.1 ) {
-	// 	streamlog_out( WARNING ) << "  different radii for hit and crossing point : " << rh << " - " << rk << std::endl ;
-	// } 
-	
-	//      if( std::abs( hPos.v().rho() - kPos->rho() ) < 0.5 &&   std::abs( hPos.v().z() - kPos->z() ) < 5. ) {
-	
-	if(  (  hPos.v() - *kPos ).r()  < 3. ) {   // check for bad outliers... FIXME: need proper criterion here .....
-	  
-	  
-	  HitCluster* clu = bestTrk->getCluster< HitCluster >() ;
-	  
-	  streamlog_out( DEBUG ) << " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos  
-				 <<   " dist: " <<  (  hPos.v() - *kPos ).r()  << std::endl ;
-	  
-	  clu->addHit( hit ) ;
-	}	
-	else 
-	  streamlog_out( DEBUG ) << " ---- NOT assigning left over hit : " << hPos.v() << " <-> " << *kPos << std::endl ;
-      }
-      else
-	streamlog_out( DEBUG ) << " ---- NO best track found ??? ---- " << std::endl ;
-      
-    }
-    
+  for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
 
-    //        ==========================================================================================
-  } else { // ================== use best matching hit for every track segment =========================
-    //        ==========================================================================================
-    
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
 
-
-    streamlog_out( DEBUG1 ) << "  ------ assign left over hits - best matching hit for every track ..."  << std::endl ;
-    
-    HitLayerID  tpcLayerID( _kalTest->indexOfFirstLayer( KalTest::DetID::TPC )  ) ;
-    
-
-    //------------- create vector of left over hits per layer
-    typedef std::list<Hit*> HitList ;
-    typedef std::vector< HitList > HitListVector ;
-    HitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
-    
-    
-    for( GHVI ih = leftOverHits.begin() ; ih != leftOverHits.end() ; ++ih ) {
-      
-      Hit* hit = *ih ;
-      //      std::cout << " ++++++  layerId: " << tpcLayerID( hit ) << " max layer index : " <<  _kalTest->maxLayerIndex() << std::endl  ;
-      hitsInLayer[ tpcLayerID( hit ) ].push_back( hit )  ;
-    }
-    //-----------------------------
-    
-    std::map< HitCluster* , KalTrack* > clu2trkMap ;
-
-    const bool use_segment_hits = false ; //true ;
-    
-    if( use_segment_hits  ){
-      
-      // store first and last hit of every segment in map with leftover hits in this layer
-      
-      for( GenericClusterVec<TrackerHit>::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
-	
-	Hit* h0 = (*icv)->front() ;
-	Hit* h1 = (*icv)->back() ;
-	
-	hitsInLayer[ tpcLayerID( h0 ) ].push_back( h0 )  ;
-	hitsInLayer[ tpcLayerID( h1 ) ].push_back( h1 )  ;
-      }
-      
-      // sort the tracks wrt. lenghts (#hits)
-      ktracks.sort( KalTrackLengthSort() ) ;
-
-      // store assoaciation between cluster and track 
-      for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
-	HitCluster* c = (*it)->getCluster< HitCluster >() ;
-	clu2trkMap[ c ] = *it ;
-      }	   
-    }
-    //-------------------------------
-    
-
-    //    Chi2_RPhi_Z ch2rz( 0.1 , 1. ) ; // fixme - need proper errors 
-    Chi2_RPhi_Z_Hit  ch2rzh ;
-    
-
-    for( std::list< KalTrack* >::iterator it = ktracks.begin() ; it != ktracks.end() ; ++it ){
-      
-      KalTrack* theTrack = *it ;
-      if( theTrack == 0 ) 
-	continue ;
-      
-      
-      // ----- define chi2 cut    ~15 for 1 GeV pt 
-      double chi2Cut = 100000. / ( std::log(1.) - std::log( std::abs(theTrack->getOmega()) ) ) ;
-
-
-      streamlog_out( DEBUG3 ) << " ------- searching for leftover hits for track : " << theTrack 
-			      << "   chi2 cut : " << chi2Cut  << " -  omega : " << theTrack->getOmega() <<  std::endl ;
-      
-      int xpLayer = 0 ;
-      
-      // const PointList& xptList = theTrack->getXingPoints() ;
-      // for(PointList::const_iterator itXP = xptList.begin() ; itXP != xptList.end() ; ++itXP , xpLayer++ ) {
-      // 	const gear::Vector3D* kPos =  *itXP ;
-      
-      PointList& xpVec = theTrack->getXingPoints() ;
-      for( unsigned ixp=0 ; ixp < xpVec.size() ; ++ixp, xpLayer++  ) {
-      	const gear::Vector3D* kPos =  xpVec[ixp]  ;
-	
-	if( kPos == 0 ) {   // we don't have a xing point
-	  continue ;
-	}
-	
-       	double ch2Min = 10e99 ;
-	Hit* bestHit = 0 ;
-	
-	HitList& hLL = hitsInLayer.at( xpLayer ) ;
-	
-	for( HitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){
-	  
-	  Hit* hit = *ih ;
-	  
-	  //VecFromArray hPos(  hit->first->getPosition() ) ;
-	  //double ch2 = ch2rz( hPos.v() , *kPos )  ;
-	  double ch2 = ch2rzh( hit->first , *kPos )  ;
-
-	  if( ch2 < ch2Min ){
-	    
-	    ch2Min = ch2 ;
-	    bestHit = hit ;
-	  }
-	}
-	
-	if( bestHit != 0 ) {
-	  
-	  VecFromArray hPos(  bestHit->first->getPosition() ) ;
-	  
-	  //	  if( ch2Min  <  6. ) { // Sum( pdf(ch2,ndf==2) )_0^6 ~ 95% )
-	  //	  if( ch2Min  <  20. ) { // Sum( pdf(ch2,ndf==2) )_0^20 ~ 99.x% ?? ) // FIXME: need steering parameter and optimize value
-	  
-	  
-	  bestHit->first->ext<HitInfo>()->chi2Residual = ch2Min ;
-
-
-	  if( ch2Min  < chi2Cut ) { 
-	    
-	    streamlog_out( DEBUG1 ) <<   " ---- assigning left over hit : " << hPos.v() << " <-> " << *kPos
-				    <<   " dist: " <<  (  hPos.v() - *kPos ).r()
-				    <<   " chi2: " <<  ch2Min 
-				    <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->getCovMatrix()[0] + bestHit->first->getCovMatrix()[2] ) 
-				    <<	 "  z= " <<  sqrt( bestHit->first->getCovMatrix()[5] )
-				    << std::endl ;
-	    
-	    
-	    if( bestHit->second != 0 ) { //--------------------------------------------------------------------------------
-	      
-	      // hit is already part of a track segment 
-	      
-	      
-	      HitCluster* c = bestHit->second  ;
-	      KalTrack* trk = clu2trkMap[ c ] ;
-	      
-
-	      if( trk == theTrack ) {
-		streamlog_out( ERROR ) << " =======================  found best matching hit from track itself: " << *bestHit->first 
-				       <<     std::endl  
-				       <<  "      track has  " << trk->getNHits()  << " hits " << std::endl ;
-
-		for( unsigned ii=0 ; ii < xpVec.size() ; ++ii) {
-		  if( xpVec[ii] ) 
-		    streamlog_out( ERROR ) << "  xing pt : "  << ii << " - " << *xpVec[ii]  ;
-		}
-		
-		
-		for( HitCluster::iterator its = c->begin(); its != c->end() ; ++its ){
-		  Hit* hit = *its ;
-		  VecFromArray hPos(  hit->first->getPosition() ) ;
-		  streamlog_out( ERROR ) << "  hit  : layer: "  <<   tpcLayerID( hit )   << " - " << hPos.v()  ;
-		}
-		
-
-	      } else {
-
-		
-		streamlog_out( DEBUG3 ) << " +++++++++ found best hit already part of a track segment !!!!!! " 
-					<< " trk : " << trk  << " #hits: " << trk->getNHits() 
-					<< " cluster " << c << c->size() 
-					<< std::endl ;   
-		
-		
-		unsigned goodHits(0), allHits(0) ;
-		
-		double chi2Max = 10. ; // fixme parameter
-		
-		for( HitCluster::iterator its = c->begin(); its != c->end() ; ++its ){
-		  
-		  ++allHits ;
-		  
-		  Hit* hit = *its ;
-		  VecFromArray hPos(  hit->first->getPosition() ) ;
-		  
-		  const gear::Vector3D* kPos = theTrack->getXingPointForLayer( tpcLayerID( hit ) ) ;
-		  
-		  if( kPos != 0 ) {
-		    
-		    //double chi2 = ch2rz( hPos.v() , *kPos )  ;
-		    double chi2 = ch2rzh( hit->first , *kPos )  ;
-
-		    streamlog_out( DEBUG3 ) << " +++++++++ chi2 : " << chi2 << hPos.v() 
-					    << " +++++++++                  " << *kPos 
-					    << " +++++++++  hit id " << std::hex << hit->first->id() << std::dec 
-					    << std::endl ;
-		    
-		    if( chi2 < chi2Max ){
-		      
-		      ++goodHits ;
-		    }
-		  }
-		}
-		
-		double goodFraction = double( goodHits ) / double(  allHits ) ;
-		
-		streamlog_out( DEBUG3 ) << " +++++++++ fraction of matching hits : " << goodFraction 
-					<< std::endl ;   
-		
-		
-		// ---------------------  merge the track segements -------------------------
-		
-		if( goodFraction > 0.5  ) { // fixme: what is reasonable here - make parameter ...
-		  
-		  
-		  for( HitCluster::iterator its = c->begin(); its != c->end() ; ++its ){
-
-		    delete  xpVec[  tpcLayerID( *its ) ] ; // erase crossing points for these hit
-		    xpVec[  tpcLayerID( *its ) ]  = 0 ;   
-		  }
-		  HitCluster* clu = theTrack->getCluster< HitCluster >() ;
-		  
-		  // merge the cluster into the larger one and delete it - remove the hits from the hitsinlayer vector first
-		  
-		  Hit* h0 = c->front() ;
-		  Hit* h1 = c->back() ;
-		  
-		  hitsInLayer[ tpcLayerID( h0 ) ].remove( h0 )  ;
-		  hitsInLayer[ tpcLayerID( h1 ) ].remove( h1 )  ;
-		  
-		  clu->mergeClusters( c ) ;
-		  
-		  cluList.remove( c  ) ;
-		  
-		  
-		  streamlog_out( DEBUG3) << " ************ found matching segment, merged all hits: delete cluster : " << c 
-					 << " and track : " << trk << std::endl ;
-		  
-		  delete c ;
-		  
-		  ktracks.remove( trk ) ;
-		  
-		} //-------------------------------------------------------------
-
-	      }
-
-		
-	    }  else  {  //--------------------------------------------------------------------------------
-	      
-	      hLL.remove(  bestHit ) ;
-	      
-	      HitCluster* clu = theTrack->getCluster< HitCluster >() ;
-	      
-	      streamlog_out( DEBUG3) << "    ************ found matching hit, add to  cluster : " << clu  << std::endl ;
-	      
-	      clu->addHit( bestHit ) ;
-	    }
-
-
-	  }
-	} 
-          // else {
-	  //	  streamlog_out( DEBUG1 ) << "????????????????????? no best Hit found xing pnt  : chi2  " << *xpVec[ixp]  << " : " << ch2Min << std::endl ;
-	  //	}
-
-      }
-    }
-    
+    static const bool backward = true ;
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
   }
 
-   //================================================================================================================ 
-  
+  //===============================================================================================
+  // recluster in the leftover hits
+  GClusterVec loclu ; // leftover clusters
+ 
+  static const bool recluster_left_overs = true ;
+  if( recluster_left_overs ) {
+
+    HitDistance dist(  _distCut ) ;  // FIXME: make parameter 
 
 
-  //std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
+    GHitVec oddHits ;
+    
+    oddHits.clear() ;
+    // add all hits in pad row range to oddHits
+    for(unsigned iRow = 0 ; iRow <  _kalTest->maxLayerIndex()  ; ++iRow ) {
+      
+      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( oddHits )  ) ;
+    }
+    
+    //----- recluster in given pad row range
+    loclu.clear() ;
+    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu ), &dist , _minCluSize ) ;
+    
+    LCCollectionVec* leftOverCol = new LCCollectionVec( LCIO::TRACK ) ;
+    evt->addCollection( leftOverCol , "LeftOverClusters" ) ;
+    std::transform( loclu.begin(), loclu.end(), std::back_inserter( *leftOverCol ) , converter ) ;
+    
+  }
+  //===============================================================================================
+  // 
+  GClusterVec reclu ; // leftovers reclustered
+
+  static const bool refit_leftover_hits = true ;
+  if( refit_leftover_hits ) {
+
+    //    NearestHitDistance nnDist(0.) ;
+ 
+    // compute the hit multiplicities in pad rows
+
+    // use a while loop to remove all clusters at the end (erase the pointer) 
+    GClusterVec::iterator icv = loclu.begin() ; 
+    while( icv != loclu.end() ) {
+
+      GCluster* clu = *icv ;
+
+      
+      GHitListVector hLV( nPadRows )  ;
+      addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
+
+      std::vector<int> mult(6) ;
+
+      for( unsigned i=0 ; i < hLV.size() ; ++i ){
+	unsigned m =  hLV[i].size() ;  
+
+	if( m >= 4 )  m = 4 ;
+
+	++mult[ m ] ;
+	++mult[ 5 ] ;
+      }
+
+      float total = (  mult[1] + mult[2] + mult[3] + mult[4] ) ; 
+      float clumu1 = mult[1] / total ;  
+      float clumu2 = mult[2] / total ;
+      float clumu3 = mult[3] / total ;
+
+      streamlog_out(  DEBUG3 ) << " leftover cluster multiplicities: (0,1,2,3,>=4, all) :  [" 
+			       <<  mult[0] << " , " <<  mult[1] << " , " <<  mult[2] << " , "    
+			       <<  mult[3] << " , " <<  mult[4] << mult[5] << "] "  
+			       << " mult_1 = " << clumu1 
+			       << " mult_2 = " << clumu2  
+			       << std::endl ;    
+
+
+
+
+      // findNearestHits( *clu, nPadRows, 1) ;
+
+      
+
+      if( clumu3 >= 0.5 ) {   //FIXME - make parameter
+	
+
+	//---- get hits from cluster into a vector
+	GHitVec v ;
+	v.reserve( clu->size() ) ;
+	clu->takeHits( std::back_inserter( v )  ) ;
+	
+	
+	create_three_clusters( v , reclu, nPadRows ) ;
+
+	GClusterVec::reverse_iterator iC = reclu.rbegin()  ;
+	GCluster* clu0 = *iC++ ;
+	GCluster* clu1 = *iC++ ;
+	GCluster* clu2 = *iC   ;
+
+	clu0->ext<ClusterInfo>() = new ClusterInfoStruct ;
+	clu1->ext<ClusterInfo>() = new ClusterInfoStruct ;
+	clu2->ext<ClusterInfo>() = new ClusterInfoStruct ;
+
+	KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
+	
+	KalTrack* trk0 = fitter( clu0 ) ;
+	KalTrack* trk1 = fitter( clu1 ) ; 
+	KalTrack* trk2 = fitter( clu2 ) ; 
+	
+	// try to extend the clusters with leftover hits (from layers that do not have two hits)
+	static const bool backward = true ;
+	
+	if( trk0->getNHits() > 3 ) {
+	  addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
+	  addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	}
+
+	if( trk1->getNHits() > 3 ) {
+	  addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
+	  addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	}
+
+	if( trk2->getNHits() > 3 ) {
+	  addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 ) ; 
+	  addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	}
+
+	delete trk0 ;
+	delete trk1 ;
+	delete trk2 ;
+
+	
+      } if( clumu2 > 0.5 ) {   //FIXME - make parameter
+	
+
+	//---- get hits from cluster into a vector
+	GHitVec v ;
+	v.reserve( clu->size() ) ;
+	clu->takeHits( std::back_inserter( v )  ) ;
+	
+	
+	create_two_clusters( v , reclu, nPadRows ) ;
+
+
+	GClusterVec::reverse_iterator iC = reclu.rbegin()  ;
+	GCluster* clu0 = *iC++ ;
+	GCluster* clu1 = *iC   ;
+
+	clu0->ext<ClusterInfo>() = new ClusterInfoStruct ;
+	clu1->ext<ClusterInfo>() = new ClusterInfoStruct ;
+
+	KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
+	
+	KalTrack* trk0 = fitter( clu0 ) ;
+	KalTrack* trk1 = fitter( clu1 ) ; 
+	
+	// try to extend the clusters with leftover hits (from layers that do not have two hits)
+	static const bool backward = true ;
+	
+	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	
+	delete trk0 ;
+	delete trk1 ;
+
+	
+      } else if( clumu1 > 0.5 ) {
+	
+	// add to final clusters directly
+	reclu.push_back( clu ) ;
+
+      }  else {
+
+	//*********************************************************
+	//FIXME: need treatment for leftover clusters with 'undefined' multicplicity .....
+	//*********************************************************
+
+
+	delete clu ;
+      }
+
+      loclu.erase( icv++ ) ;  // erase all clusters from the list (GClusterVec)
+    }
+
+    // for( GClusterVec::iterator icv = reclu.begin() ; icv != reclu.end() ; ++ icv ) {
+    //   (*icv)->ext<ClusterInfo>() = new ClusterInfoStruct ;
+    // }
+    
+    LCCollectionVec* ccol = new LCCollectionVec( LCIO::TRACK ) ;
+    std::transform( reclu.begin(), reclu.end(), std::back_inserter( *ccol ) , converter ) ;
+    evt->addCollection( ccol , "ReclusteredLeftOvers" ) ;
+    
+    
+    // for now just fit the clusters ...
+    cluList.merge( reclu ) ;
+
+  }
+  //================================================================================================================ 
+  // recluster in the leftover hits
+  GClusterVec loclu2 ; // leftover clusters
+ 
+
+  //===============================================================================================
+  //  refit all found tracks 
+  //==============================
+
 
   std::list< KalTrack* > newKTracks ;
 
   //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
-  //  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
 
+  // adding an IP hit does not work for curler segments - as we fit everything leave out the IP hit
+  //KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
   //FIXME: DEBUG - non ip fitter
   KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
   
@@ -1423,13 +695,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   kaltracks->setFlag( trkFlag.getFlag()  ) ;
   
   std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
-  //  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *kaltracks ) , converter ) ;
+  //std::transform( cluList.begin(), cluList.end(), std::back_inserter( *kaltracks ) , converter ) ;
 
-  evt->addCollection( kaltracks , _outColName ) ;
+  evt->addCollection( kaltracks , "ClupatraTrackSegments" ) ; 
   
  
-
- //================================================================================================================ 
+  //================================================================================================================ 
   //   merge track segments based on track parameters and errors ...
   //
   static const int merge_track_segments = true ;
@@ -1439,10 +710,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     GenericHitVec<Track> trkVec ;
     GenericClusterVec<Track> trkCluVec ;
     LCCollectionVec* mergedTracks = new LCCollectionVec( LCIO::TRACK ) ;
+    LCFlagImpl trkFlag(0) ;
+    trkFlag.setBit( LCIO::TRBIT_HITS ) ;
+    mergedTracks->setFlag( trkFlag.getFlag()  ) ;
   
     addToGenericHitVec( trkVec , kaltracks ,  AllwaysTrue()  ) ;
 
-    //    TrackStateDistance trkMerge( 50. ) ;
+    //    TrackStateDistance trkMerge( 1000. ) ;
     TrackCircleDistance trkMerge( 0.1 ) ; 
 
     cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), &trkMerge  , 2 ) ;
@@ -1467,22 +741,27 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       TrackImpl* trk = new TrackImpl ;
       Track* bestTrk = 0 ;
       double chi2Min = 99999999999999999. ;
+      int hitCount = 0 ;
+      int hitsInFit = 0 ;
       for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
 	
 	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
-
 	for(unsigned i=0 ; i < hV.size() ; ++i){
-
 	  trk->addHit( hV[i] ) ;
-	  double chi2ndf = (*itML)->getChi2() / (*itML)->getNdf() ;
-
-	  if( chi2ndf < chi2Min ){
-	    bestTrk = (*itML) ;
-	    chi2Min = chi2ndf ;
-	  }
+	  ++hitCount ;
 	}
+
+	double chi2ndf = (*itML)->getChi2() / (*itML)->getNdf() ;
+	
+	if( chi2ndf < chi2Min ){
+	  bestTrk = (*itML) ;
+	  chi2Min = chi2ndf ;
+	}
+
       }
       if( bestTrk != 0 ){ 
+
+	hitsInFit = trk->getTrackerHits().size() ;
 
 	trk->setD0( bestTrk->getD0() ) ;
 	trk->setOmega( bestTrk->getOmega() ) ;
@@ -1496,28 +775,30 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       else{
 	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
       }
-      mergedTracks->addElement( trk )  ;
 
+      trk->subdetectorHitNumbers().push_back( hitCount ) ;  
+      trk->subdetectorHitNumbers().push_back( hitsInFit ) ;  
+
+      mergedTracks->addElement( trk )  ;
     }
 
     // add all tracks that have not been merged :
     for( GenericHitVec<Track>::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
 
       if( (*it)->second == 0 ){
-
-	mergedTracks->addElement(  new TrackImpl( *dynamic_cast<TrackImpl*>( (*it)->first ) ) ) ;
+	
+	TrackImpl* t =   new TrackImpl( *dynamic_cast<TrackImpl*>( (*it)->first ) ) ;
+	
+	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
+	
+	mergedTracks->addElement( t ) ;
       }
     }
-
-
-    evt->addCollection( mergedTracks , "MergedKalTracks" ) ;
+    
+    evt->addCollection( mergedTracks , _outColName ) ;
   }
 
 
-  //------ register some debugging print funtctions for picking in CED :
-
-  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
-  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
   //======================================================================================================
 
  
@@ -1525,8 +806,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
 
   //FIXME: memory leak - need for debugging....
-
-  //  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
+  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
   //=====================================
 
 
@@ -1539,25 +819,26 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   unUsedHits->setSubset() ;
   usedHits->reserve( h.size() ) ;
   unUsedHits->reserve( h.size() ) ;
-  //  typedef GenericHitVec<TrackerHit>::iterator GHVI ;
+
   for( GHVI it = h.begin(); it != h.end() ;++it){
     if( (*it)->second != 0 ){
-      usedHits->push_back( (*it)->first ) ;
+      usedHits->push_back( (*it)->first->lcioHit ) ;
     } else {
-      unUsedHits->push_back( (*it)->first ) ;          
+      unUsedHits->push_back( (*it)->first->lcioHit ) ;          
     }
   }
   for( GHVI it = hSmallR.begin(); it != hSmallR.end() ;++it){
     if( (*it)->second != 0 ){
-      usedHits->push_back( (*it)->first ) ;
+      usedHits->push_back( (*it)->first->lcioHit ) ;
     } else {
-      unUsedHits->push_back( (*it)->first ) ;          
+      unUsedHits->push_back( (*it)->first->lcioHit ) ;          
     }
   }
   evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits" ) ;
   evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
   
   //========================================================================================================
+#endif // IGNORE_THE_CODE  //===========================================================================================================
   
   _nEvt ++ ;
 
@@ -1572,254 +853,252 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 /*************************************************************************************************/
 void ClupatraProcessor::check( LCEvent * evt ) { 
   /*************************************************************************************************/
-
-  std::string colName( "MergedKalTracks"  ) ;
+  
+  // //  std::string colName( "MergedKalTracks"  ) ;
   // std::string colName(  _outColName ) ;
 
 
-  bool checkForDuplicatePadRows =  false ; //true ;
-  bool checkForMCTruth =  true ;
+  // bool checkForDuplicatePadRows =  false ;
+  // bool checkForMCTruth          =  true  ;
+  // bool checkForSplitTracks      =  true  ; 
 
-  bool checkForSplitTracks =  true ;   // WARNING: DEBUG only - this requires the kaltracks to not be deleted in processEvent !!!!!!!!! 
+  // streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
 
-
-  streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
-
-  const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
-  const gear::PadRowLayout2D& pL = gearTPC.getPadLayout() ;
+  // const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
+  // const gear::PadRowLayout2D& pL = gearTPC.getPadLayout() ;
 
 
-  //====================================================================================
-  // check for duplicate padRows 
-  //====================================================================================
+  // //====================================================================================
+  // // check for duplicate padRows 
+  // //====================================================================================
 
-  if( checkForDuplicatePadRows ) {
+  // if( checkForDuplicatePadRows ) {
 
-    LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
-    oddCol->setSubset( true ) ;
-    // try iterator class ...
+  //   LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
+  //   oddCol->setSubset( true ) ;
+  //   // try iterator class ...
 
-    LCIterator<Track> trIt( evt, colName ) ;
-    while( Track* tr = trIt.next()  ){
+  //   LCIterator<Track> trIt( evt, colName ) ;
+  //   while( Track* tr = trIt.next()  ){
 
       
-      // check for duplicate layer numbers
-      std::vector<int> hitsInLayer( pL.getNRows() ) ; 
-      const TrackerHitVec& thv = tr->getTrackerHits() ;
-      typedef TrackerHitVec::const_iterator THI ;
-      for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
-	TrackerHit* th = *it ;
-	++ hitsInLayer.at( th->ext<HitInfo>()->layerID )   ;
-      } 
-      unsigned nHit = thv.size() ;
-      unsigned nDouble = 0 ;
-      for(unsigned i=0 ; i < hitsInLayer.size() ; ++i ) {
-	if( hitsInLayer[i] > 1 ){
-	  ++nDouble ;
-	  streamlog_out( DEBUG4 ) << " &&&&&&&&&&&&&&&&&&&&&&&&&& duplicate hit in layer : " << i << std::endl ;
-	}
-      }
-      if( double(nDouble) / nHit > _duplicatePadRowFraction ){
-	//if( nDouble  > 0){
-	streamlog_out( DEBUG4 ) << " oddTrackCluster found with "<< 100. * double(nDouble) / nHit 
-				<< "% of double hits " << std::endl ;
-	oddCol->addElement( tr ) ;
-      }
-    }
-    evt->addCollection( oddCol , "OddCluTracks" ) ;
-  }
-  //====================================================================================
-  // check Monte Carlo Truth via SimTrackerHits 
-  //====================================================================================
+  //     // check for duplicate layer numbers
+  //     std::vector<int> hitsInLayer( pL.getNRows() ) ; 
+  //     const TrackerHitVec& thv = tr->getTrackerHits() ;
+  //     typedef TrackerHitVec::const_iterator THI ;
+  //     for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
+  // 	TrackerHit* th = *it ;
+  // 	++ hitsInLayer.at( th->ext<HitInfo>()->layerID )   ;
+  //     } 
+  //     unsigned nHit = thv.size() ;
+  //     unsigned nDouble = 0 ;
+  //     for(unsigned i=0 ; i < hitsInLayer.size() ; ++i ) {
+  // 	if( hitsInLayer[i] > 1 ){
+  // 	  ++nDouble ;
+  // 	  streamlog_out( DEBUG4 ) << " &&&&&&&&&&&&&&&&&&&&&&&&&& duplicate hit in layer : " << i << std::endl ;
+  // 	}
+  //     }
+  //     if( double(nDouble) / nHit > _duplicatePadRowFraction ){
+  // 	//if( nDouble  > 0){
+  // 	streamlog_out( DEBUG4 ) << " oddTrackCluster found with "<< 100. * double(nDouble) / nHit 
+  // 				<< "% of double hits " << std::endl ;
+  // 	oddCol->addElement( tr ) ;
+  //     }
+  //   }
+  //   evt->addCollection( oddCol , "OddCluTracks" ) ;
+  // }
+  // //====================================================================================
+  // // check Monte Carlo Truth via SimTrackerHits 
+  // //====================================================================================
 
-  if( checkForMCTruth ) {
+  // if( checkForMCTruth ) {
  
 
-    LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
-    oddCol->setSubset( true ) ;
+  //   LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
+  //   oddCol->setSubset( true ) ;
 
-    LCCollectionVec* splitCol = new LCCollectionVec( LCIO::TRACK ) ;
-    splitCol->setSubset( true ) ;
+  //   LCCollectionVec* splitCol = new LCCollectionVec( LCIO::TRACK ) ;
+  //   splitCol->setSubset( true ) ;
     
-    typedef std::map<Track* , unsigned > TRKMAP ; 
+  //   typedef std::map<Track* , unsigned > TRKMAP ; 
     
-    typedef std::map< MCParticle* , TRKMAP > MCPTRKMAP ;
-    MCPTRKMAP mcpTrkMap ;
+  //   typedef std::map< MCParticle* , TRKMAP > MCPTRKMAP ;
+  //   MCPTRKMAP mcpTrkMap ;
     
-    typedef std::map< MCParticle* , unsigned > MCPMAP ;
-    MCPMAP hitMap ;
+  //   typedef std::map< MCParticle* , unsigned > MCPMAP ;
+  //   MCPMAP hitMap ;
     
     
-    // if( streamlog_level( DEBUG4) )
-    //   LCTOOLS::printTracks( evt->getCollection("KalTestTracks") ) ;
+  //   // if( streamlog_level( DEBUG4) )
+  //   //   LCTOOLS::printTracks( evt->getCollection("KalTestTracks") ) ;
 
 
-    LCIterator<Track> trIt( evt, colName  ) ;  
-    //    "KalTestTracks" ) ;
-    //    LCIterator<Track> trIt( evt, _outColName ) ;
-    //    LCIterator<Track> trIt( evt, "TPCTracks" ) ;
+  //   LCIterator<Track> trIt( evt, colName  ) ;  
+  //   //    "KalTestTracks" ) ;
+  //   //    LCIterator<Track> trIt( evt, _outColName ) ;
+  //   //    LCIterator<Track> trIt( evt, "TPCTracks" ) ;
 
-    while( Track* tr = trIt.next()  ){
+  //   while( Track* tr = trIt.next()  ){
       
-      MCPMAP mcpMap ;
+  //     MCPMAP mcpMap ;
 
-      const TrackerHitVec& thv = tr->getTrackerHits() ;
-      typedef TrackerHitVec::const_iterator THI ;
+  //     const TrackerHitVec& thv = tr->getTrackerHits() ;
+  //     typedef TrackerHitVec::const_iterator THI ;
 
-      // get relation between mcparticles and tracks
-      for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
+  //     // get relation between mcparticles and tracks
+  //     for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
 
-	TrackerHit* th = *it ;
-	// FIXME:
-	// we know that the digitizer puts the sim hit into the raw hit pointer
-	// but of course the proper way is to go through the LCRelation ...
-	SimTrackerHit* sh = (SimTrackerHit*) th->getRawHits()[0] ;
-	MCParticle* mcp = sh->getMCParticle() ;
+  // 	TrackerHit* th = *it ;
+  // 	// FIXME:
+  // 	// we know that the digitizer puts the sim hit into the raw hit pointer
+  // 	// but of course the proper way is to go through the LCRelation ...
+  // 	SimTrackerHit* sh = (SimTrackerHit*) th->getRawHits()[0] ;
+  // 	MCParticle* mcp = sh->getMCParticle() ;
 
 	
-	hitMap[ mcp ] ++ ;   // count all hits from this mcp
+  // 	hitMap[ mcp ] ++ ;   // count all hits from this mcp
 	
-	mcpMap[ mcp ]++ ;    // count hits from this mcp for this track
+  // 	mcpMap[ mcp ]++ ;    // count hits from this mcp for this track
 	
-	mcpTrkMap[ mcp ][ tr ]++ ;  // map between mcp, tracks and hits
+  // 	mcpTrkMap[ mcp ][ tr ]++ ;  // map between mcp, tracks and hits
 	
-      } 
+  //     } 
 
-      // check for tracks with hits from several mcparticles
-      unsigned nHit = thv.size() ;
-      unsigned maxHit = 0 ; 
-      for( MCPMAP::iterator it= mcpMap.begin() ;
-	   it != mcpMap.end() ; ++it ){
-	if( it->second  > maxHit ){
-	  maxHit = it->second ;
-	}
-      }
+  //     // check for tracks with hits from several mcparticles
+  //     unsigned nHit = thv.size() ;
+  //     unsigned maxHit = 0 ; 
+  //     for( MCPMAP::iterator it= mcpMap.begin() ;
+  // 	   it != mcpMap.end() ; ++it ){
+  // 	if( it->second  > maxHit ){
+  // 	  maxHit = it->second ;
+  // 	}
+  //     }
 
-      if( double(maxHit) / nHit < 0.99 ){ // What is acceptable here ???
-	//if( nDouble  > 0){
-	streamlog_out( MESSAGE ) << " oddTrackCluster found with only "
-				 << 100.*double(maxHit)/nHit 
-				 << "% of hits  form one MCParticle " << std::endl ;
-	oddCol->addElement( tr ) ;
-      }
-    }
-    evt->addCollection( oddCol , "OddMCPTracks" ) ;
+  //     if( double(maxHit) / nHit < 0.95 ){ // What is acceptable here ???
+  // 	//if( nDouble  > 0){
+  // 	streamlog_out( MESSAGE ) << " oddTrackCluster found with only "
+  // 				 << 100.*double(maxHit)/nHit 
+  // 				 << "% of hits  form one MCParticle " << std::endl ;
+  // 	oddCol->addElement( tr ) ;
+  //     }
+  //   }
+  //   evt->addCollection( oddCol , "OddMCPTracks" ) ;
     
     
-    if( checkForSplitTracks ) {
+  //   if( checkForSplitTracks ) {
       
-      streamlog_out( DEBUG ) << " checking for split tracks - mcptrkmap size : " <<  mcpTrkMap.size() << std::endl ;
+  //     streamlog_out( DEBUG ) << " checking for split tracks - mcptrkmap size : " <<  mcpTrkMap.size() << std::endl ;
       
-      // check for split tracks 
-      for( MCPTRKMAP::iterator it0 = mcpTrkMap.begin() ; it0 != mcpTrkMap.end() ; ++it0){
+  //     // check for split tracks 
+  //     for( MCPTRKMAP::iterator it0 = mcpTrkMap.begin() ; it0 != mcpTrkMap.end() ; ++it0){
 	
-	streamlog_out( DEBUG ) << " checking for split tracks - map size : " <<  it0->second.size() << std::endl ;
+  // 	streamlog_out( DEBUG ) << " checking for split tracks - map size : " <<  it0->second.size() << std::endl ;
 	
 	
-	if( it0->second.size() > 1 ) {
+  // 	if( it0->second.size() > 1 ) {
 	  
 	  
-	  typedef std::list< EVENT::Track* > TL ;
-	  TL trkList ;
+  // 	  typedef std::list< EVENT::Track* > TL ;
+  // 	  TL trkList ;
 	  
-	  for( TRKMAP::iterator it1 = it0->second.begin() ; it1 != it0->second.end() ; ++it1){
+  // 	  for( TRKMAP::iterator it1 = it0->second.begin() ; it1 != it0->second.end() ; ++it1){
 	    
-	    double totalHits = hitMap[ it0->first ]  ; // total hits for this track 
+  // 	    double totalHits = hitMap[ it0->first ]  ; // total hits for this track 
 	    
-	    double thisMCPHits = it1->second ;     //  hits from this mcp
+  // 	    double thisMCPHits = it1->second ;     //  hits from this mcp
 	    
-	    double ratio =  thisMCPHits / totalHits  ;
+  // 	    double ratio =  thisMCPHits / totalHits  ;
 	    
-	    streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
-				   << thisMCPHits << " / " << totalHits << " = " << ratio << std::endl ;
+  // 	    streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
+  // 				   << thisMCPHits << " / " << totalHits << " = " << ratio << std::endl ;
 	    
-	    if( ratio > 0.03 && ratio < 0.95 ){
-	      // split track
+  // 	    if( ratio > 0.05 && ratio < 0.95 ){
+  // 	      // split track
 	      
-	      splitCol->addElement( it1->first ) ; 
+  // 	      splitCol->addElement( it1->first ) ; 
 	      
-	      trkList.push_back( it1->first ) ;
-	    } 
-	  }
-	  // chi2 between split track segments :
-	  // for( TRKMAP::iterator ist0 = it0->second.begin() ; ist0 != it0->second.end() ; ++ist0){
+  // 	      trkList.push_back( it1->first ) ;
+  // 	    } 
+  // 	  }
+  // 	  // chi2 between split track segments :
+  // 	  // for( TRKMAP::iterator ist0 = it0->second.begin() ; ist0 != it0->second.end() ; ++ist0){
 	    
-	  //   KalTrack* sptrk0 = ist0->first->ext<KalTrackLink>() ; 
+  // 	  //   KalTrack* sptrk0 = ist0->first->ext<KalTrackLink>() ; 
 	    
-	  //   TRKMAP::iterator ist0_pp = ist0 ;
-	  //   ++ist0_pp ;
+  // 	  //   TRKMAP::iterator ist0_pp = ist0 ;
+  // 	  //   ++ist0_pp ;
 
-	  //   for( TRKMAP::iterator ist1 = ist0_pp ; ist1 != it0->second.end() ; ++ist1){
+  // 	  //   for( TRKMAP::iterator ist1 = ist0_pp ; ist1 != it0->second.end() ; ++ist1){
 	  
-	  //     KalTrack* sptrk1 = ist1->first->ext<KalTrackLink>() ; 
+  // 	  //     KalTrack* sptrk1 = ist1->first->ext<KalTrackLink>() ; 
 	      
-	  //     double chi2 =  KalTrack::chi2( *sptrk0 ,  *sptrk1 ) ;
+  // 	  //     double chi2 =  KalTrack::chi2( *sptrk0 ,  *sptrk1 ) ;
 	      
-	  //     streamlog_out( DEBUG4 ) << " *********************  chi2 between split tracks : "  << chi2 << std::endl 
-	  // 			      << myheader< Track >() << std::endl 
-	  // 			      << lcshort( ist0->first )  << std::endl 
-	  // 			      << lcshort( ist1->first )	 << std::endl ; 
+  // 	  //     streamlog_out( DEBUG4 ) << " *********************  chi2 between split tracks : "  << chi2 << std::endl 
+  // 	  // 			      << myheader< Track >() << std::endl 
+  // 	  // 			      << lcshort( ist0->first )  << std::endl 
+  // 	  // 			      << lcshort( ist1->first )	 << std::endl ; 
 	      
-	  //   }
-	  // }
+  // 	  //   }
+  // 	  // }
 
 
 
-	  streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
+  // 	  streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
 	  
-	  for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
+  // 	  for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
 	    
 	    
-	    //	    KalTrack* trk0 = (*it0)->ext<KalTrackLink>() ; 
+  // 	    //	    KalTrack* trk0 = (*it0)->ext<KalTrackLink>() ; 
 	    
-	    HelixClass hel ;
-	    hel.Initialize_Canonical( (*it0)->getPhi(),
-				      (*it0)->getD0(),
-				      (*it0)->getZ0(),
-				      (*it0)->getOmega(),
-				      (*it0)->getTanLambda(),
-				      3.50 ) ;
+  // 	    HelixClass hel ;
+  // 	    hel.Initialize_Canonical( (*it0)->getPhi(),
+  // 				      (*it0)->getD0(),
+  // 				      (*it0)->getZ0(),
+  // 				      (*it0)->getOmega(),
+  // 				      (*it0)->getTanLambda(),
+  // 				      3.50 ) ;
 	    
-	    streamlog_out( DEBUG1 ) << hel.getXC() << "\t"
-				    << hel.getYC() << "\t"
-				    << hel.getRadius() << "\t" 
-				    << hel.getTanLambda() << std::endl ; 
+  // 	    streamlog_out( DEBUG1 ) << hel.getXC() << "\t"
+  // 				    << hel.getYC() << "\t"
+  // 				    << hel.getRadius() << "\t" 
+  // 				    << hel.getTanLambda() << std::endl ; 
 	    
 	    
-	    // streamlog_out( DEBUG1 ) << (*it0)->getPhi() << "\t"
-	    // 			  << (*it0)->getD0()  << "\t"
-	    // 			  << (*it0)->getOmega()  << "\t"
-	    // 			  << (*it0)->getZ0()  << "\t"
-	    // 			  << (*it0)->getTanLambda()  << "\t"
-	    // 			  << std::endl ;
+  // 	    // streamlog_out( DEBUG1 ) << (*it0)->getPhi() << "\t"
+  // 	    // 			  << (*it0)->getD0()  << "\t"
+  // 	    // 			  << (*it0)->getOmega()  << "\t"
+  // 	    // 			  << (*it0)->getZ0()  << "\t"
+  // 	    // 			  << (*it0)->getTanLambda()  << "\t"
+  // 	    // 			  << std::endl ;
 	    
-	    //	    streamlog_out( DEBUG1 ) << " trk0 : " << *trk0 << std::endl ;
+  // 	    //	    streamlog_out( DEBUG1 ) << " trk0 : " << *trk0 << std::endl ;
 	    
-	    // TL::iterator its = it0 ;
-	    // ++its ;
+  // 	    // TL::iterator its = it0 ;
+  // 	    // ++its ;
 	    
-	    // for( TL::iterator it1 =  its ; it1 != trkList.end() ; ++it1 ){
+  // 	    // for( TL::iterator it1 =  its ; it1 != trkList.end() ; ++it1 ){
 	      
-	    //   KalTrack* trk1 = (*it1)->ext<KalTrackLink>() ; 
+  // 	    //   KalTrack* trk1 = (*it1)->ext<KalTrackLink>() ; 
 	      
-	    //   streamlog_out( DEBUG1 ) << "    - trk0 : " << *trk0 << std::endl ;
-	    //   streamlog_out( DEBUG1 ) << "    - trk1 : " << *trk1 << std::endl ;
+  // 	    //   streamlog_out( DEBUG1 ) << "    - trk0 : " << *trk0 << std::endl ;
+  // 	    //   streamlog_out( DEBUG1 ) << "    - trk1 : " << *trk1 << std::endl ;
 	      
-	    //   double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
+  // 	    //   double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
 	      
-	    //   streamlog_out( DEBUG1 ) << " +++++++++++++++++  chi2 between split tracks : " 
-	    // 			      << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
+  // 	    //   streamlog_out( DEBUG1 ) << " +++++++++++++++++  chi2 between split tracks : " 
+  // 	    // 			      << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
 	      
 	      
-	    // }
-	  }
+  // 	    // }
+  // 	  }
 	  
-	}
-      }
-      evt->addCollection( splitCol , "SplitTracks" ) ;
-    }
+  // 	}
+  //     }
+  //     evt->addCollection( splitCol , "SplitTracks" ) ;
+  //   }
 
-  }
+  // }
   //====================================================================================
 
 }
@@ -1827,12 +1106,29 @@ void ClupatraProcessor::check( LCEvent * evt ) {
 
 void ClupatraProcessor::end(){ 
   
-  //   std::cout << "ClupatraProcessor::end()  " << name() 
-  // 	    << " processed " << _nEvt << " events in " << _nRun << " runs "
-  // 	    << std::endl ;
+  streamlog_out( MESSAGE )  << "ClupatraProcessor::end()  " << name() 
+			    << " processed " << _nEvt << " events in " << _nRun << " runs "
+			    << std::endl ;
   
-  delete _kalTest ;
 }
 
-
 //====================================================================================================
+
+
+
+inline void printSimTrackerHit(const lcio::LCObject* o){
+
+  lcio::SimTrackerHit* hit = const_cast<lcio::SimTrackerHit*> ( dynamic_cast<const lcio::SimTrackerHit*> (o) ) ; 
+  
+  if( hit == 0 ) {
+    
+    streamlog_out( ERROR ) << "  printSimTrackerHit : dynamic_cast<SimTrackerHit*> failed for LCObject : " << o << std::endl ;
+    return  ;
+  }
+  
+  streamlog_out( MESSAGE ) << *hit 
+			   << " MCParticle id: " << hit->getMCParticle()->id() 
+			   << " MCParticle parent id: " 
+			   << ( hit->getMCParticle()->getParent(0) ? hit->getMCParticle()->getParent(0)->id() : -1 ) 
+			   << std::endl ;
+}

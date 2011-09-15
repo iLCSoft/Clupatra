@@ -59,9 +59,9 @@ namespace clupatra{
 	GHit* bestHit = 0 ;
 	
  	for( GHitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){    
-
+	  
 	  GHit* hit = *ih ;
-
+	  
 	  double ch2 = ch2rzh( hit->first , xv )  ;
 	  
  	  if( ch2 < ch2Min ){

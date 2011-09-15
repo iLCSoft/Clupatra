@@ -43,16 +43,16 @@
 
 /** Helper class for defining a filter condition based on the delta chi2 in the AddAndFilter step.
  */
-class KalTrackFilter : public TKalFilterCond{
+class KTFilter : public TKalFilterCond{
 
 public:
   
   /** C'tor - takes as optional argument the maximum allowed delta chi2 for adding the hit (in IsAccepted() )
    */
-  KalTrackFilter(double maxDeltaChi2 = -1.) : _deltaChi2( 0.0 ) , 
+  KTFilter(double maxDeltaChi2 = -1.) : _deltaChi2( 0.0 ) , 
 					      _maxDeltaChi2( maxDeltaChi2 ) {
   } 
-  virtual ~KalTrackFilter() {} 
+  virtual ~KTFilter() {} 
   
   double deltaChi2() { return _deltaChi2 ; }
   
@@ -60,7 +60,7 @@ public:
     
     _deltaChi2 = site.GetDeltaChi2();
     
-    streamlog_out( DEBUG0 ) << " KalTrackFilter::IsAccepted called  !  deltaChi2 = "  <<  _deltaChi2  << std::endl;
+    streamlog_out( DEBUG0  ) << " KTFilter::IsAccepted called  !  deltaChi2 = "  <<  _deltaChi2  << std::endl;
 
     return ( _maxDeltaChi2 > -1. ?  _deltaChi2 < _maxDeltaChi2  : true )   ; 
   }
@@ -287,7 +287,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
   TVTrackHit *hitp = 0;
 
-  KalTrackFilter filter( 35. )   ; //FIXME: make parameter ?
+  KTFilter filter( 35. )   ; //FIXME: make parameter ?
  
   int counter = -1 ;
   while ( (hitp = dynamic_cast<TVTrackHit *>( next() ) ) ) {
@@ -326,7 +326,7 @@ void KalTrack::fitTrack( bool fitDirection ) {
 
 bool KalTrack::addAndFilter( TVTrackHit* hit, double maxDeltaChi2){
   
-  KalTrackFilter filter( maxDeltaChi2 )   ;
+  KTFilter filter( maxDeltaChi2 )   ;
 
   TKalTrackSite* site = new TKalTrackSite( *hit ); // new site
 
@@ -350,7 +350,7 @@ bool KalTrack::addAndFilter( TVTrackHit* hit, double maxDeltaChi2){
 
 double KalTrack::testDeltaChi2( TVTrackHit* hit ){
 
-  KalTrackFilter filter( -0.0 )   ; // filter will always fail
+  KTFilter filter( -0.0 )   ; // filter will always fail
 
   TKalTrackSite* site = new TKalTrackSite( *hit ); // new site
 
