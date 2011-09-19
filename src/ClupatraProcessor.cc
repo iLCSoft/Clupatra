@@ -203,10 +203,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     return ;
   } 
       
-  //------ create clupa and clustering hits for every lcio hit -------------------------------------------------
-
+  //===============================================================================================
+  //   create clupa and clustering hits for every lcio hit
+  //===============================================================================================
+  
   CellIDDecoder<TrackerHit> idDec( col ) ;
-
+  
   int nHit = col->getNumberOfElements() ;
   
   clupaHits.resize( nHit ) ;       // creates clupa hits (w/ default c'tor)
@@ -253,24 +255,45 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   //---------------------------------------------------------------------------------------------------------
 
+  //===============================================================================================
+  //   create some additional (optional) output collections
+  //===============================================================================================
+
   static const bool writeSeedCluster = true ;
   static const bool writeCluTrackSegments = true ;
+  static const bool writeLeftoverClusters = true ;
   
   LCCollectionVec* seedCol =  ( writeSeedCluster      ?  newTrkCol( "SeedCluster"      , evt )  :   0   )  ; 
 
   LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "CluTrackSegments" , evt )  :   0   )  ; 
-  
-  
+
+  LCCollectionVec* locCol  =  ( writeCluTrackSegments ?  newTrkCol( "LeftoverClusters" , evt )  :   0   )  ; 
+    
+  LCCollectionVec* tsCol  =  newTrkCol( "ClupatraTrackSegments" , evt ) ;
+
   LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
   
   //---------------------------------------------------------------------------------------------------------
   
-  // cluster in pad row ranges to find clean cluster segments, statirng from the outside
-  // and then moving in to the next more inside pad row range...
   
+  //===============================================================================================
+  // first main step of clupatra:
+  //   * cluster in pad row range - starting from the outside - to find clean cluster segments
+  //   * extend the track segments with best matching hits, based on extrapolation to next layer(s)
+  //   * add the hits and apply a Kalman filter step ( track segement is always best estimate )
+  //   * repeat in backward direction ( after smoothing back, to get a reasonable track 
+  //     state for extrapolating backwards )
+  //===============================================================================================
+
   Clusterer nncl ;
   
   int outerRow = maxTPCLayers - 1 ;
+
+  nnclu::PtrVector<IMarlinTrack> seedTrks ;
+  seedTrks.setOwner() ;
+  
+  IMarlinTrkFitter fitter( _trksystem ) ;
+
   
   while( outerRow > _padRowRange ) {
     
@@ -286,37 +309,44 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     //-----  cluster in given pad row range  -----------------------------
     Clusterer::cluster_list sclu ;    
     sclu.setOwner() ;  
-
+    
     nncl.cluster( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
     
     if( writeSeedCluster ) {
       std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
     }
-
+    
     // remove clusters whith too many duplicate hits per pad row
     Clusterer::cluster_list bclu ;    // bad clusters  
     bclu.setOwner() ;      
-
+    
     split_list( sclu, std::back_inserter(bclu),  DuplicatePadRows( maxTPCLayers, _duplicatePadRowFraction  ) ) ;
-
-    // free hits from these clusters 
+    
+    // free hits from bad clusters 
     std::for_each( bclu.begin(), bclu.end(), std::mem_fun( &CluTrack::freeElements ) ) ;
-   
-
-    // now fit seed cluster tracks
-    nnclu::PtrVector<IMarlinTrack> seedTrks ;
-    seedTrks.setOwner() ;
-
-    IMarlinTrkFitter fitter( _trksystem ) ;
-    std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+    
+    
+    // ---- now we also need to remove the hits from good cluster seeds from the hitsInLayers:
+    for( Clusterer::cluster_list::iterator sci=sclu.begin(), end= sclu.end() ; sci!=end; ++sci ){
+      for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
 	
-
+	// this is not cheap ...
+	hitsInLayer[ (*ci)->first->layer ].remove( *ci )  ; 
+      }
+    }
+    
+    
+    
+    
+    std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+    
+    
     for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
       
       addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
       
       static const bool backward = true ;
-      addHitsAndFilter( *icv , hitsInLayer , 60. , 300.,  3 , backward ) ; 
+      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
     } 
 
     // merge the good clusters to final list
@@ -329,15 +359,155 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
  
   //---------------------------------------------------------------------------------------------------------
 
-  //  ---- here we have almost complete track segments from the main clupatra algorithm -----  
+  //  ---- store track segments from the first main step  -----  
   if( writeCluTrackSegments )
     std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
 
   //---------------------------------------------------------------------------------------------------------
   
 
+  //===============================================================================================
+  //  do a global reclustering in all leftover hits
+  //===============================================================================================
 
-  //========  create collections of used and unused TPC hits ===========================================
+  Clusterer::cluster_list loclu ; // leftover clusters
+  loclu.setOwner() ;
+  
+  HitVec hits ;
+
+  //  CluTrack debug ;
+  
+  for(unsigned iRow = 0 ; iRow <  maxTPCLayers ; ++iRow ) {
+    
+    std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+
+    //    std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( debug )  ) ;    
+  }
+  
+  nncl.cluster( hits.begin(), hits.end() , std::back_inserter( loclu ),  dist , _minCluSize ) ;
+  
+  //loclu.push_back( &debug ) ;
+
+  if( writeLeftoverClusters )
+    std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
+  
+
+
+  //===============================================================================================
+  //  now we split the clusters based on their hit multiplicities
+  //===============================================================================================
+
+  
+  
+  for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
+    
+    CluTrack* clu = *it ;
+
+    streamlog_out(  DEBUG2 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
+    
+    std::vector<int> mult(5) ; 
+    // get hit multiplicities up to 3 ( 4 means 4 or higher ) 
+    
+    getHitMultiplicities( clu , mult ) ;
+    
+    streamlog_out(  DEBUG2 ) << " **** left over cluster with hit multiplicities: " 
+			     << "     m[0] = " <<  mult[0] << "\n" 
+			     << "     m[1] = " <<  mult[1] << "\n"
+			     << "     m[2] = " <<  mult[2] << "\n"
+			     << "     m[3] = " <<  mult[3] << "\n"
+			     << "     m[4] = " <<  mult[4] << std::endl ;
+    
+    
+    
+    if( float( mult[3]) / mult[0]  >= 0.5 &&  mult[3] >  3 ) {   //FIXME - make parameter
+      
+      Clusterer::cluster_list reclu ; // reclustered leftover clusters
+      reclu.setOwner() ;
+      
+      create_three_clusters( *clu , reclu ) ;
+      
+      std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+      
+      for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	
+	streamlog_out( DEBUG2 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 ) ; 
+	static const bool backward = true ;
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+      } 
+      
+      cluList.merge( reclu ) ;
+    } 
+    
+    else if( float( mult[2]) / mult[0]  >= 0.5 &&  mult[2] >  3 ) {   //FIXME - make parameter
+      
+      Clusterer::cluster_list reclu ; // reclustered leftover clusters
+      reclu.setOwner() ;
+      
+      create_two_clusters( *clu , reclu ) ;
+      
+      std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+      
+      for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	
+	streamlog_out( DEBUG2 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
+	
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 ) ; 
+	static const bool backward = true ;
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+      } 
+      
+      cluList.merge( reclu ) ;
+
+    }
+    else if( float( mult[1]) / mult[0]  >= 0.5 &&  mult[1] >  3 ) {    
+
+
+      fitter( *it ) ;
+
+      cluList.push_back( *it ) ;
+
+      it = loclu.erase( it ) ;
+      --it ; // erase returns iterator to next element 
+
+    } else {
+      
+      //  discard cluster and free hits
+      clu->freeElements() ; 
+    }
+
+  }
+
+
+  //===============================================================================================
+  //  try again to gobble up hits at the ends ....
+  //===============================================================================================
+
+  for( Clusterer::cluster_list::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
+    static const bool backward = true ;
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+  }
+  
+  
+  //===============================================================================================
+  //  now refit the tracks 
+  //===============================================================================================
+
+  nnclu::PtrVector<IMarlinTrack> finalTrks ;
+  finalTrks.setOwner() ;
+  finalTrks.reserve( cluList.size() ) ;
+  
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
+  
+  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
+
+  
+  
+  //===============================================================================================
+  //   create collections of used and unused TPC hits 
+  //===============================================================================================
   
   LCCollectionVec* usedHits   = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
   LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
@@ -355,388 +525,50 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
   }
   
-
-  //---------------------------------------------------------------------------------------------------------
-
   
-  
-  //---------------------------------------------------------------------------------------------------------
-  // the final track collection:
- 
-  // now fit the tracks again
-  nnclu::PtrVector<IMarlinTrack> finalTrks ;
-  finalTrks.setOwner() ;
-  finalTrks.reserve( 256 ) ;
-
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
-  
-  //FIXME:   need to merge segments ....
-
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *outCol ) , converter ) ;
-  
-  //---------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-#ifdef IGNORE_THIS_CODE  //===========================================================================================================
-
-
-  //================================================================================
-  
-  // create vector with left over hits
-  GHitVec leftOverHits ;
-  leftOverHits.reserve(  h.size() ) ;
-  
-  typedef GHitVec::const_iterator GHVI ;
-  
-  for( GHVI it = h.begin(); it != h.end() ; ++it ){
-    
-    if ( (*it)->second == 0 ) leftOverHits.push_back( *it ) ;
-  }
-  
-  // add all hits that failed the rcut 
-  std::copy( hSmallR.begin() , hSmallR.end() , std::back_inserter( leftOverHits )  ) ;
-  
-  
-  //*********************************************************
-  //   run KalTest on track segments (clusters)
-  //*********************************************************
-
-  streamlog_out( DEBUG ) <<  "************* fitted segments and KalTest tracks : **********************************" 
-			 << std::endl ;
-
-
-  for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
-    (*icv)->ext<ClusterInfo>() = new ClusterInfoStruct ;
-  }
-
-  std::list< KalTrack* > ktracks ;
-  
-  //  KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward > fitter( _kalTest ) ;
-  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
-    
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( ktracks ) , fitter ) ;
-  
-  // std::for_each( ktracks.begin(), ktracks.end(), std::mem_fun( &KalTrack::findXingPoints ) ) ;
-  
-  
-  if( streamlog_level( DEBUG4 ) ) {
-    for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
-      GCluster* clu  = *icv ;
-      KalTrack* trk =  clu->ext<ClusterInfo>()->track ;
-      gear::Vector3D xv ;
-      int  layer ;
-      trk->findNextXingPoint(  xv , layer , 1 ) ;
-      
-      clu->ext<ClusterInfo>()->nextXPoint = xv ;
-      clu->ext<ClusterInfo>()->nextLayer = layer ;
-      
-      streamlog_out( DEBUG ) <<  "   ----  FINDNEXTXINGPOINT: "  <<  clu
-			     <<  " next xing point at layer: "   <<  clu->ext<ClusterInfo>()->nextLayer
-			     << " : " <<  clu->ext<ClusterInfo>()->nextXPoint ;
-    }
-  }
-
-  LCCollectionVec* trksegs = new LCCollectionVec( LCIO::TRACK ) ;
-  std::transform( ktracks.begin(), ktracks.end(), std::back_inserter( *trksegs ) , KalTrack2LCIO() ) ;
-  evt->addCollection( trksegs , "KalTrackSegments" ) ;
-
-  
-  
-  //===========  merge track segments based on xing points ==================================================
-  
-  
-  
-  //=========== assign left over hits ... ==================================================================
-  
-
-  //------------- create vector of left over hits per layer
-  GHitListVector hitsInLayer( _kalTest->maxLayerIndex() ) ;
-
-  addToHitListVector(  leftOverHits.begin(), leftOverHits.end() , hitsInLayer ,  _kalTest->indexOfFirstLayer( KalTest::DetID::TPC)  ) ;
-
-
-  for( GClusterVec::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
-
-    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
-
-    static const bool backward = true ;
-    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-  }
-
   //===============================================================================================
-  // recluster in the leftover hits
-  GClusterVec loclu ; // leftover clusters
- 
-  static const bool recluster_left_overs = true ;
-  if( recluster_left_overs ) {
-
-    HitDistance dist(  _distCut ) ;  // FIXME: make parameter 
-
-
-    GHitVec oddHits ;
-    
-    oddHits.clear() ;
-    // add all hits in pad row range to oddHits
-    for(unsigned iRow = 0 ; iRow <  _kalTest->maxLayerIndex()  ; ++iRow ) {
-      
-      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( oddHits )  ) ;
-    }
-    
-    //----- recluster in given pad row range
-    loclu.clear() ;
-    cluster( oddHits.begin(), oddHits.end() , std::back_inserter( loclu ), &dist , _minCluSize ) ;
-    
-    LCCollectionVec* leftOverCol = new LCCollectionVec( LCIO::TRACK ) ;
-    evt->addCollection( leftOverCol , "LeftOverClusters" ) ;
-    std::transform( loclu.begin(), loclu.end(), std::back_inserter( *leftOverCol ) , converter ) ;
-    
-  }
+  //  merge track segements 
   //===============================================================================================
-  // 
-  GClusterVec reclu ; // leftovers reclustered
-
-  static const bool refit_leftover_hits = true ;
-  if( refit_leftover_hits ) {
-
-    //    NearestHitDistance nnDist(0.) ;
- 
-    // compute the hit multiplicities in pad rows
-
-    // use a while loop to remove all clusters at the end (erase the pointer) 
-    GClusterVec::iterator icv = loclu.begin() ; 
-    while( icv != loclu.end() ) {
-
-      GCluster* clu = *icv ;
-
-      
-      GHitListVector hLV( nPadRows )  ;
-      addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
-
-      std::vector<int> mult(6) ;
-
-      for( unsigned i=0 ; i < hLV.size() ; ++i ){
-	unsigned m =  hLV[i].size() ;  
-
-	if( m >= 4 )  m = 4 ;
-
-	++mult[ m ] ;
-	++mult[ 5 ] ;
-      }
-
-      float total = (  mult[1] + mult[2] + mult[3] + mult[4] ) ; 
-      float clumu1 = mult[1] / total ;  
-      float clumu2 = mult[2] / total ;
-      float clumu3 = mult[3] / total ;
-
-      streamlog_out(  DEBUG3 ) << " leftover cluster multiplicities: (0,1,2,3,>=4, all) :  [" 
-			       <<  mult[0] << " , " <<  mult[1] << " , " <<  mult[2] << " , "    
-			       <<  mult[3] << " , " <<  mult[4] << mult[5] << "] "  
-			       << " mult_1 = " << clumu1 
-			       << " mult_2 = " << clumu2  
-			       << std::endl ;    
-
-
-
-
-      // findNearestHits( *clu, nPadRows, 1) ;
-
-      
-
-      if( clumu3 >= 0.5 ) {   //FIXME - make parameter
-	
-
-	//---- get hits from cluster into a vector
-	GHitVec v ;
-	v.reserve( clu->size() ) ;
-	clu->takeHits( std::back_inserter( v )  ) ;
-	
-	
-	create_three_clusters( v , reclu, nPadRows ) ;
-
-	GClusterVec::reverse_iterator iC = reclu.rbegin()  ;
-	GCluster* clu0 = *iC++ ;
-	GCluster* clu1 = *iC++ ;
-	GCluster* clu2 = *iC   ;
-
-	clu0->ext<ClusterInfo>() = new ClusterInfoStruct ;
-	clu1->ext<ClusterInfo>() = new ClusterInfoStruct ;
-	clu2->ext<ClusterInfo>() = new ClusterInfoStruct ;
-
-	KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
-	
-	KalTrack* trk0 = fitter( clu0 ) ;
-	KalTrack* trk1 = fitter( clu1 ) ; 
-	KalTrack* trk2 = fitter( clu2 ) ; 
-	
-	// try to extend the clusters with leftover hits (from layers that do not have two hits)
-	static const bool backward = true ;
-	
-	if( trk0->getNHits() > 3 ) {
-	  addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
-	  addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	}
-
-	if( trk1->getNHits() > 3 ) {
-	  addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
-	  addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	}
-
-	if( trk2->getNHits() > 3 ) {
-	  addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 ) ; 
-	  addHitsAndFilter( clu2 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	}
-
-	delete trk0 ;
-	delete trk1 ;
-	delete trk2 ;
-
-	
-      } if( clumu2 > 0.5 ) {   //FIXME - make parameter
-	
-
-	//---- get hits from cluster into a vector
-	GHitVec v ;
-	v.reserve( clu->size() ) ;
-	clu->takeHits( std::back_inserter( v )  ) ;
-	
-	
-	create_two_clusters( v , reclu, nPadRows ) ;
-
-
-	GClusterVec::reverse_iterator iC = reclu.rbegin()  ;
-	GCluster* clu0 = *iC++ ;
-	GCluster* clu1 = *iC   ;
-
-	clu0->ext<ClusterInfo>() = new ClusterInfoStruct ;
-	clu1->ext<ClusterInfo>() = new ClusterInfoStruct ;
-
-	KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > fitter( _kalTest ) ;
-	
-	KalTrack* trk0 = fitter( clu0 ) ;
-	KalTrack* trk1 = fitter( clu1 ) ; 
-	
-	// try to extend the clusters with leftover hits (from layers that do not have two hits)
-	static const bool backward = true ;
-	
-	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 ) ; 
-	addHitsAndFilter( clu0 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	
-	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 ) ; 
-	addHitsAndFilter( clu1 , hitsInLayer , 35. , 100.,  3 , backward ) ; 
-	
-	delete trk0 ;
-	delete trk1 ;
-
-	
-      } else if( clumu1 > 0.5 ) {
-	
-	// add to final clusters directly
-	reclu.push_back( clu ) ;
-
-      }  else {
-
-	//*********************************************************
-	//FIXME: need treatment for leftover clusters with 'undefined' multicplicity .....
-	//*********************************************************
-
-
-	delete clu ;
-      }
-
-      loclu.erase( icv++ ) ;  // erase all clusters from the list (GClusterVec)
-    }
-
-    // for( GClusterVec::iterator icv = reclu.begin() ; icv != reclu.end() ; ++ icv ) {
-    //   (*icv)->ext<ClusterInfo>() = new ClusterInfoStruct ;
-    // }
-    
-    LCCollectionVec* ccol = new LCCollectionVec( LCIO::TRACK ) ;
-    std::transform( reclu.begin(), reclu.end(), std::back_inserter( *ccol ) , converter ) ;
-    evt->addCollection( ccol , "ReclusteredLeftOvers" ) ;
-    
-    
-    // for now just fit the clusters ...
-    cluList.merge( reclu ) ;
-
-  }
-  //================================================================================================================ 
-  // recluster in the leftover hits
-  GClusterVec loclu2 ; // leftover clusters
- 
-
-  //===============================================================================================
-  //  refit all found tracks 
-  //==============================
-
-
-  std::list< KalTrack* > newKTracks ;
-
-  //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
-
-
-  // adding an IP hit does not work for curler segments - as we fit everything leave out the IP hit
-  //KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
-  //FIXME: DEBUG - non ip fitter
-  KalTestFitter<KalTest::OrderOutgoing, KalTest::FitBackward > ipFitter( _kalTest ) ;
   
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( newKTracks ) , ipFitter  ) ;
-
-
-  LCCollectionVec* kaltracks = new LCCollectionVec( LCIO::TRACK ) ;
-  LCFlagImpl trkFlag(0) ;
-  trkFlag.setBit( LCIO::TRBIT_HITS ) ;
-  kaltracks->setFlag( trkFlag.getFlag()  ) ;
   
-  std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
-  //std::transform( cluList.begin(), cluList.end(), std::back_inserter( *kaltracks ) , converter ) ;
-
-  evt->addCollection( kaltracks , "ClupatraTrackSegments" ) ; 
-  
- 
-  //================================================================================================================ 
-  //   merge track segments based on track parameters and errors ...
-  //
   static const int merge_track_segments = true ;
 
   if( merge_track_segments ) {
 
-    GenericHitVec<Track> trkVec ;
-    GenericClusterVec<Track> trkCluVec ;
-    LCCollectionVec* mergedTracks = new LCCollectionVec( LCIO::TRACK ) ;
-    LCFlagImpl trkFlag(0) ;
-    trkFlag.setBit( LCIO::TRBIT_HITS ) ;
-    mergedTracks->setFlag( trkFlag.getFlag()  ) ;
-  
-    addToGenericHitVec( trkVec , kaltracks ,  AllwaysTrue()  ) ;
+    
+    typedef nnclu::NNClusterer<Track> TrackClusterer ;
+    TrackClusterer nntrkclu ;
 
-    //    TrackStateDistance trkMerge( 1000. ) ;
+    TrackClusterer::element_vector trkVec ;
+    TrackClusterer::cluster_vector trkCluVec ;
+
+
+    std::for_each( tsCol->begin() , tsCol->end() , ComputeTrackerInfo()  ) ;
+    
+    std::transform( tsCol->begin() , tsCol->end() , std::back_inserter( trkVec ) , MakeLCIOElement<Track>() ) ; 
+
     TrackCircleDistance trkMerge( 0.1 ) ; 
 
-    cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), &trkMerge  , 2 ) ;
+    nntrkclu.cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), trkMerge , 2  ) ;
 
 
-    streamlog_out( DEBUG4 ) << " ===== merged tracks - # cluster: " << trkCluVec.size()   << "  ============================== " << std::endl ;
+    streamlog_out( DEBUG3 ) << " ===== merged tracks - # cluster: " << trkCluVec.size()   
+			    << " from " << tsCol->size() << " track segments "    << "  ============================== " << std::endl ;
     
-    for( GenericClusterVec<Track>::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
+    for(  TrackClusterer::cluster_vector::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
       
-      streamlog_out( DEBUG2 ) <<  myheader<Track>() << std::endl ;
+      streamlog_out( DEBUG2 ) <<  lcio::header<Track>() << std::endl ;
       
-      GenericCluster<Track>* trkClu = *it ;
-      
+      TrackClusterer::cluster_type*  trkClu = *it ;
+
       std::list<Track*> mergedTrk ;
-      for( GenericCluster<Track>::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
+      for( TrackClusterer::cluster_type::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
 	
 	streamlog_out( DEBUG2 ) << lcshort(  (*itC)->first ) << std::endl ; 
-	
+
 	mergedTrk.push_back( (*itC)->first ) ; 
       }
+
 
       TrackImpl* trk = new TrackImpl ;
       Track* bestTrk = 0 ;
@@ -779,11 +611,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       trk->subdetectorHitNumbers().push_back( hitCount ) ;  
       trk->subdetectorHitNumbers().push_back( hitsInFit ) ;  
 
-      mergedTracks->addElement( trk )  ;
+      outCol->addElement( trk )  ;
     }
 
     // add all tracks that have not been merged :
-    for( GenericHitVec<Track>::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
+    for( TrackClusterer::element_vector::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
 
       if( (*it)->second == 0 ){
 	
@@ -791,61 +623,24 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
 	
-	mergedTracks->addElement( t ) ;
+	outCol->addElement( t ) ;
       }
     }
     
-    evt->addCollection( mergedTracks , _outColName ) ;
   }
 
-
-  //======================================================================================================
-
- 
-  //========== cleanup KalTracks ========
-  std::for_each( ktracks.begin() , ktracks.end() , delete_ptr<KalTrack> ) ;
-
-  //FIXME: memory leak - need for debugging....
-  std::for_each( newKTracks.begin() , newKTracks.end() , delete_ptr<KalTrack> ) ;
-  //=====================================
-
-
-
-  //========  create collections of used and unused TPC hits ===========================================
-
-  LCCollectionVec* usedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
-  LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
-  usedHits->setSubset() ;
-  unUsedHits->setSubset() ;
-  usedHits->reserve( h.size() ) ;
-  unUsedHits->reserve( h.size() ) ;
-
-  for( GHVI it = h.begin(); it != h.end() ;++it){
-    if( (*it)->second != 0 ){
-      usedHits->push_back( (*it)->first->lcioHit ) ;
-    } else {
-      unUsedHits->push_back( (*it)->first->lcioHit ) ;          
-    }
-  }
-  for( GHVI it = hSmallR.begin(); it != hSmallR.end() ;++it){
-    if( (*it)->second != 0 ){
-      usedHits->push_back( (*it)->first->lcioHit ) ;
-    } else {
-      unUsedHits->push_back( (*it)->first->lcioHit ) ;          
-    }
-  }
-  evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits" ) ;
-  evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
+  // write final output list
+  //std::transform( cluList.begin(), cluList.end(), std::back_inserter( *outCol ) , converter ) ;
   
-  //========================================================================================================
-#endif // IGNORE_THE_CODE  //===========================================================================================================
+  //---------------------------------------------------------------------------------------------------------
+  
   
   _nEvt ++ ;
 
   clock_t end = clock () ; 
   
-  streamlog_out( DEBUG )  << "---  clustering time: " 
- 			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
+  streamlog_out( MESSAGE0 )  << "---  clustering time: " 
+			     <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
   
 }
 

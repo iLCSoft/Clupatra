@@ -1412,8 +1412,8 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   clock_t end = clock () ; 
   
-  streamlog_out( DEBUG )  << "---  clustering time: " 
- 			  <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
+  streamlog_out( MESSAGE0 )  << "---  clustering time: " 
+			     <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
   
 }
 

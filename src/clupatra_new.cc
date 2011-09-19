@@ -12,8 +12,6 @@
 #include "gear/PadRowLayout2D.h"
 //#include "gear/BField.h"
 
-// ----- include for verbosity dependend logging ---------
-#include "marlin/VerbosityLevels.h"
 
 using namespace MarlinTrk ;
 
@@ -73,8 +71,7 @@ namespace clupatra_new{
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
 
     
-    streamlog_out( DEBUG4 ) <<  "  -- addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
-    //			    <<  ( backward ?  *clu->front()->first->lcioHit : *clu->back()->first->lcioHit   )   ;
+    streamlog_out( DEBUG ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
 
 
    if( layer <= 0  || layer >=  maxTPCLayerID   ) 
@@ -105,7 +102,7 @@ namespace clupatra_new{
       int smoothed  = trk->smooth( firstHit ) ;
       //int smoothed  = trk->smooth() ;
 
-     if( backward )   streamlog_out( DEBUG4 ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
+     streamlog_out( DEBUG ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
 
     }
 
@@ -146,11 +143,11 @@ namespace clupatra_new{
 
 
 
-     if( backward )   streamlog_out( DEBUG4 ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
-			      <<  "  Step : " << step 
-			      <<  "  at layer: "   << layer      
-			      <<  "   intersects: " << MarlinTrk::errorCode( intersects )
-			      <<  "  next xing point : " <<  xv  ;
+      streamlog_out( DEBUG ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
+			     <<  "  Step : " << step 
+			     <<  "  at layer: "   << layer      
+			     <<  "   intersects: " << MarlinTrk::errorCode( intersects )
+			     <<  "  next xing point : " <<  xv  ;
       
       
       if( intersects == IMarlinTrack::success ) { // found a crossing point 
@@ -173,10 +170,10 @@ namespace clupatra_new{
  	}//-------------------------------------------------------------------
 	
 
- if( backward ) 	streamlog_out( DEBUG4 ) <<   " ************ bestHit "  << bestHit 
-				<<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
-				<<   " chi2: " <<  ch2Min 
-				<<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
+  	streamlog_out( DEBUG ) <<   " ************ bestHit "  << bestHit 
+			       <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
+			       <<   " chi2: " <<  ch2Min 
+			       <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
 	
  	if( bestHit != 0 ){
 	  
@@ -185,21 +182,20 @@ namespace clupatra_new{
 	  if( ch2Min  < chi2Cut ) { 
 	    
 	    double deltaChi = 0. ;  
-
+	    
 	    int addHit = trk->addAndFit( bestHit->first->lcioHit, deltaChi, dChi2Max ) ;
 	    
-
-
-	    if( backward ) 	    streamlog_out( DEBUG4 ) <<   " *****       assigning left over hit : " << errorCode( addHit ) 
-				      //<< hPos << " <-> " << xv
-							    <<   " dist: " <<  (  hPos - xv ).r()
-							    <<   " chi2: " <<  ch2Min 
-							    <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
-												   + bestHit->first->lcioHit->getCovMatrix()[2] ) 
-							    <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
-							    << std::endl ;
-
-
+	    
+	    
+	    streamlog_out( DEBUG ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
+				   <<   " dist: " <<  (  hPos - xv ).r()
+				   <<   " chi2: " <<  ch2Min 
+				   <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
+									  + bestHit->first->lcioHit->getCovMatrix()[2] ) 
+				   <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
+				   << std::endl ;
+	    
+	    
 
 
 
@@ -214,7 +210,7 @@ namespace clupatra_new{
 	      firstHit = 0 ; // after we added a hit, the next intersection search should use this last hit...
 	      
 	      
- if( backward ) 	      streamlog_out( DEBUG4 ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
+	      streamlog_out( DEBUG ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
 	    }
 	  } // chi2Cut 
 	} // bestHit
@@ -236,7 +232,297 @@ namespace clupatra_new{
 
 
   //------------------------------------------------------------------------------------------------------------
-  //  //-----------------------------------------------------------------
+  void getHitMultiplicities( CluTrack* clu, std::vector<int>& mult ){
+    
+    // int static maxTPCLayerID = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
+    // HitListVector hLV( maxTPCLayerID )  ;
+    // addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
+    
+    std::map<int, unsigned > hm ;
+    
+    for( CluTrack::iterator it=clu->begin(), end =clu->end() ;   it != end ; ++ it ){
+      
+      ++hm[ (*it)->first->layer ] ;
+    }
+
+    unsigned maxN = mult.size() - 1 ;
+
+    //    for( unsigned i=0 ; i < hLV.size() ; ++i ){
+    //      unsigned m =  hLV[i].size() ;  
+      
+    for( std::map<int, unsigned>::iterator it= hm.begin() , end = hm.end() ; it != end ; ++ it ){
+      
+      unsigned m = ( it->second < maxN ?  it->second  :  maxN   ) ;
+      
+      if( m == 0 ) 
+	continue ;
+      
+      ++mult[m] ;
+      
+      ++mult[0] ;
+    }
+  }
+
+
+  //------------------------------------------------------------------------------------------------------------------------- 
+
+  void create_three_clusters( Clusterer::cluster_type& hV, Clusterer::cluster_list& cluVec ) {
+    
+    hV.freeElements() ;
+    
+    int static tpcNRow = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() ; 
+    
+    HitListVector hitsInLayer( tpcNRow )  ; 
+    addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
+    
+    CluTrack* clu[3] ;
+
+    gear::Vector3D lastp[3] ;
+    //    gear::Vector3D cluDir[3] ;
+
+    clu[0] = new CluTrack ;
+    clu[1] = new CluTrack ;
+    clu[2] = new CluTrack ;
+    
+    cluVec.push_back( clu[0] ) ;
+    cluVec.push_back( clu[1] ) ;
+    cluVec.push_back( clu[2] ) ;
+
+       
+    for( int l=tpcNRow-1 ; l >= 0 ; --l){
+      
+      HitList& hL = hitsInLayer[ l ] ;
+      
+      streamlog_out(  DEBUG ) << " create_three_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
+      
+      if( hL.size() != 3 ){
+	
+	continue ;
+      }
+      
+      HitList::iterator iH = hL.begin() ;
+      
+      Hit* h[3] ;
+      h[0] = *iH++ ;
+      h[1] = *iH++   ;
+      h[2] = *iH   ;
+      
+      gear::Vector3D p[3] ;
+      p[0] = h[0]->first->pos ;
+      p[1] = h[1]->first->pos ;
+      p[2] = h[2]->first->pos ;
+      
+      
+      streamlog_out(  DEBUG ) << " create_three_clusters  ---  layer " << l 
+  			      << "  h0 : " << p[0] 
+  			      << "  h1 : " << p[1] 
+  			      << "  h2 : " << p[2] ;
+      //			       << std::endl ;
+      
+      if( clu[0]->empty() ){ // first hit triplet
+	
+  	streamlog_out(  DEBUG ) << " create_three_clusters  --- initialize clusters " << std::endl ;
+	
+  	clu[0]->addElement( h[0] ) ;
+  	clu[1]->addElement( h[1] ) ;
+  	clu[2]->addElement( h[2] ) ;
+	
+  	lastp[0] =  p[0] ;
+  	lastp[1] =  p[1] ;
+  	lastp[2] =  p[2] ;
+	
+  	lastp[0] = ( 1. / p[0].r() ) * p[0] ;
+  	lastp[1] = ( 1. / p[1].r() ) * p[1] ;
+  	lastp[2] = ( 1. / p[2].r() ) * p[2] ;
+	
+  	continue ;  
+      }
+      
+
+      // unit vector in direction of current hits
+      gear::Vector3D pu[3] ;
+      pu[0] = ( 1. / p[0].r() ) * p[0] ;
+      pu[1] = ( 1. / p[1].r() ) * p[1] ;
+      pu[2] = ( 1. / p[2].r() ) * p[2] ;
+      
+
+      std::list< CDot > cDot ; 
+
+      // create list of dot products between last hit in cluster and current hit 
+      // cos( angle between  hits as seen from IP ) 
+      for( int i = 0 ; i < 3 ; ++i ){	         
+  	for( int j = 0 ; j < 3 ; ++j ){
+	  
+  	  // // unit vector in direction of last hit and 
+  	  // gear::Vector3D pu = - ( p[0] - lastp[0] ) ;
+  	  // pu[1] = - ( p[1] - lastp[1] ) ;
+  	  // pu[2] = - ( p[2] - lastp[2] ) ;
+  	  // pu[0] =  (  1. / pu[0].r() ) * pu[0]  ;
+  	  // pu[1] =  (  1. / pu[1].r() ) * pu[1]  ;
+  	  // pu[2] =  (  1. / pu[2].r() ) * pu[2]  ;
+  	  // cDot.push_back( CDot( i , j , cluDir[i].dot( pu[ j ] ) )) ;
+	  
+  	  cDot.push_back( CDot( i , j , lastp[i].dot( pu[ j ] ) )) ;
+	  
+  	}   
+      }   
+      
+      // sort dot products in descending order 
+      cDot.sort( sort_CDot ) ;
+
+      // assign hits to clusters with largest dot product ( smallest angle )
+
+      std::set<int> cluIdx ;
+      std::set<int> hitIdx ;
+
+      for( std::list<CDot>::iterator it = cDot.begin() ; it != cDot.end() ; ++ it ) {
+	
+  	streamlog_out(  DEBUG ) << " I : " << it->I  
+  				<< " J : " << it->J 
+  				<< " d : " << it->Dot 
+  				<< std::endl ;
+	
+  	int i =  it->I ;
+  	int j =  it->J ;
+
+  	// ignore clusters or hits that hvae already been assigned
+  	if( cluIdx.find( i ) == cluIdx.end()  && hitIdx.find( j ) == hitIdx.end() ){
+
+  	  cluIdx.insert( i ) ;
+  	  hitIdx.insert( j ) ;
+
+  	  clu[ i ]->addElement( h[ j ] ) ;
+
+  	  // cluDir[i] = - ( p[j] - lastp[i] ) ;
+  	  // cluDir[i] =  (  1. / cluDir[i].r() ) * cluDir[i]  ;
+
+  	  lastp[i] =  p[j] ;
+
+  	  streamlog_out(  DEBUG ) << " **** adding to cluster : " << it->I  
+  				  << " hit  : " << it->J 
+  				  << " d : " << it->Dot 
+  				  << std::endl ;
+  	}
+	
+      }
+
+      // lastp[0] =  pu[0] ;
+      // lastp[1] =  pu[1] ;
+      // lastp[2] =  pu[2] ;
+      // lastp[0] =  p[0] ;
+      // lastp[1] =  p[1] ;
+      // lastp[2] =  p[2] ;
+      
+      
+    }
+
+
+    streamlog_out(  DEBUG ) << " create_three_clusters  --- clu[0] " << clu[0]->size() 
+  			    <<  " clu[1] " << clu[1]->size() 
+  			    <<  " clu[2] " << clu[2]->size() 
+  			    << std::endl ;
+
+
+
+
+    return ;
+  }
+  //-----------------------------------------------------------------
+
+  void create_two_clusters( Clusterer::cluster_type& clu, Clusterer::cluster_list& cluVec ) {
+    
+
+    clu.freeElements() ;
+    
+    streamlog_out(  DEBUG ) << " create_two_clusters  --- called ! - size :  " << clu.size()  << std::endl ;
+
+    int static tpcNRow = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() ; 
+    
+    HitListVector hitsInLayer( tpcNRow )  ; 
+
+    addToHitListVector(  clu.begin(), clu.end(), hitsInLayer ) ;
+    
+
+    CluTrack* clu0 = new CluTrack ;
+    CluTrack* clu1 = new CluTrack ;
+
+    cluVec.push_back( clu0 ) ;
+    cluVec.push_back( clu1 ) ;
+
+
+    gear::Vector3D lastDiffVec(0.,0.,0.) ;
+    
+    for( int l=tpcNRow-1 ; l >= 0 ; --l){
+
+      HitList& hL = hitsInLayer[ l ] ;
+	
+      streamlog_out(  DEBUG ) << " create_two_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
+
+      if( hL.size() != 2 ){
+	
+  	// if there is not exactly two hits in the layer, we simply copy the unassigned hits to the leftover hit vector
+  	// std::copy( hL.begin(),  hL.end() , std::back_inserter( hV ) ) ;
+  	continue ;
+      }
+
+      HitList::iterator iH = hL.begin() ;
+
+      Hit* h0 = *iH++ ;
+      Hit* h1 = *iH   ;
+      
+      gear::Vector3D& p0 = h0->first->pos ;
+      gear::Vector3D& p1 = h1->first->pos ;
+
+
+      streamlog_out(  DEBUG ) << " create_two_clusters  ---  layer " << l 
+  			      << "  h0 : " << p0 
+  			      << "  h1 : " << p1 ;
+      //			       << std::endl ;
+      
+      if( clu0->empty() ){ // first hit pair
+	
+  	streamlog_out(  DEBUG ) << " create_two_clusters  --- initialize clusters " << std::endl ;
+	
+  	clu0->addElement( h0 ) ;
+  	clu1->addElement( h1 ) ;
+	
+  	lastDiffVec = p1 - p0 ;
+	
+  	continue ;  
+      }
+
+      gear::Vector3D d = p1 - p0 ;
+      
+      float s0 =  ( lastDiffVec + d ).r() ;
+      float s1 =  ( lastDiffVec - d ).r() ;
+      
+      if( s0 > s1 ){  // same orientation, i.e. h0 in this layer belongs to h0 in first layer
+	
+  	streamlog_out(  DEBUG ) << " create_two_clusters  ---   same orientation " << std::endl ;
+  	clu0->addElement( h0 ) ;
+  	clu1->addElement( h1 ) ;
+	
+      } else{                // oposite orientation, i.e. h1 in this layer belongs to h0 in first layer
+
+  	streamlog_out(  DEBUG3 ) << " create_two_clusters  ---  oposite orientation " << std::endl ;
+  	clu0->addElement( h1 ) ;
+  	clu1->addElement( h0 ) ;
+      }
+
+    }
+
+    // clu.freeHits() ;
+
+    streamlog_out(  DEBUG1 ) << " create_two_clusters  --- clu0 " << clu0->size() 
+  			     <<  " clu1 " << clu1->size() << std::endl ;
+
+    // return std::make_pair( clu0 , clu1 ) ;
+
+    return ;
+  }
+
+ //------------------------------------------------------------------------------------------------------------------------- 
+
 
   // /** Find the nearest hits in the previous and next layers - (at most maxStep layers appart - NOT YET).
   //  */
@@ -313,253 +599,6 @@ namespace clupatra_new{
   // //std::pair<CluTrack*, CluTrack* > create_two_clusters( CluTrack& clu,  HitVec& hV,  int maxLayerID){
   // void create_two_clusters( const HitVec& hV, CluTrackVec& cluVec,  int maxLayerID) {
 
-  //   HitListVector hitsInLayer( maxLayerID )  ; 
-  //   //    addToHitListVector(  clu.begin(), clu.end(), hitsInLayer ) ;
-  //   addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
-    
-
-  //   CluTrack* clu0 = new CluTrack ;
-  //   CluTrack* clu1 = new CluTrack ;
-
-  //   cluVec.push_back( clu0 ) ;
-  //   cluVec.push_back( clu1 ) ;
-
-  //   streamlog_out(  DEBUG ) << " create_two_clusters  --- called ! " << std::endl ;
-
-  //   gear::Vector3D lastDiffVec(0.,0.,0.) ;
-    
-  //   for( int l=maxLayerID-1 ; l >= 0 ; --l){
-
-  //     HitList& hL = hitsInLayer[ l ] ;
-	
-  //     streamlog_out(  DEBUG ) << " create_two_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
-
-  //     if( hL.size() != 2 ){
-	
-  // 	// if there is not exactly two hits in the layer, we simply copy the unassigned hits to the leftover hit vector
-  // 	// std::copy( hL.begin(),  hL.end() , std::back_inserter( hV ) ) ;
-  // 	continue ;
-  //     }
-
-  //     HitList::iterator iH = hL.begin() ;
-
-  //     Hit* h0 = *iH++ ;
-  //     Hit* h1 = *iH   ;
-      
-  //     gear::Vector3D& p0 = h0->first->pos ;
-  //     gear::Vector3D& p1 = h1->first->pos ;
-
-
-  //     streamlog_out(  DEBUG ) << " create_two_clusters  ---  layer " << l 
-  // 			      << "  h0 : " << p0 
-  // 			      << "  h1 : " << p1 ;
-  //     //			       << std::endl ;
-      
-  //     if( clu0->empty() ){ // first hit pair
-	
-  // 	streamlog_out(  DEBUG ) << " create_two_clusters  --- initialize clusters " << std::endl ;
-	
-  // 	clu0->addHit( h0 ) ;
-  // 	clu1->addHit( h1 ) ;
-	
-  // 	lastDiffVec = p1 - p0 ;
-	
-  // 	continue ;  
-  //     }
-
-  //     gear::Vector3D d = p1 - p0 ;
-      
-  //     float s0 =  ( lastDiffVec + d ).r() ;
-  //     float s1 =  ( lastDiffVec - d ).r() ;
-      
-  //     if( s0 > s1 ){  // same orientation, i.e. h0 in this layer belongs to h0 in first layer
-	
-  // 	streamlog_out(  DEBUG ) << " create_two_clusters  ---   same orientation " << std::endl ;
-  // 	clu0->addHit( h0 ) ;
-  // 	clu1->addHit( h1 ) ;
-	
-  //     } else{                // oposite orientation, i.e. h1 in this layer belongs to h0 in first layer
-
-  // 	streamlog_out(  DEBUG3 ) << " create_two_clusters  ---  oposite orientation " << std::endl ;
-  // 	clu0->addHit( h1 ) ;
-  // 	clu1->addHit( h0 ) ;
-  //     }
-
-  //   }
-
-  //   // clu.freeHits() ;
-
-  //   streamlog_out(  DEBUG1 ) << " create_two_clusters  --- clu0 " << clu0->size() 
-  // 			     <<  " clu1 " << clu1->size() << std::endl ;
-
-  //   // return std::make_pair( clu0 , clu1 ) ;
-
-  //   return ;
-  // }
-
-  // //------------------------------------------------------------------------------------------------------------------------- 
-
-  // void create_three_clusters( const HitVec& hV, CluTrackVec& cluVec,  int maxLayerID) {
-    
-  //   HitListVector hitsInLayer( maxLayerID )  ; 
-  //   //    addToHitListVector(  clu.begin(), clu.end(), hitsInLayer ) ;
-  //   addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
-    
-  //   CluTrack* clu[3] ;
-
-  //   gear::Vector3D lastp[3] ;
-  //   gear::Vector3D cluDir[3] ;
-
-  //   clu[0] = new CluTrack ;
-  //   clu[1] = new CluTrack ;
-  //   clu[2] = new CluTrack ;
-    
-  //   cluVec.push_back( clu[0] ) ;
-  //   cluVec.push_back( clu[1] ) ;
-  //   cluVec.push_back( clu[2] ) ;
-
-       
-  //   for( int l=maxLayerID-1 ; l >= 0 ; --l){
-
-  //     HitList& hL = hitsInLayer[ l ] ;
-	
-  //     streamlog_out(  DEBUG ) << " create_three_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
-
-  //     if( hL.size() != 3 ){
-	
-  // 	// if there is not exactly two hits in the layer, we simply copy the unassigned hits to the leftover hit vector
-  // 	// std::copy( hL.begin(),  hL.end() , std::back_inserter( hV ) ) ;
-  // 	continue ;
-  //     }
-
-  //     HitList::iterator iH = hL.begin() ;
-
-  //     Hit* h[3] ;
-  //     h[0] = *iH++ ;
-  //     h[1] = *iH++   ;
-  //     h[2] = *iH   ;
-      
-  //     gear::Vector3D p[3] ;
-  //     p[0] = h[0]->first->pos ;
-  //     p[1] = h[1]->first->pos ;
-  //     p[2] = h[2]->first->pos ;
-      
-      
-  //     streamlog_out(  DEBUG ) << " create_three_clusters  ---  layer " << l 
-  // 			      << "  h0 : " << p[0] 
-  // 			      << "  h1 : " << p[1] 
-  // 			      << "  h2 : " << p[2] ;
-  //     //			       << std::endl ;
-      
-  //     if( clu[0]->empty() ){ // first hit triplet
-	
-  // 	streamlog_out(  DEBUG ) << " create_three_clusters  --- initialize clusters " << std::endl ;
-	
-  // 	clu[0]->addHit( h[0] ) ;
-  // 	clu[1]->addHit( h[1] ) ;
-  // 	clu[2]->addHit( h[2] ) ;
-	
-  // 	lastp[0] =  p[0] ;
-  // 	lastp[1] =  p[1] ;
-  // 	lastp[2] =  p[2] ;
-	
-  // 	lastp[0] = ( 1. / p[0].r() ) * p[0] ;
-  // 	lastp[1] = ( 1. / p[1].r() ) * p[1] ;
-  // 	lastp[2] = ( 1. / p[2].r() ) * p[2] ;
-	
-  // 	continue ;  
-  //     }
-
-
-  //     // unit vector in direction of current hits
-  //     gear::Vector3D pu[3] ;
-  //     pu[0] = ( 1. / p[0].r() ) * p[0] ;
-  //     pu[1] = ( 1. / p[1].r() ) * p[1] ;
-  //     pu[2] = ( 1. / p[2].r() ) * p[2] ;
-      
-
-  //     std::list< CDot > cDot ; 
-
-  //     // create list of dot products between last hit in cluster and current hit 
-  //     // cos( angle between  hits as seen from IP ) 
-  //     for( int i = 0 ; i < 3 ; ++i ){	         
-  // 	for( int j = 0 ; j < 3 ; ++j ){
-	  
-  // 	  // // unit vector in direction of last hit and 
-  // 	  // gear::Vector3D pu = - ( p[0] - lastp[0] ) ;
-  // 	  // pu[1] = - ( p[1] - lastp[1] ) ;
-  // 	  // pu[2] = - ( p[2] - lastp[2] ) ;
-  // 	  // pu[0] =  (  1. / pu[0].r() ) * pu[0]  ;
-  // 	  // pu[1] =  (  1. / pu[1].r() ) * pu[1]  ;
-  // 	  // pu[2] =  (  1. / pu[2].r() ) * pu[2]  ;
-  // 	  // cDot.push_back( CDot( i , j , cluDir[i].dot( pu[ j ] ) )) ;
-	  
-  // 	  cDot.push_back( CDot( i , j , lastp[i].dot( pu[ j ] ) )) ;
-	  
-  // 	}   
-  //     }   
-      
-  //     // sort dot products in descending order 
-  //     cDot.sort( sort_CDot ) ;
-
-  //     // assign hits to clusters with largest dot product ( smallest angle )
-
-  //     std::set<int> cluIdx ;
-  //     std::set<int> hitIdx ;
-
-  //     for( std::list<CDot>::iterator it = cDot.begin() ; it != cDot.end() ; ++ it ) {
-	
-  // 	streamlog_out(  DEBUG ) << " I : " << it->I  
-  // 				<< " J : " << it->J 
-  // 				<< " d : " << it->Dot 
-  // 				<< std::endl ;
-	
-  // 	int i =  it->I ;
-  // 	int j =  it->J ;
-
-  // 	// ignore clusters or hits that hvae already been assigned
-  // 	if( cluIdx.find( i ) == cluIdx.end()  && hitIdx.find( j ) == hitIdx.end() ){
-
-  // 	  cluIdx.insert( i ) ;
-  // 	  hitIdx.insert( j ) ;
-
-  // 	  clu[ i ]->addHit( h[ j ] ) ;
-
-  // 	  // cluDir[i] = - ( p[j] - lastp[i] ) ;
-  // 	  // cluDir[i] =  (  1. / cluDir[i].r() ) * cluDir[i]  ;
-
-  // 	  lastp[i] =  p[j] ;
-
-  // 	  streamlog_out(  DEBUG ) << " **** adding to cluster : " << it->I  
-  // 				  << " hit  : " << it->J 
-  // 				  << " d : " << it->Dot 
-  // 				  << std::endl ;
-  // 	}
-	
-  //     }
-
-  //     // lastp[0] =  pu[0] ;
-  //     // lastp[1] =  pu[1] ;
-  //     // lastp[2] =  pu[2] ;
-  //     // lastp[0] =  p[0] ;
-  //     // lastp[1] =  p[1] ;
-  //     // lastp[2] =  p[2] ;
-      
-      
-  //   }
-
-
-  //   streamlog_out(  DEBUG ) << " create_three_clusters  --- clu[0] " << clu[0]->size() 
-  // 			    <<  " clu[1] " << clu[1]->size() 
-  // 			    <<  " clu[2] " << clu[2]->size() 
-  // 			    << std::endl ;
-
-
-
-
-  //   return ;
-  // }
-  // //------------------------------------------------------------------------------------------------------------------------- 
  
   
 }//namespace

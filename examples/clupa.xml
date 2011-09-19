@@ -24,7 +24,7 @@
 		<parameter name="LCIOInputFiles"> recfile.slcio </parameter>
 		<parameter name="GearXMLFile" value="gear_ILD_00.xml" />
 		<parameter name="MaxRecordNumber" value="0" />
-		<parameter name="SkipNEvents" value="0" />
+		<parameter name="SkipNEvents" value="72" />
 		<parameter name="SupressCheck" value="false true false" />
 		<parameter name="Verbosity" value="DEBUG MESSAGE" />
 	</global>
@@ -58,7 +58,7 @@
 	  <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
 
 	  <!--number of pad rows used in initial seed clustering-->
-	  <parameter name="PadRowRange" type="int">12 </parameter>
+	  <parameter name="PadRowRange" type="int">12</parameter>
 
 	  <!--Cut for r_min in mm-->
 	  <parameter name="RCut" type="float">0 </parameter>
@@ -67,7 +67,7 @@
 	  <!--Name of the tpc hit input collections-->
 	  <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">UsedTPCTrackerHits </parameter>
 	  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-	  <parameter name="Verbosity" type="string">DEBUG4 DEBUG </parameter>
+	  <parameter name="Verbosity" type="string">DEBUG3 DEBUG </parameter>
 	</processor>
 
 	<processor name="MyGenericViewer" type="GenericViewer">
@@ -151,7 +151,6 @@
 		  LDCTracksClupa 0 3 3
 		  MergedKalTracks 0 3 6
 		  ReclusteredLeftOvers 0 3 6
-		  LeftOverClustersFinal 0 3 5
 
 		  KalTestTracks 5 1 1
 		  TPCTracks 5 2 2
@@ -169,8 +168,8 @@
 		  TPCTracks 0 3 0
 		  SeedCluster 0 3  1 
 
-		  OddClu_2 0 3  2
-		  OddClu_3 0 3  3 
+		  LeftoverClusters 0 3 2
+
 
 		  ReclusteredLeftOvers 0 3 5
 

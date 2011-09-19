@@ -65,22 +65,12 @@ namespace nnclu {
   } ;
 
 
-
-  // /** Helper vector of Element<T>. When setOwner(true) is called it will take care of memory management, 
-  //  *  i.e. delete all Element<T> objects when it goes out of scope. 
-  //  */
-  // template <class T> 
-  // class ElementVec : public std::vector< Element<T>* > {
-  //   typedef std::vector< Element<T>* > Vector ;
-  //   bool _isOwner ;
-  // public:
-  //   ElementVec() : _isOwner( false ) {}
-  //   ~ElementVec() {
-  //     if( _isOwner ) 
-  //       for( typename ElementVec::iterator i = Vector::begin(),end = Vector::end(); i != end ; delete *i++ ) ; //++i ) delete *i ;
-  //   }
-  //   void setOwner( bool val=true ) { _isOwner = val ; }
-  // };
+  /** Helper class that creates an Elements for an objects of type T.
+   */
+  template <class T>
+  struct MakeElement{  
+    Element<T>  operator()( T* t) { return new Element<T>( t ) ;  }    
+  } ;
 
 
   /** Extension of std::vector that allows to take ownership of objects pointed to and

@@ -17,6 +17,9 @@
 #include "MarlinTrk/IMarlinTrack.h"
 #include "MarlinTrk/IMarlinTrkSystem.h"
 
+// ----- include for verbosity dependend logging ---------
+#include "marlin/VerbosityLevels.h"
+
 
 namespace clupatra_new{
   
@@ -57,6 +60,9 @@ namespace clupatra_new{
   // typedef GenericHitVec<ClupaHit>      GHitVec ;
   // typedef GenericClusterVec<ClupaHit>  GClusterVec ;
   
+  //------------------------------------------------------------------------------------------
+
+  struct MarTrk : lcrtrel::LCExtension<MarTrk, MarlinTrk::IMarlinTrack> {} ;
 
   //------------------------------------------------------------------------------------------
   
@@ -170,11 +176,40 @@ namespace clupatra_new{
 	nHit++ ;
       }
 
-   
+
+      MarlinTrk::IMarlinTrack* mtrk = c->ext<MarTrk>()  ;
+
+      if( mtrk != 0 ){
+
+	lcio::TrackStateImpl* ts =  new lcio::TrackStateImpl ;
+	double chi2 ;
+	int ndf  ;
+	const gear::Vector3D ipv( 0.,0.,0. );
+
+	//	int ret = mtrk->getTrackState( *ts, chi2, ndf ) ;
+
+	// get track state at the IP 
+	int ret = mtrk->propagate( ipv, *ts, chi2, ndf ) ;
+
+	if( ret == MarlinTrk::IMarlinTrack::success ){
+	  
+	  ts->setLocation(  lcio::TrackState::AtIP ) ;
+	  
+	  trk->trackStates().push_back( ts ) ;
+	  trk->setChi2( chi2 ) ;
+	  trk->setNdf( ndf ) ;
+	  
+	} else {
+
+	  // ??
+	}
+
+      }
+
       trk->setdEdx( e/nHit ) ;
       trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
  
-      // FIXME - these are no meaningfull tracks - just a test for clustering tracker hits
+
       return trk ;
     }
 
@@ -224,9 +259,6 @@ namespace clupatra_new{
   
   
 
-  //------------------------------------------------------------------------------------------
-
-  struct MarTrk : lcrtrel::LCExtension<MarTrk, MarlinTrk::IMarlinTrack> {} ;
 
   //------------------------------------------------------------------------------------------
 
@@ -240,6 +272,13 @@ namespace clupatra_new{
       
       MarlinTrk::IMarlinTrack* trk = _ts->createTrack();
       
+      if( clu->empty()  ){
+
+	streamlog_out( ERROR ) << " IMarlinTrkFitter::operator() : cannot fit empty cluster track ! " << std::endl ;
+
+	return trk ;
+      }
+
       // // store mutual pointers between tracks and 'clusters'
       // trk->setCluster<GCluster>( clu ) ;
       // if( !  clu->ext<ClusterInfo>() )
@@ -249,7 +288,7 @@ namespace clupatra_new{
       // 	return trk ;
       //      static HitLayerID tpcLayerID( _ts->indexOfFirstLayer( KalTest::DetID::TPC )  )  ;
       
-
+      
       clu->ext<MarTrk>() = trk ;
       
       clu->sort( LayerSortOut() ) ;
@@ -302,7 +341,199 @@ namespace clupatra_new{
 			 bool backward=false) ; 
   //------------------------------------------------------------------------------------------
 
+  /** Returns the number of rows where cluster clu has i hits in mult[i] for i=1,2,3,4,.... -
+   *  mult[0] counts all rows that have hits
+   */
+  void getHitMultiplicities( CluTrack* clu, std::vector<int>& mult ) ;
+
+  //------------------------------------------------------------------------------------------
+
+  /** Split the cluster into two clusters.
+   */
+  void create_two_clusters( Clusterer::cluster_type& clu, Clusterer::cluster_list& cluVec ) ;
+
+  //------------------------------------------------------------------------------------------
+
+  /** Split the cluster into three clusters.
+   */
+  void create_three_clusters( Clusterer::cluster_type& clu, Clusterer::cluster_list& cluVec ) ;
 
 
+
+
+  //=======================================================================================
+
+  struct TrackInfoStruct{  TrackInfoStruct() : zMin(0.), zAvg(0.), zMax(0.) {}
+    float zMin ;
+    float zAvg ;
+    float zMax ;
+  } ;
+  struct TrackInfo : lcrtrel::LCOwnedExtension<TrackInfo, TrackInfoStruct> {} ;
+
+  /** Helper class to compute track segment properties.
+   */
+  struct ComputeTrackerInfo{ 
+
+    void operator()( lcio::LCObject* o ){ 
+
+      lcio::Track* lTrk  = (lcio::Track*) o ; 
+
+      // compute z-extend of this track segment
+      const lcio::TrackerHitVec& hv = lTrk->getTrackerHits() ;
+      float zMin =  1e99 ;
+      float zMax = -1e99 ;
+      float zAvg =  0. ;
+      for(unsigned i=0; i < hv.size() ; ++i ){
+	
+	float z = hv[i]->getPosition()[2] ;
+	
+	if( z < zMin )   zMin = z ;
+	if( z > zMax )   zMax = z ;
+	
+	zAvg += z ;
+      }
+      zAvg /= hv.size() ;
+      
+      // if( hv.size() >  1 ) {
+      // 	 zMin = hv[            0  ]->getPosition()[2] ;
+      // 	 zMax = hv[ hv.size() -1  ]->getPosition()[2] ;
+      // }
+      
+      if( zMin > zMax ){ // swap 
+	float d = zMax ;
+	zMax = zMin ;
+	zMin = d  ;
+      }
+
+      if( ! lTrk->ext<TrackInfo>() )
+	lTrk->ext<TrackInfo>() =  new TrackInfoStruct ;
+
+      lTrk->ext<TrackInfo>()->zMin = zMin ;
+      lTrk->ext<TrackInfo>()->zMax = zMax ;
+      lTrk->ext<TrackInfo>()->zAvg = zAvg ;
+    }
+  } ;
+  //=======================================================================================
+  
+  /** helper class for merging track segments, based on circle (and tan lambda) */
+  
+  class TrackCircleDistance{
+    
+  public:
+    /** C'tor takes merge distance */
+    TrackCircleDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut){}
+    
+    /** Merge condition: ... */
+    inline bool operator()( nnclu::Element<lcio::Track>* h0, nnclu::Element<lcio::Track>* h1){
+      
+     
+
+      lcio::Track* trk0 = h0->first ;
+      lcio::Track* trk1 = h1->first ;
+      
+      const TrackInfoStruct* ti0 =  trk0->ext<TrackInfo>() ;
+      const TrackInfoStruct* ti1 =  trk1->ext<TrackInfo>() ;
+
+
+      streamlog_out( DEBUG0 ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+			      << "  (  ti0->zAvg > ti1->zAvg ) " << (  ti0->zAvg > ti1->zAvg )
+			      << std::endl ;
+
+
+      // don't allow  overlaps in z !!!!
+      float epsilon = 0. ; 
+      if(  ti0->zAvg > ti1->zAvg ){
+	
+      	if( ti1->zMax > ( ti0->zMin + epsilon )  )
+      	  return false ;
+	
+      } else {
+	
+      	if( ti0->zMax > ( ti1->zMin + epsilon ) )
+      	  return false ;
+	
+      }
+      
+      double tl0 = std::abs( trk0->getTanLambda() ) ;
+      double tl1 = std::abs( trk1->getTanLambda() ) ;
+      
+      double dtl = 2. * std::abs( tl0 - tl1 ) / ( tl0 + tl1 ) ;
+
+      streamlog_out( DEBUG ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+			     << "(  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  ) " << (  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  )
+			     << std::endl ;
+      
+      if(  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  )
+      	return false ;
+      // for very steep tracks (tanL < 0.001 ) tanL might differ largely for curlers due to multiple scattering
+      
+      double r0 = 1. / trk0->getOmega()   ;
+      double r1 = 1. / trk1->getOmega()  ;
+      
+      double r0abs = std::abs( r0 ) ; 
+      double r1abs = std::abs( r1 ) ; 
+      
+
+      double d0 = trk0->getD0() ;
+      double d1 = trk1->getD0() ;
+
+      double z0 = trk0->getZ0() ;
+      double z1 = trk1->getZ0() ;
+
+      double rIP = 20. ; 
+
+      // streamlog_out( DEBUG3 ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+      // 			      << " (  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  && std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     ) " 
+      // 			      << (  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  && std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     )
+      // 			      << std::endl ;
+      
+
+      // // don't merge tracks that come from an area of 20 mm around the IP
+      if(  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  &&
+       	   std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     )
+      	return false ;
+
+      double p0 = trk0->getPhi() ;
+      double p1 = trk1->getPhi() ;
+
+      double x0 = ( r0 - d0 ) * sin( p0 ) ;
+      double x1 = ( r1 - d1 ) * sin( p1 ) ;
+
+      double y0 = ( d0 - r0 ) * cos( p0 ) ;
+      double y1 = ( d1 - r1 ) * cos( p1 ) ;
+    
+      double dr = 2. * std::abs( r0abs - r1abs )  / (r0abs + r1abs )  ;
+
+      double distMS = sqrt ( ( x0 - x1 ) * ( x0 - x1 ) + ( y0 - y1 ) * ( y0 - y1 )  ) ;
+    
+      streamlog_out( DEBUG ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+			     << "( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) " 
+			     << ( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) 
+			     <<  " dr : " << dr 
+			     <<  " _dCut * std::abs( r0 ) " << _dCut * std::abs( r0 )
+			     << " distMS :" << distMS 
+			     << std::endl ;
+      
+      //      return ( dr < DRMAX && distMS < _dCut * std::abs( r0 )  ) ;
+      return ( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) ;
+
+    }
+  
+  protected:
+    float _dCutSquared ;
+    float _dCut ;
+  } ; 
+
+
+  //=======================================================================================
+  
+  /** Helper class that creates an Elements for an LCOjects of type T.
+   */
+  template <class T>
+  struct MakeLCIOElement{  
+    nnclu::Element<T>*  operator()( lcio::LCObject* o) { return new nnclu::Element<T>( (T*) o) ;  }    
+  } ;
+  
+  
 }
 #endif
