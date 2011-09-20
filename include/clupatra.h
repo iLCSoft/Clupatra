@@ -1055,7 +1055,47 @@ namespace clupatra{
 
 
 
+  //==========================================================================================================
 
+  class Timer{
+  public:
+    Timer(){
+      _clocks.reserve( 100 ) ;
+      _names.reserve( 100 ) ;
+      
+      _clocks.push_back(0) ;
+      _names.push_back(  "start"  ) ;
+    }
+    unsigned registerTimer( const std::string& name ){
+      _clocks.push_back(0) ;
+      _names.push_back( name ) ;
+      return _clocks.size() - 1 ;
+    }
+
+    void time(unsigned index){
+      _clocks[ index ] = clock() ;
+    }
+    void start() { time(0) ; }
+
+
+    std::string toString(){
+      
+      std::stringstream s ;
+
+      s << " ============= Timer ================================ "  << std::endl ;
+      unsigned N=_clocks.size() ;
+      for( unsigned i=1 ;  i < N ; ++i){
+	s << "    " << _names[i] << " : " <<  double(_clocks[i] - _clocks[i-1] ) / double(CLOCKS_PER_SEC) << std::endl ;
+      } 
+      s << "         Total  : " <<  double(_clocks[N-1] - _clocks[0] ) / double(CLOCKS_PER_SEC) << std::endl ;
+      s << " ==================================================== "  << std::endl ;
+      
+      return s.str() ;
+    }
+  protected:  
+    std::vector< clock_t> _clocks ;
+    std::vector< std::string > _names ;
+  };
 
 
 

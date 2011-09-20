@@ -2,7 +2,9 @@
 #define clupatra_new_h
 
 #include <cmath>
+#include <time.h>
 #include <math.h>
+#include <sstream>
 #include "assert.h"
 
 #include "NNClusterer.h"
@@ -186,10 +188,14 @@ namespace clupatra_new{
 	int ndf  ;
 	const gear::Vector3D ipv( 0.,0.,0. );
 
-	//	int ret = mtrk->getTrackState( *ts, chi2, ndf ) ;
 
+	//	int ret = mtrk->getTrackState( *ts, chi2, ndf ) ;
 	// get track state at the IP 
-	int ret = mtrk->propagate( ipv, *ts, chi2, ndf ) ;
+	//  fg: this is terribly slow !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//  int ret = mtrk->propagate( ipv, *ts, chi2, ndf ) ;
+	//
+
+	int ret = mtrk->extrapolate( ipv, *ts, chi2, ndf ) ;
 
 	if( ret == MarlinTrk::IMarlinTrack::success ){
 	  
@@ -380,24 +386,26 @@ namespace clupatra_new{
 
       // compute z-extend of this track segment
       const lcio::TrackerHitVec& hv = lTrk->getTrackerHits() ;
+
       float zMin =  1e99 ;
       float zMax = -1e99 ;
       float zAvg =  0. ;
-      for(unsigned i=0; i < hv.size() ; ++i ){
+      // for(unsigned i=0; i < hv.size() ; ++i ){
 	
-	float z = hv[i]->getPosition()[2] ;
+      // 	float z = hv[i]->getPosition()[2] ;
 	
-	if( z < zMin )   zMin = z ;
-	if( z > zMax )   zMax = z ;
+      // 	if( z < zMin )   zMin = z ;
+      // 	if( z > zMax )   zMax = z ;
 	
-	zAvg += z ;
-      }
-      zAvg /= hv.size() ;
-      
-      // if( hv.size() >  1 ) {
-      // 	 zMin = hv[            0  ]->getPosition()[2] ;
-      // 	 zMax = hv[ hv.size() -1  ]->getPosition()[2] ;
+      // 	zAvg += z ;
       // }
+      // zAvg /= hv.size() ;
+      
+      if( hv.size() >  1 ) {
+	zMin = hv[            0  ]->getPosition()[2] ;
+	zMax = hv[ hv.size() -1  ]->getPosition()[2] ;
+	zAvg = ( zMax + zMin ) / 2. ;
+      }
       
       if( zMin > zMax ){ // swap 
 	float d = zMax ;
@@ -535,5 +543,48 @@ namespace clupatra_new{
   } ;
   
   
+  //=======================================================================================
+
+  class Timer{
+  public:
+    Timer(){
+      _clocks.reserve( 100 ) ;
+      _names.reserve( 100 ) ;
+      
+      _clocks.push_back(0) ;
+      _names.push_back(  "start"  ) ;
+    }
+    unsigned registerTimer( const std::string& name ){
+      _clocks.push_back(0) ;
+      _names.push_back( name ) ;
+      return _clocks.size() - 1 ;
+    }
+
+    void time(unsigned index){
+      _clocks[ index ] = clock() ;
+    }
+    void start() { time(0) ; }
+
+
+    std::string toString(){
+      
+      std::stringstream s ;
+
+      s << " ============= Timer ================================ "  << std::endl ;
+      unsigned N=_clocks.size() ;
+      for( unsigned i=1 ;  i < N ; ++i){
+	s << "    " << _names[i] << " : " <<  double(_clocks[i] - _clocks[i-1] ) / double(CLOCKS_PER_SEC) << std::endl ;
+      } 
+      s << "         Total  : " <<  double(_clocks[N-1] - _clocks[0] ) / double(CLOCKS_PER_SEC) << std::endl ;
+      s << " ==================================================== "  << std::endl ;
+
+      return s.str() ;
+    }
+  protected:  
+    std::vector< clock_t> _clocks ;
+    std::vector< std::string > _names ;
+  };
+
+
 }
 #endif

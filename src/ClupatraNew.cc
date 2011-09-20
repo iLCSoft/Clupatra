@@ -143,7 +143,16 @@ void ClupatraNew::processRunHeader( LCRunHeader* run) {
 
 void ClupatraNew::processEvent( LCEvent * evt ) { 
 
-  clock_t start =  clock() ; 
+  //  clock_t start =  clock() ; 
+  Timer timer ;
+  unsigned t_init       = timer.registerTimer(" initialization      " ) ;
+  unsigned t_seedtracks = timer.registerTimer(" extend seed tracks  " ) ;
+  unsigned t_recluster  = timer.registerTimer(" recluster leftovers " ) ;
+  unsigned t_split      = timer.registerTimer(" split clusters      " ) ;
+  unsigned t_finalfit   = timer.registerTimer(" final refit         " ) ;
+  unsigned t_merge      = timer.registerTimer(" merge segments      " ) ;
+  
+  timer.start() ;
 
   GHitVec ghits ;
   ghits.setOwner( true ) ;
@@ -290,6 +299,10 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
 
   int _nRowForSplitting = 10 ; //FIXME:  make proc param
   
+
+  timer.time(t_init ) ; 
+
+
   for( GCVI it = ocs.begin() ; it != ocs.end() ; ++it ){  // loop over all odd clusters ...
     
     GClusterVec sclu ; // new split clusters
@@ -476,6 +489,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   }
   ocs.clear() ;
 
+  timer.time( t_seedtracks ) ;
 
   LCCollectionVec* cluCol = new LCCollectionVec( LCIO::TRACK ) ;
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
@@ -1040,6 +1054,9 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   }
   //===============================================================================================
   // 
+  timer.time( t_recluster ) ;
+
+
   GClusterVec reclu ; // leftovers reclustered
 
   static const bool refit_leftover_hits = true ;
@@ -1206,6 +1223,7 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
     cluList.merge( reclu ) ;
 
   }
+
   //================================================================================================================ 
   // recluster in the leftover hits
   GClusterVec loclu2 ; // leftover clusters
@@ -1245,6 +1263,12 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   //==============================
 
 
+  timer.time( t_split ) ;
+
+  streamlog_out( MESSAGE ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
+
+
+
   std::list< KalTrack* > newKTracks ;
 
   //KalTestFitter<KalTest::OrderIncoming, KalTest::FitForward, KalTest::PropagateToIP > ipFitter( _kalTest ) ;
@@ -1263,8 +1287,11 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   trkFlag.setBit( LCIO::TRBIT_HITS ) ;
   kaltracks->setFlag( trkFlag.getFlag()  ) ;
   
+
   std::transform( newKTracks.begin(), newKTracks.end(), std::back_inserter( *kaltracks ) , KalTrack2LCIO() ) ;
   //std::transform( cluList.begin(), cluList.end(), std::back_inserter( *kaltracks ) , converter ) ;
+
+  timer.time( t_finalfit ) ;
 
   evt->addCollection( kaltracks , "ClupatraTrackSegments" ) ; 
   
@@ -1408,13 +1435,17 @@ void ClupatraNew::processEvent( LCEvent * evt ) {
   
   //========================================================================================================
   
+  timer.time( t_merge ) ;  
+  
   _nEvt ++ ;
-
+  
   clock_t end = clock () ; 
   
-  streamlog_out( MESSAGE0 )  << "---  clustering time: " 
-			     <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
-  
+  // streamlog_out( MESSAGE0 )  << "---  clustering time: " 
+  // 			     <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
+
+  streamlog_out( MESSAGE0 )  <<  timer.toString () << std::endl ;
+ 
 }
 
 

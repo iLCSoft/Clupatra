@@ -49,14 +49,21 @@ using namespace MarlinTrk ;
 using namespace clupatra_new ;
 
 
-inline void printSimTrackerHit(const lcio::LCObject* o) ;
 
+/** helper method cto create a track collections and add it to the event */
 inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt ){
+
   LCCollectionVec* col = new LCCollectionVec( LCIO::TRACK ) ;  
+
+  LCFlagImpl hitFlag(0) ;
+  hitFlag.setBit( LCIO::TRBIT_HITS ) ;
+  col->setFlag( hitFlag.getFlag()  ) ;
+
   evt->addCollection( col , name ) ;
+
   return col ;
 }
-
+//----------------------------------------------------------------
 
 ClupatraProcessor aClupatraProcessor ;
 
@@ -160,7 +167,16 @@ void ClupatraProcessor::processRunHeader( LCRunHeader* run) {
 
 void ClupatraProcessor::processEvent( LCEvent * evt ) { 
   
-  clock_t start =  clock() ; 
+  //  clock_t start =  clock() ; 
+  Timer timer ;
+  unsigned t_init       = timer.registerTimer(" initialization      " ) ;
+  unsigned t_seedtracks = timer.registerTimer(" extend seed tracks  " ) ;
+  unsigned t_recluster  = timer.registerTimer(" recluster leftovers " ) ;
+  unsigned t_split      = timer.registerTimer(" split clusters      " ) ;
+  unsigned t_finalfit   = timer.registerTimer(" final refit         " ) ;
+  unsigned t_merge      = timer.registerTimer(" merge segments      " ) ;
+  
+  timer.start() ;
   
   // the clupa wrapper hits that hold pointers to LCIO hits plus some additional parameters
   // create them in a vector for convenient memeory mgmt 
@@ -192,9 +208,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   unsigned maxTPCLayers =  padLayout.getNRows() ;
   
 
-  LCCollectionVec* col = 0 ;
+  LCCollection* col = 0 ;
 
-  try{   col =  dynamic_cast<LCCollectionVec*> (evt->getCollection( _colName )  ); 
+  try{   col =  dynamic_cast<LCCollection*> (evt->getCollection( _colName )  ); 
     
   } catch( lcio::DataNotAvailableException& e) { 
     
@@ -259,23 +275,25 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //   create some additional (optional) output collections
   //===============================================================================================
 
+
   static const bool writeSeedCluster = true ;
   static const bool writeCluTrackSegments = true ;
   static const bool writeLeftoverClusters = true ;
   
   LCCollectionVec* seedCol =  ( writeSeedCluster      ?  newTrkCol( "SeedCluster"      , evt )  :   0   )  ; 
-
-  LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "CluTrackSegments" , evt )  :   0   )  ; 
-
-  LCCollectionVec* locCol  =  ( writeCluTrackSegments ?  newTrkCol( "LeftoverClusters" , evt )  :   0   )  ; 
-    
-  LCCollectionVec* tsCol  =  newTrkCol( "ClupatraTrackSegments" , evt ) ;
-
-  LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
   
+  LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "CluTrackSegments" , evt )  :   0   )  ; 
+  
+  LCCollectionVec* locCol  =  ( writeCluTrackSegments ?  newTrkCol( "LeftoverClusters" , evt )  :   0   )  ; 
+  
+  LCCollectionVec* tsCol  =  newTrkCol( "ClupatraTrackSegments" , evt ) ;
+  
+  LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
+
   //---------------------------------------------------------------------------------------------------------
   
-  
+  timer.time(t_init ) ; 
+
   //===============================================================================================
   // first main step of clupatra:
   //   * cluster in pad row range - starting from the outside - to find clean cluster segments
@@ -365,6 +383,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   //---------------------------------------------------------------------------------------------------------
   
+  
+  timer.time( t_seedtracks ) ;
 
   //===============================================================================================
   //  do a global reclustering in all leftover hits
@@ -392,6 +412,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
   
 
+
+  timer.time( t_recluster ) ;
 
   //===============================================================================================
   //  now we split the clusters based on their hit multiplicities
@@ -480,6 +502,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   }
 
 
+
+
   //===============================================================================================
   //  try again to gobble up hits at the ends ....
   //===============================================================================================
@@ -491,6 +515,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   }
   
   
+  timer.time( t_split ) ;
+
+  streamlog_out( MESSAGE ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
+
   //===============================================================================================
   //  now refit the tracks 
   //===============================================================================================
@@ -504,6 +532,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
 
   
+  timer.time( t_finalfit) ;
   
   //===============================================================================================
   //   create collections of used and unused TPC hits 
@@ -525,7 +554,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
   }
   
-  
+
   //===============================================================================================
   //  merge track segements 
   //===============================================================================================
@@ -542,6 +571,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     TrackClusterer::element_vector trkVec ;
     TrackClusterer::cluster_vector trkCluVec ;
 
+    trkVec.reserve( tsCol->size()  ) ;
+    trkCluVec.reserve(  tsCol->size() ) ;
 
     std::for_each( tsCol->begin() , tsCol->end() , ComputeTrackerInfo()  ) ;
     
@@ -629,19 +660,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
   }
 
-  // write final output list
-  //std::transform( cluList.begin(), cluList.end(), std::back_inserter( *outCol ) , converter ) ;
-  
   //---------------------------------------------------------------------------------------------------------
+
+
+  timer.time( t_merge ) ;  
   
-  
+  streamlog_out( DEBUG4 )  <<  timer.toString () << std::endl ;
+
   _nEvt ++ ;
 
-  clock_t end = clock () ; 
-  
-  streamlog_out( MESSAGE0 )  << "---  clustering time: " 
-			     <<  double( end - start ) / double(CLOCKS_PER_SEC) << std::endl  ;
-  
 }
 
 
@@ -908,22 +935,3 @@ void ClupatraProcessor::end(){
 }
 
 //====================================================================================================
-
-
-
-inline void printSimTrackerHit(const lcio::LCObject* o){
-
-  lcio::SimTrackerHit* hit = const_cast<lcio::SimTrackerHit*> ( dynamic_cast<const lcio::SimTrackerHit*> (o) ) ; 
-  
-  if( hit == 0 ) {
-    
-    streamlog_out( ERROR ) << "  printSimTrackerHit : dynamic_cast<SimTrackerHit*> failed for LCObject : " << o << std::endl ;
-    return  ;
-  }
-  
-  streamlog_out( MESSAGE ) << *hit 
-			   << " MCParticle id: " << hit->getMCParticle()->id() 
-			   << " MCParticle parent id: " 
-			   << ( hit->getMCParticle()->getParent(0) ? hit->getMCParticle()->getParent(0)->id() : -1 ) 
-			   << std::endl ;
-}
