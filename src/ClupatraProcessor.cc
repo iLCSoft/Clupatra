@@ -316,7 +316,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   while( outerRow > _padRowRange ) {
     
     HitVec hits ;
-    
+    hits.reserve( nHit ) ;
     
     // add all hits in pad row range to hits
     for(int iRow = outerRow ; iRow > ( outerRow - _padRowRange) ; --iRow ) {
@@ -328,7 +328,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     Clusterer::cluster_list sclu ;    
     sclu.setOwner() ;  
     
-    nncl.cluster( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
+    nncl.cluster_sorted( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
     
     if( writeSeedCluster ) {
       std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;

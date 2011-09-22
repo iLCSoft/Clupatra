@@ -4,7 +4,6 @@
 
 #include <list>
 #include <vector>
-#include <map>
 
 #include "LCRTRelations.h"
 
@@ -15,7 +14,14 @@
  */
 namespace nnclu {
   
+   /** fast check if integer is in a given range [Min,Max] */
+  template <unsigned Min,unsigned Max > 
+  inline bool inRange( int i){   return ( (unsigned int) ( i - Min )  <= (unsigned int) ( Max - Min ) ); }
   
+  /** fast check if integer is not in a given range [Min,Max] */
+  template <unsigned Min,unsigned Max >
+  inline bool notInRange( int i){   return ( (unsigned int) ( i - Min )  > (unsigned int) ( Max - Min ) ); }
+
   
   // forward declaration:
   template <class U>
@@ -209,8 +215,8 @@ namespace nnclu {
     typedef Element<T> element_type ; 
     typedef PtrVector< element_type >    element_vector ;
     typedef PtrVector< cluster_type >    cluster_vector ;
-    typedef PtrList< element_type >    element_list ;
-    typedef PtrList< cluster_type >    cluster_list ;
+    typedef PtrList< element_type >      element_list ;
+    typedef PtrList< cluster_type >      cluster_list ;
     
     /** Simple nearest neighbour (NN) clustering algorithm. Users have to provide an input iterator of
      *  Element objects and an output iterator for the clusters found. The predicate has to have 
@@ -221,8 +227,6 @@ namespace nnclu {
   
     template <class In, class Out, class Pred > 
     void cluster( In first, In last, Out result, Pred& pred , const unsigned minSize=1) {
-    
-      // typedef typename Pred::element_type ElementType ;
     
       cluster_vector tmp ; 
       tmp.reserve( 1024 ) ;
@@ -260,16 +264,12 @@ namespace nnclu {
               }
             }
           
-          } // dCut 
-          //       ++j ;
+          }
         }
-        //     ++i ;
         ++first ;
       }
     
       // remove empty clusters 
-      //   std::remove_copy_if( tmp.begin() , tmp.end() , result , &empty_list< Cluster<ElementType > > ) ;
-    
       for( typename cluster_vector::iterator i = tmp.begin(); i !=  tmp.end() ; i++ ){
       
         if( (*i)->size() > minSize-1 ) {
@@ -284,7 +284,73 @@ namespace nnclu {
     }
 
 
+    /** Same as above - but requires the elements to be sorted in index0 (only compare neighbouring bins in index0). */
+
+    template <class In, class Out, class Pred > 
+    void cluster_sorted( In first, In last, Out result, Pred& pred , const unsigned minSize=1) {
+ 
+
+      cluster_vector tmp ; 
+      tmp.reserve( 1024 ) ;
+      
+      while( first != last ) {
+        
+        for( In other = first+1 ;   other != last ; other ++ ) {
+          
+          // if the elements are sorted we can skip the rest of the inner loop
+          if( notInRange<-1,1>(   (*first)->Index0 - (*other)->Index0  )   ) 
+            break ;
+
+          if( pred( (*first) , (*other) ) ) {
+            
+            if( (*first)->second == 0 && (*other)->second == 0 ) {  // no cluster exists
+              
+              //             Cluster<ElementType >* cl = new Cluster<ElementType >( (*first) ) ;
+              cluster_type* cl = new cluster_type( (*first) ) ;
+              
+              cl->addElement( (*other) ) ;
+              
+              tmp.push_back( cl ) ;
+              
+            }
+            else if( (*first)->second != 0 && (*other)->second != 0 ) { // two clusters
+              
+              if(  (*first)->second != (*other)->second )  // don't call merge on identical clusters
+                (*first)->second->mergeClusters( (*other)->second ) ;
+              
+            } else {  // one cluster exists
+              
+              if( (*first)->second != 0 ) {
+                
+                (*first)->second->addElement( (*other)  ) ;
+                
+              } else {                           
+                
+                (*other)->second->addElement( (*first)  ) ;
+              }
+            }
+            
+          }
+        }
+        ++first ;
+      }
+      
+      // remove empty clusters 
+      for( typename cluster_vector::iterator i = tmp.begin(); i !=  tmp.end() ; i++ ){
+        
+        if( (*i)->size() > minSize-1 ) {
+          
+          result++ = *i ;
+        } 
+        else {  
+          
+          delete *i ; 
+        }
+      }
+    }
+
   };
+  //-----------------------------------------------------------------------------------------------------------------------
 
 
 
@@ -311,339 +377,11 @@ namespace nnclu {
   
   
 
-  // /** Same as above - but requires the elements to be sorted in index0 (only compare neighbouring bins in index0). */
-  // template <class In, class Out, class Pred > 
-  // void cluster_sorted( In first, In last, Out result, Pred* pred , const unsigned minSize=1) {
-  
-  //   typedef typename In::value_type ElementPtr ;
-  //   typedef typename Pred::element_type ElementType ;
-  
-  //   typedef std::vector< Cluster<ElementType >* >  ClusterList ;
-  
-  //   ClusterList tmp ; 
-  //   tmp.reserve( 1024 ) ;
-  
-  //   //   int i(0),j(0) ;
 
-  //   while( first != last ) {
+  //-----------------------------------------------------------------------------------------------------------------------
 
-  //     //     j=i+1 ;
-
+} // namespace nnclu
  
-  //     for( In other = first+1 ;   other != last ; other ++ ) {
-
-      
-  //       if( notInRange<-1,1>(   (*first)->Index0 - (*other)->Index0  )   ) 
-  //          break ;
-
-
-  //       if( pred->mergeElements( (*first) , (*other) ) ) {
-	
-  //         if( (*first)->second == 0 && (*other)->second == 0 ) {  // no cluster exists
-	  
-  //           Cluster<ElementType >* cl = new Cluster<ElementType >( (*first) ) ;
-
-  //           cl->addElement( (*other) ) ;
-	  
-  //           tmp.push_back( cl ) ;
-
-  //         }
-  //         else if( (*first)->second != 0 && (*other)->second != 0 ) { // two clusters
-	  
-  //           if(  (*first)->second != (*other)->second )  // don't call merge on identical clusters
-  //             (*first)->second->mergeClusters( (*other)->second ) ;
-	  
-  //         } else {  // one cluster exists
-	  
-  //           if( (*first)->second != 0 ) {
-	    
-  //             (*first)->second->addElement( (*other)  ) ;
-	    
-  //           } else {                           
-	    
-  //             (*other)->second->addElement( (*first)  ) ;
-  //           }
-  //         }
-	
-  //       } // dCut 
-  //       //       ++j ;
-  //     }
-  //     //     ++i ;
-  //     ++first ;
-  //   }
-
-  //   // remove empty clusters 
-  //   //   std::remove_copy_if( tmp.begin() , tmp.end() , result , &empty_list< Cluster<ElementType > > ) ;
-
-  //   for( typename ClusterList::iterator i = tmp.begin(); i !=  tmp.end() ; i++ ){
-
-  //     if( (*i)->size() > minSize-1 ) {
-
-  //       result++ = *i ;
-  //     } 
-  //     else {  
-
-  //       delete *i ; 
-  //     }
-  //   }
-  // }
-
-
-
-
-
-  // /** Helper method that copies all element pointers from an LCIO collection that fullfill the predicate to
-  //  *  a ElementVec. The predicate can either be a bool funtion or functor that takes a T*, e.g.
-  //  *  @see EnergyCut
-  //  */
-  // template <class T, class Pred> 
-  // void addToElementVec(ElementVec<T>& v, EVENT::LCCollection* col, Pred pred ){
-
-  //   for( int i=0 ; i < col->getNumberOfElements() ; i++ ){
-
-  //     T* element = dynamic_cast<T*>( col->getElementAt( i) ) ;
-
-  //     if( pred( element ) ){
-
-  //       v.push_back( new Element<T>( element ) ) ;
-  //     }
-  //   }
-  // } 
-  // /** Same as addToElementVec(ElementVec<T>& v, LCCollection* col, Pred pred ) except that
-  //  *  an additional order function/functor can be given that defines the index of the element, e.g.
-  //  *  @see ZIndex.
-  //  */
-  // template <class T, class Pred, class Order> 
-  // void addToElementVec(ElementVec<T>& v, EVENT::LCCollection* col, Pred pred , Order order ){
-
-  //   for( int i=0 ; i < col->getNumberOfElements() ; i++ ){
-
-  //     T* element = dynamic_cast<T*>( col->getElementAt( i) ) ;
-
-  //     if( pred( element ) ){
-
-  //       v.push_back( new Element<T>( element , order(element) ) ) ;
-  //     }
-  //   }
-  // } 
-
-  // /** Same as addToElementVec(ElementVec<T>& v, LCCollection* col, Pred pred ) except that
-  //  *  no LCIO collection but an iterator pair is given. If no order index is needed, use NullIndex.
-  //  */
-  // template <class T, class Pred, class Order, class In> 
-  // void addToElementVec(ElementVec<T>& v, In first, In last, Pred pred , Order order ){
-
-  //   while( first != last ){
-    
-  //     T* element = *first++  ;
-
-  //     if( pred( element) ){
-  //       v.push_back( new Element<T>( element , order(element) ) ) ;
-  //     }
-  //   }
-  // } 
-  // // /** Helper method that copies all element pointers from a container of LCIO objects that fullfill the predicate to
-  // //  *  a ElementVec. The predicate can either be a bool funtion or functor that takes a T*, e.g.
-  // //  *  @see EnergyCut
-  // //  */
-  // // template <class T, class IT, class Pred> 
-  // // void copyToElementVec(ElementVec<T>& v, IT start, IT end,  Pred pred ){
-  // //   for(IT it = start; it != end ; ++it ){
-  // //     T* element = (T*) *(it) ;
-  // //     if( pred( element ) ){
-  // //       v.push_back( new Element<T>( element ) ) ;
-  // //     }
-  // //   } 
-  // // }
-
-
-
-  // /** Helper vector of Cluster<T> taking care of memory management.
-  //  * It is the users responsibility that various instances of this class do not
-  //  * contain duplicate entries and that no elements are removed from the list
-  //  * w/o being deleted or added to another list.
-  //  */
-  // template <class T> 
-  // class cluster_vector : public std::list< Cluster<T>* > {
-  //   typedef std::list< Cluster<T>* > List ;
-  // public:
-  //   ~cluster_vector() {
-  //     //static int c=0 ;
-  //     for( typename cluster_vector::iterator i = List::begin() ; i != List::end() ; i++) {
-      
-  // //       std::cout << " --- deleting cluster at : " << std::hex << *i << ", " 
-  // //                 << std::dec<< c++ 
-  // //                 << " - size: " << (*i)->size()
-  // //                 << " ID: " <<  (*i)->ID 
-  // //                 << std::endl ;
-  //       delete *i ;
-  //     }
-  //   }
-
-  //   void clear() {
-  // //     for( typename cluster_vector::iterator i = List::begin() ; i != List::end() ; i++) {
-  // //       delete *i ;
-  // //     }
-  //     std::list< Cluster<T>* >::clear() ;
-  //   }
-  // };
-
-
-  // /** Simple predicate class for NN clustering. Requires 
-  //  *  PosType* ElementClass::getPosition(), e.g for CalorimeterElements use: <br>
-  //  *  NNDistance<CalorimeterElement,float> dist( myDistCut ) ; 
-  //  */
-  // template <class ElementClass, typename PosType > 
-  // class NNDistance{
-  // public:
-
-  //   /** Required typedef for cluster algorithm 
-  //    */
-  //   typedef ElementClass element_type ;
-
-  //   /** C'tor takes merge distance */
-  //   NNDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
-
-
-  //   /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
-  //   inline bool mergeElements( Element<ElementClass>* h0, Element<ElementClass>* h1){
-    
-  //     if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
-
-  //     const PosType* pos0 =  h0->first->getPosition() ;
-  //     const PosType* pos1 =  h1->first->getPosition() ;
-    
-  //     return 
-  //       ( pos0[0] - pos1[0] ) * ( pos0[0] - pos1[0] ) +
-  //       ( pos0[1] - pos1[1] ) * ( pos0[1] - pos1[1] ) +
-  //       ( pos0[2] - pos1[2] ) * ( pos0[2] - pos1[2] )   
-  //       < _dCutSquared ;
-  //   }
-  
-  // protected:
-  //   NNDistance() ;
-  //   float _dCutSquared ;
-  //   float _dCut ;
-  // } ;
-
-
-  // /** Simple predicate class for applying an energy cut to the objects of type T.
-  //  *  Requires float/double T::getEnergy().
-  //  */
-  // template <class T>
-  // class EnergyCut{
-  // public:
-  //   EnergyCut( double eCut ) : _eCut( eCut ) {}  
-
-  //   inline bool operator() (T* element) {  return element->getEnergy() > _eCut ; }
-
-  // protected:
-
-  //   EnergyCut() {} ;
-  //   double _eCut ;
-  // } ;
-
-
-  // /** Simple predicate class for computing an index from N bins of the z-coordinate of LCObjects
-  //  *  that have a float/double* getPostion() method.
-  //  */
-  // template <class T, int N>
-  // class ZIndex{
-  // public:
-  //   /** C'tor takes zmin and zmax - NB index can be negative and larger than N */
-  //   ZIndex( float zmin , float zmax ) : _zmin( zmin ), _zmax( zmax ) {}  
-
-  //   inline int operator() (T* element) {  
-
-  //     return (int) std::floor( ( element->getPosition()[2] - _zmin ) / ( _zmax - _zmin ) * N ) ; 
-  //   }
-
-  // protected:
-
-  //   ZIndex() {} ;
-  //   float _zmin ;
-  //   float _zmax ;
-  // } ;
-
-  // /** Simple predicate class for 'computing' a NULL index.
-  //  */
-  // //template <class T>
-  // struct NullIndex{
-  //   inline int operator() (void* element) {  
-  //     return 0 ;
-  //   }
-  // };
-
-  // struct AllwaysTrue{
-  //   inline int operator() (void* element) {  return true ; }  
-  // };
-
-  // /** Helper class that creates an lcio::Cluster from a generic cluster with element types that have a 
-  //  *  getPosition() and a getEnergy() method.
-  //  */
-  // template <class T>
-  // struct LCIOCluster{
-
-  //   inline lcio::Cluster* operator() (Cluster<T>* c) {  
-    
-  //     IMPL::ClusterImpl* clu = new IMPL::ClusterImpl ;
-    
-  //     unsigned n = c->size() ;
-  //     unsigned i=0 ;
-
-  //     float a[n], x[n], y[n], z[n] ;
-
-  //     for( typename Cluster<T>::iterator hi = c->begin(); hi != c->end() ; hi++) {
-      
-  //       T* element = (*hi)->first ;  
-
-  //       a[i] = element->getEnergy() ;
-  //       x[i] = element->getPosition()[0] ;
-  //       y[i] = element->getPosition()[1] ;
-  //       z[i] = element->getPosition()[2] ;
-
-  //       clu->addElement( element , a[i] ) ;
-      
-  //       ++i ;
-  //     }
-    
-  //     ClusternShapes cs( n,a,x,y,z) ;
-
-  //     clu->setEnergy( cs.getTotalAmplitude()  ) ;
-  //     clu->setPosition( cs.getCenterOfGravity() ) ;
-
-  //     // direction of cluster's PCA
-  //     float* d = cs.getEigenVecInertia() ;
-
-  //     Hep3Vector v( d[0], d[1], d[2] ) ;
-    
-  //     clu->setITheta( v.theta() )  ;
-  //     clu->setIPhi(   v.phi() ) ;
-  
-  //     std::vector<float> param(5) ;
-
-  //     //     float* ev = cs.getEigenValInertia() ;
-  //     //     param[0] = ev[0] ;
-  //     //     param[1] = ev[1] ;
-  //     //     param[2] = ev[2] ;
-
-  //     param[0] = cs.getElipsoid_r1() ;
-  //     param[1] = cs.getElipsoid_r2() ;
-  //     param[2] = cs.getElipsoid_r3() ;
-  //     param[3] = cs.getElipsoid_vol() ;
-  //     param[4] = cs.getWidth() ;
-
-  //     clu->setShape( param ) ;
-
-  //     return clu ;
-
-  //   }
-
-  // } ;
-
-}
-
-
 #endif
 
 

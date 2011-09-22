@@ -152,20 +152,28 @@ namespace clupatra_new{
       
       if( intersects == IMarlinTrack::success ) { // found a crossing point 
 	
+	//FIXME: this is copied from ClupatraProcessor 
+	static const int ZBins = 160 ; 
+	ZIndex zIndex( -2750. , 2750. ,ZBins  ) ; 
+	int zIndCP = zIndex.index( xv[2] ) ;
+
  	HitList& hLL = hLV.at( layer ) ;
 	
 	double ch2Min = 1.e99 ;
 	Hit* bestHit = 0 ;
-	for( HitList::const_iterator ih = hLL.begin() ; ih != hLL.end() ; ++ih ){    
+
+	for( HitList::const_iterator ih = hLL.begin(), end = hLL.end() ; ih != end ; ++ih ){    
+
+	  // if the z indices differ by more than one we can continue
+	  if( nnclu::notInRange<-1,1>(  (*ih)->first->zIndex - zIndCP ) ) 
+	    continue ;
 	  
-	  Hit* hit = *ih ;
+	  double ch2 = ch2rzh( (*ih)->first , xv )  ;
 	  
-	  double ch2 = ch2rzh( hit->first , xv )  ;
-	  
- 	  if( ch2 < ch2Min ){
-	    
- 	    ch2Min = ch2 ;
- 	    bestHit = hit ;
+	  if( ch2 < ch2Min ){
+
+	    ch2Min = ch2 ;
+ 	    bestHit = (*ih) ;
  	  }
  	}//-------------------------------------------------------------------
 	
@@ -327,9 +335,9 @@ namespace clupatra_new{
   	clu[1]->addElement( h[1] ) ;
   	clu[2]->addElement( h[2] ) ;
 	
-  	lastp[0] =  p[0] ;
-  	lastp[1] =  p[1] ;
-  	lastp[2] =  p[2] ;
+  	// lastp[0] =  p[0] ;
+  	// lastp[1] =  p[1] ;
+  	// lastp[2] =  p[2] ;
 	
   	lastp[0] = ( 1. / p[0].r() ) * p[0] ;
   	lastp[1] = ( 1. / p[1].r() ) * p[1] ;

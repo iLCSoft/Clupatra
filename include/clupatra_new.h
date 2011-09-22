@@ -82,6 +82,8 @@ namespace clupatra_new{
       return (int) std::floor( ( hit->getPosition()[2] - _zmin ) / ( _zmax - _zmin ) * _N ) ; 
     }
     
+    inline int index( double z) {  return  (int) std::floor( ( z - _zmin ) / ( _zmax - _zmin ) * _N ) ;  } 
+
   protected:
     ZIndex() {} ;
     float _zmin ;
@@ -189,12 +191,10 @@ namespace clupatra_new{
 	const gear::Vector3D ipv( 0.,0.,0. );
 
 
-	//	int ret = mtrk->getTrackState( *ts, chi2, ndf ) ;
 	// get track state at the IP 
-	//  fg: this is terribly slow !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//  fg: propagate is quite slow  and not really needed for the TPC
 	//  int ret = mtrk->propagate( ipv, *ts, chi2, ndf ) ;
-	//
-
+	//  
 	int ret = mtrk->extrapolate( ipv, *ts, chi2, ndf ) ;
 
 	if( ret == MarlinTrk::IMarlinTrack::success ){

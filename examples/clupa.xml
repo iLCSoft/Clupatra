@@ -9,15 +9,15 @@
                 <XXif condition="MyEventSelector">
 	        <processor name="MyEventSelector"/>
 		</XXif>
-		<processor name="MyAIDAProcessor" />
+		<Xprocessor name="MyAIDAProcessor" />
 
 		<processor name="MyFixCellIDs"/>
 		<processor name="MyClupatraProcessor" />
 		<Xprocessor name="MyFullLDCTracking" />
 		<Xprocessor name="MyMyProcessor" />
 		<Xprocessor name="MyGenericViewer" />
-		<processor name="MyCEDViewer" />
-		<processor name="MyLCIOOutputProcessor" />
+		<Xprocessor name="MyCEDViewer" />
+		<Xprocessor name="MyLCIOOutputProcessor" />
 	</execute>
 
 	<global>
@@ -58,7 +58,7 @@
 	  <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
 
 	  <!--number of pad rows used in initial seed clustering-->
-	  <parameter name="PadRowRange" type="int">12</parameter>
+	  <parameter name="PadRowRange" type="int">15</parameter>
 
 	  <!--Cut for r_min in mm-->
 	  <parameter name="RCut" type="float">0 </parameter>
