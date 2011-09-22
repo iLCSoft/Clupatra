@@ -13,18 +13,20 @@
 
 
 ------------------------------------------------------------
- - current version of algorithm ( May, 2011)
+ 
 
-   ClupatraNew.cc
+
+- current version of algorithm ( Sep, 2011)
+
+   ClupatraProcessor.cc
 
  - fill histos for track finding efficiencies
    TrackEfficiency.cc
-   
-    
+       
 
   steering files in ./examples
  
-   clupaNew.xml
+   clupa.xml
       - do patrec and display result in CED
 
    clupa_ana.xml 
@@ -41,9 +43,27 @@
 
 
  =============================================================================================================
+  --------
+ | v00-02 |
+  -------- 
+      - NNClusterer.h : re-factoring of NNCluster code
+         - clearer type definitions 
+         - use Element and Cluster (as oposed to GenericHits/GenericClusters)
+         - clearer memory management
+            - classes PtrVector and PtrList: user defines ownership
+         - introduced NNClusterer class to collect cluster functions and
+          conveneient typedefs
 
- 
- --------
+      - clupatra_new.cc :   re-factoring of clupatra helper code
+          using new NNClusterer      
+
+      - rewrote ClupatraProcessor to use clupatra_new and NNClusterer and
+        MarlinTrk package
+         => KalTest/KalTrack and KalDet like classes no longer needed
+
+      - old classs and code still left for comparisons ....
+        
+  --------
  | v00-01 |
   -------- 
         *  first tagged version 

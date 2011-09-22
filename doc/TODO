@@ -2,8 +2,3 @@
     TO DO
     -----
 
-   - iterate once more over clusters with duplicate pad rows .....
- 
-   - cluster on circle fits 
-
-   - make mergeHits() operator() 

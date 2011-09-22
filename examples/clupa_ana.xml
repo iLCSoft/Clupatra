@@ -32,24 +32,34 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
     <parameter name="Verbosity" value="MESSAGE" />
   </global>
   
-  <processor name="MyClupatraProcessor" type="ClupatraNew">
-    <parameter name="Verbosity" value="MESSAGE DEBUG" />
-    <!--ClupatraProcessor : simple nearest neighbour clustering-->
-    <!--Name of the input collections-->
-    <parameter name="HitCollections" type="string" lcioInType="TrackerHit"> UsedTPCTrackerHits </parameter>
-    <!--Name of the output collections-->
-    <parameter name="OutputCollection" type="string"
-	       lcioOutType="Track"> ClupatraTracks </parameter>
+  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
+    <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
     <!--Cut for distance between hits in mm-->
-    <parameter name="DistanceCut" type="float" value="40" />
-    <!--fraction of hits in same pad row per track-->
-    <parameter name="DuplicatePadRowFraction" type="float"  value="0.10" />
-    <!--Minimum number of hits per cluster-->
-    <parameter name="MinimumClusterSize" type="int" value="6" />
+    <parameter name="DistanceCut" type="float">40 </parameter>
+    <!--allowed fraction of hits in same pad row per track-->
+    <parameter name="DuplicatePadRowFraction" type="float">0.1 </parameter>
+    <!--Use Energy Loss in Fit-->
+    <parameter name="EnergyLossOn" type="bool">true </parameter>
+    <!--minimum number of hits per cluster-->
+    <parameter name="MinimumClusterSize" type="int">6 </parameter>
+    <!--Use MultipleScattering in Fit-->
+    <parameter name="MultipleScatteringOn" type="bool">true </parameter>
+    <!--Name of the output collection-->
+    <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
+    
+    <!--number of pad rows used in initial seed clustering-->
+    <parameter name="PadRowRange" type="int">15</parameter>
+    
     <!--Cut for r_min in mm-->
-    <parameter name="RCut" type="float" value="0." />
+    <parameter name="RCut" type="float">0 </parameter>
+    <!--Smooth All Mesurement Sites in Fit-->
+    <parameter name="SmoothOn" type="bool">false </parameter>
+    <!--Name of the tpc hit input collections-->
+    <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">UsedTPCTrackerHits </parameter>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string">DEBUG4 MESSAGE </parameter>
   </processor>
-
+  
   <processor name="MyRecoMCTruthLinker" type="RecoMCTruthLinker">
     <!--Name of the MCParticle input collection-->
     <parameter name="MCParticleCollection" type="string" lcioInType="MCParticle">MCParticle </parameter>
