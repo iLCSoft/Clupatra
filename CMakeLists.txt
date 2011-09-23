@@ -15,7 +15,7 @@ SET( ${PROJECT_NAME}_VERSION_MAJOR 0 )
 SET( ${PROJECT_NAME}_VERSION_MINOR 2 )
 SET( ${PROJECT_NAME}_VERSION_PATCH 0 )
 
-
+cmake_policy(SET CMP0008 NEW)
 
 ### DEPENDENCIES ############################################################
 
@@ -92,7 +92,15 @@ INCLUDE_DIRECTORIES( ./kaltest )
 # add library
 AUX_SOURCE_DIRECTORY( ./src library_sources )
 AUX_SOURCE_DIRECTORY( ./kaltest library_sources )
-ADD_SHARED_LIBRARY( ${PROJECT_NAME} ${library_sources} )
+
+# needed for adding header files to xcode project
+IF(CMAKE_GENERATOR MATCHES "Xcode")
+  FILE( GLOB_RECURSE library_headers "*.h" )
+  ADD_SHARED_LIBRARY( ${PROJECT_NAME} ${library_sources} ${library_headers})
+ELSE()
+  ADD_SHARED_LIBRARY( ${PROJECT_NAME} ${library_sources} )
+ENDIF()
+	  
 INSTALL_SHARED_LIBRARY( ${PROJECT_NAME} DESTINATION lib )
 
 # display some variables and write them to cache
