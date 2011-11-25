@@ -35,7 +35,7 @@
                 ClupatraTracks
                 
    trkeff.xml
-     - create root file with histos fro track finding efficiencies
+     - create root file with histos for track finding efficiencies
    
   
    trkeff.C

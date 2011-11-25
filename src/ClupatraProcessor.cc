@@ -730,9 +730,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       	}
 
 	double val = std::abs( z) / hV.size() ;  // take parameters from track segment that is closests to IP .....
+
 	//double val = (*itML)->getChi2() / (*itML)->getNdf() ; 
 	
-	streamlog_out( DEBUG3 ) << "   ---  " <<   &mergedTrk <<   " new  value : " << val << "   -- " << lcshort( *itML ) << std::endl ;
+	streamlog_out( DEBUG ) << "   ---  " <<   &mergedTrk <<   " new  value : " << val << "   -- " << lcshort( *itML ) << std::endl ;
 
       	if( val < min ){
       	  bestTrk = (*itML) ;
@@ -760,7 +761,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
 	
 
-	streamlog_out( DEBUG4 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
+	streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
 				<< "  with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
 				<< std::endl ;
 	
@@ -794,7 +795,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	// t->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  nHit ;  
 	// t->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  nHit ;  
 
-	streamlog_out( DEBUG4 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
+	streamlog_out( DEBUG2 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
 	
 	outCol->addElement( t ) ;
       }
@@ -839,7 +840,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   
   /*************************************************************************************************/
   
-  streamlog_out( DEBUG4  ) << " ************ pickUpSiTrackerHits() called - nTracks : " << trackCol->getNumberOfElements() <<std::endl ;
+  streamlog_out( DEBUG2  ) << " ************ pickUpSiTrackerHits() called - nTracks : " << trackCol->getNumberOfElements() <<std::endl ;
   
   std::map< int , std::list<TrackerHit*> > hLMap ;
   
@@ -864,13 +865,13 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   }
 
 
-  streamlog_out( DEBUG4 ) << "  *****  hitMap size : " <<   hLMap.size() << std::endl ;
+  streamlog_out( DEBUG2 ) << "  *****  hitMap size : " <<   hLMap.size() << std::endl ;
   
   for( std::map< int , std::list<TrackerHit*> >::iterator it= hLMap.begin(), End = hLMap.end() ; it != End ; ++it ){
     
     encoder.setValue( it->first ) ;
     
-    streamlog_out( DEBUG4 ) << "  *****  sensor: " << encoder.valueString()  << " - nHits: " <<  it->second.size()  << std::endl ;
+    streamlog_out( DEBUG2 ) << "  *****  sensor: " << encoder.valueString()  << " - nHits: " <<  it->second.size()  << std::endl ;
     
   }
   
@@ -901,33 +902,33 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     // create a temporary MarlinTrk
     //--------------------------------------------
 
-#if 0 //===========================================================================================
+// #if 0 //===========================================================================================
 
-      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
+//       std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
 
-      double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
+//       double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
       
-      const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
+//       const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
       
-      //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
-      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getClosestTrackState( 0., 0., 0. ) ) ;
-      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getTrackState( EVENT::TrackState::AtOther ) ) ;
-      //  // FIXME:  what do we need here EVENT::TrackState::AtIP  or AtFirstHit ??
+//       //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
+//       //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getClosestTrackState( 0., 0., 0. ) ) ;
+//       //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getTrackState( EVENT::TrackState::AtOther ) ) ;
+//       //  // FIXME:  what do we need here EVENT::TrackState::AtIP  or AtFirstHit ??
       
-      int nHit = trk->getTrackerHits().size() ;
+//       int nHit = trk->getTrackerHits().size() ;
       
-      if( nHit == 0 || ts ==0 )
-	continue ;
+//       if( nHit == 0 || ts ==0 )
+// 	continue ;
       
-      streamlog_out( DEBUG4  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+//       streamlog_out( DEBUG2  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
       
-      //need to add a dummy hit to the track
-      mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
+//       //need to add a dummy hit to the track
+//       mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
       
       
-      mTrk->initialise( *ts ,  b ,  MarlinTrk::IMarlinTrack::backward ) ;
+//       mTrk->initialise( *ts ,  b ,  MarlinTrk::IMarlinTrack::backward ) ;
     
-#else  //===========================================================================================
+// #else  //===========================================================================================
       // use the MarlinTrk allready stored with the TPC track
 
 
@@ -937,11 +938,11 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
       if( mTrk == 0 ){
 	
-	streamlog_out( DEBUG4  )  << "  ------ null pointer in ext<MarTrk> ! ?? ..... " << std::endl ;
+	streamlog_out( DEBUG2  )  << "  ------ null pointer in ext<MarTrk> ! ?? ..... " << std::endl ;
 	continue ;
       }
 
-#endif //===========================================================================================
+      //#endif //===========================================================================================
 
     //--------------------------------------------------
     // get intersection points with SIT and VXD layers 
@@ -967,7 +968,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       
       encoder.setValue( sensorID )  ;
 
-      streamlog_out( DEBUG4 ) << " *******  pickUpSiTrackerHits - intersection with SIT/VXD layer " << layer 
+      streamlog_out( DEBUG2 ) << " *******  pickUpSiTrackerHits - intersection with SIT/VXD layer " << layer 
 			      << " intersects:  " << MarlinTrk::errorCode( intersects ) 
 			      << " sensorID: " << encoder.valueString() 
 			      << std::endl ;
@@ -976,7 +977,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	
 	std::list<TrackerHit*>& hL = hLMap[ sensorID ] ;
 	
-	streamlog_out( DEBUG4 ) << "    **** found candidate hits : " << hL.size()  
+	streamlog_out( DEBUG2 ) << "    **** found candidate hits : " << hL.size()  
 				<< "         for point " << point << std::endl ;
 	
 	double min = 1.e99 ;
@@ -986,7 +987,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	
 	if( bestIt == hL.end() || min  > maxDist ){
 
-	  streamlog_out( DEBUG4 ) << " ######### no close by hit found !! " << std::endl ;
+	  streamlog_out( DEBUG2 ) << " ######### no close by hit found !! " << std::endl ;
 	  continue ; // FIXME: need to limit the number of layers w/o hits !!!!!!
 	}
 
@@ -996,7 +997,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	int addHit = mTrk->addAndFit( *bestIt , deltaChi, _dChi2Max ) ;
 	    
-	streamlog_out( DEBUG4 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
+	streamlog_out( DEBUG2 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
 				<< "         added : " << MarlinTrk::errorCode( addHit )
 				<< "   deltaChi2: " << deltaChi 
 				<< std::endl ;
@@ -1012,7 +1013,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	  mTrk->getTrackState( tsi , chi2N , ndfN ) ; 
 
-	  streamlog_out( DEBUG4  )  << "  -- extrapolate TrackState : " << lcshort( (TrackState*)&tsi )  << "\n" 
+	  streamlog_out( DEBUG2  )  << "  -- extrapolate TrackState : " << lcshort( (TrackState*)&tsi )  << "\n" 
 				    << " chi2: " << chi2N
 				    << " ndfN: " << ndfN    
 				    << std::endl ;
