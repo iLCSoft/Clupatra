@@ -239,7 +239,6 @@ namespace nnclu {
           
             if( (*first)->second == 0 && (*other)->second == 0 ) {  // no cluster exists
             
-              //             Cluster<ElementType >* cl = new Cluster<ElementType >( (*first) ) ;
               cluster_type* cl = new cluster_type( (*first) ) ;
             
               cl->addElement( (*other) ) ;
@@ -305,7 +304,6 @@ namespace nnclu {
             
             if( (*first)->second == 0 && (*other)->second == 0 ) {  // no cluster exists
               
-              //             Cluster<ElementType >* cl = new Cluster<ElementType >( (*first) ) ;
               cluster_type* cl = new cluster_type( (*first) ) ;
               
               cl->addElement( (*other) ) ;

@@ -11,6 +11,8 @@
 #include "marlin/Global.h"
 #include "gear/GEAR.h"
 #include "gear/TPCParameters.h"
+#include "gear/ZPlanarParameters.h"
+#include "gear/ZPlanarLayerLayout.h"
 #include "gear/PadRowLayout2D.h"
 #include "gear/BField.h"
 
@@ -29,10 +31,24 @@ FixCellIDs::FixCellIDs() : Processor("FixCellIDs") {
   
   // register steering parameters: name, description, class-variable, default value
   registerInputCollection( LCIO::TRACKERHIT,
-			   "CollectionName" , 
-			   "Name of the TrackerHit collection"  ,
-			   _colName ,
+			   "TPCCollectionName" , 
+			   "Name of the TPC TrackerHit collection"  ,
+			   _tpcColName ,
 			   std::string("AllTPCTrackerHits")
+			   );
+  
+  registerInputCollection( LCIO::TRACKERHIT,
+			   "VXDCollectionName" , 
+			   "Name of the VXD TrackerHit collection"  ,
+			   _vxdColName ,
+			   std::string("VXDTrackerHits")
+			   );
+  
+  registerInputCollection( LCIO::TRACKERHIT,
+			   "SITCollectionName" , 
+			   "Name of the SIT TrackerHit collection"  ,
+			   _sitColName ,
+			   std::string("SITTrackerHits")
 			   );
 }
 
@@ -59,65 +75,129 @@ void FixCellIDs::processRunHeader( LCRunHeader* run) {
 
 void FixCellIDs::modifyEvent( LCEvent * evt ) { 
 
-  const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
-  const gear::PadRowLayout2D& padLayout = gearTPC.getPadLayout() ;
+
+   UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
 
 
-  LCCollection* col = 0 ;
+  //=====================================================================================================
+  //      TPC 
+  //=====================================================================================================
   
-  try{   col =  dynamic_cast<LCCollection*> (evt->getCollection( _colName )  ); 
+  
+  LCCollection* tpcCol = 0 ;
+
+  try{   tpcCol =  dynamic_cast<LCCollection*> (evt->getCollection( _tpcColName )  ); 
+
+  } catch( lcio::DataNotAvailableException& e) { 
+    
+    streamlog_out( WARNING ) <<  " input collection not in event : " << _tpcColName << "   - nothing to do for TPC hits  !!! " << std::endl ;  
+  } 
+  
+  if( tpcCol ) {
+
+    const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
+    const gear::PadRowLayout2D& padLayout = gearTPC.getPadLayout() ;
+    
+    int nHit = tpcCol->getNumberOfElements()  ;
+    
+    for(int i=0; i< nHit ; i++){
+      
+      TrackerHitImpl* h = dynamic_cast<TrackerHitImpl*>( tpcCol->getElementAt( i ) ) ;
+      
+      
+      gear::Vector3D   pos(  h->getPosition() ) ;
+      
+      int padIndex = padLayout.getNearestPad( pos.rho() , pos.phi() ) ;
+      
+      int layer = padLayout.getRowNumber( padIndex ) ;
+      
+      
+      encoder.reset() ;  // reset to 0
+      
+      encoder[ILDCellID0::subdet] = ILDDetID::TPC ;
+      encoder[ILDCellID0::side]   = 0 ;
+      encoder[ILDCellID0::layer]  = layer ;
+      encoder[ILDCellID0::module] = 0 ;
+      encoder[ILDCellID0::sensor] = 0 ;
+      
+      int layerID = encoder.lowWord() ;  
+      
+      h->setCellID0(  layerID ) ;
+      
+      tpcCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
+      
+    } 
+  }
+
+  //=====================================================================================================
+  //      VXD 
+  //=====================================================================================================
+
+
+  LCCollection* vxdCol = 0 ;
+  
+  try{   vxdCol =  dynamic_cast<LCCollection*> (evt->getCollection( _vxdColName )  ); 
     
   } catch( lcio::DataNotAvailableException& e) { 
     
-    streamlog_out( WARNING ) <<  " input collection not in event : " << _colName << "   - nothing to do  !!! " << std::endl ;  
-    return ;
+    streamlog_out( WARNING ) <<  " input collection not in event : " << _vxdColName << "   - nothing to do for VXD hits  !!! " << std::endl ;  
   } 
   
-  
-  int nHit = col->getNumberOfElements()  ;
-  
-  UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
-  
-  for(int i=0; i< nHit ; i++){
+  if( vxdCol ) { 
     
-    TrackerHitImpl* h = dynamic_cast<TrackerHitImpl*>( col->getElementAt( i ) ) ;
+    const gear::ZPlanarParameters& gearVXD = Global::GEAR->getVXDParameters() ;
     
+    int nHit = vxdCol->getNumberOfElements()  ;
+    
+    for(int i=0; i< nHit ; i++){
+      
+      TrackerHitImpl* h = dynamic_cast<TrackerHitImpl*>( vxdCol->getElementAt( i ) ) ;
+      
+      gear::Vector3D   pos(  h->getPosition() ) ;
+      
+      
+      //-----------------------------------
+      gear::SensorID sensorID ;
+      
+      bool hitOnLadder =  gearVXD.isPointInSensitive( pos ,  &sensorID ) ;
 
-    gear::Vector3D   pos(  h->getPosition() ) ;
+      if( !hitOnLadder ) {
+	
+	streamlog_out( WARNING ) <<  " hit not in sensitive volume  - distance: " << gearVXD.distanceToNearestSensitive( pos ).r() 
+				 <<  " pos : " << pos << std::endl ;
+      }
+     //-------------------------------------
+      
+      encoder.reset() ;  // reset to 0
+      
+      encoder[ILDCellID0::subdet] = ILDDetID::VXD   ;
+      encoder[ILDCellID0::side]   = 0 ; //sensorID.side   ; 
+      encoder[ILDCellID0::layer]  = sensorID.layer  ;
+      encoder[ILDCellID0::module] = sensorID.module ;
+      encoder[ILDCellID0::sensor] = sensorID.sensor ;
+      
+      int layerID = encoder.lowWord() ;  
+      
+      h->setCellID0(  layerID ) ;
+      
+      vxdCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
+    }
+
+    // if( streamlog_level( DEBUG )  ) {
+    //   UTIL::LCTOOLS::printTrackerHits(  vxdCol ) ;
+    // }
     
-    int padIndex = padLayout.getNearestPad( pos.rho() , pos.phi() ) ;
-    
-    int layer = padLayout.getRowNumber( padIndex ) ;
+  }
 
 
-    encoder.reset() ;  // reset to 0
-    
-    encoder[ILDCellID0::subdet] = ILDDetID::TPC ;
-    encoder[ILDCellID0::side]   = 0 ;
-    encoder[ILDCellID0::layer]  = layer ;
-    encoder[ILDCellID0::module] = 0 ;
-    encoder[ILDCellID0::sensor] = 0 ;
-    
-    int layerID = encoder.lowWord() ;  
 
-    h->setCellID0(  layerID ) ;
-    
-    col->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
-  
-  } 
-  
-
-
-  //-- note: this will not be printed if compiled w/o MARLINDEBUG=1 !
   
   streamlog_out( DEBUG3 ) << "   processing event: " << evt->getEventNumber() 
 			  << "   in run:  " << evt->getRunNumber() << std::endl ;
 
 
-  // if( streamlog_level( DEBUG )  ) {
-  //   UTIL::LCTOOLS::printTrackerHits(  col ) ;
-  // }
-  
+
+
   _nEvt ++ ;
 }
 

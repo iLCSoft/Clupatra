@@ -13,6 +13,7 @@
 #include "EVENT/TrackerHit.h"
 #include "IMPL/TrackImpl.h"
 #include "UTIL/Operators.h"
+#include "UTIL/ILDConf.h"
 
 #include "GEAR.h"
 
@@ -102,6 +103,14 @@ namespace clupatra_new{
 
   //------------------------------------------------------------------------------------------
 
+  struct PtSort {  // sort tracks wtr to pt - largest first
+    inline bool operator()( const LCObject* l, const LCObject* r) {      
+      return ( std::abs( ( (const Track*) l )->getOmega() ) < std::abs( ( (const Track*) r )->getOmega() )  );  // pt ~ 1./omega  
+    }
+  };
+
+  //------------------------------------------------------------------------------------------
+
 
   /** Add the elements (Hits) from (First,Last) to the HitListVector - vector needs to be initialized, e.g. with
    *  hLV.resize( MAX_LAYER_INDEX ) 
@@ -117,50 +126,43 @@ namespace clupatra_new{
 
   //------------------------------------------------------------------------------------------
 
-  /** Predicate class for 'distance' of NN clustering.
-   */
+  /** Predicate class for 'distance' of NN clustering. */
   class HitDistance{
-    typedef double PosType ;
   public:
 
-    /** Required typedef for cluster algorithm 
-     */
-    typedef ClupaHit element_type ;
+    HitDistance(float dCut) : _dCutSquared( dCut*dCut ) {} 
 
-    /** C'tor takes merge distance */
-    HitDistance(float dCut) : _dCutSquared( dCut*dCut ) , _dCut(dCut)  {} 
-
-
-    /** Merge condition: true if distance  is less than dCut given in the C'tor.*/ 
+    /** Merge condition: true if distance  is less than dCut */ 
     inline bool operator()( Hit* h0, Hit* h1){
     
       if( std::abs( h0->Index0 - h1->Index0 ) > 1 ) return false ;
     
-      //     //------- don't merge hits from same layer !
-      //     if( l0 == l1 )
-      //       return false ;
-
       if( h0->first->layer == h1->first->layer )
 	return false ;
 
-      // const PosType* pos0 =  h0->first->getPosition() ;
-      // const PosType* pos1 =  h1->first->getPosition() ;
-    
-      // return 
-      // 	( pos0[0] - pos1[0] ) * ( pos0[0] - pos1[0] ) +
-      // 	( pos0[1] - pos1[1] ) * ( pos0[1] - pos1[1] ) +
-      // 	( pos0[2] - pos1[2] ) * ( pos0[2] - pos1[2] )   
-      // 	< _dCutSquared ;
-
       return ( h0->first->pos - h1->first->pos).r2()  < _dCutSquared ;
-
     }
-  
   protected:
     HitDistance() ;
     float _dCutSquared ;
-    float _dCut ;
   } ;
+  
+  
+  // /** Predicate class for 'distance' of NN clustering. */
+
+  // struct HitDistance{  float _dCutSquared ;
+  //   HitDistance(float dCut) : _dCutSquared( dCut*dCut ) {} 
+    
+  //   inline bool operator()( Hit* h0, Hit* h1){
+      
+  //     if( h0->first->layer == h1->first->layer )
+  // 	return false ;
+      
+  //     return ( h0->first->pos - h1->first->pos).r2()  
+  // 	< _dCutSquared ;
+  //   }
+  // } ;
+  
 
 
   //------------------------------------------------------------------------------------------
@@ -170,7 +172,8 @@ namespace clupatra_new{
     lcio::Track* operator() (CluTrack* c) {  
     
       lcio::TrackImpl* trk = new lcio::TrackImpl ;
-    
+ 
+   
       double e = 0.0 ;
       int nHit = 0 ;
       for( CluTrack::iterator hi = c->begin(); hi != c->end() ; hi++) {
@@ -180,9 +183,15 @@ namespace clupatra_new{
 	nHit++ ;
       }
 
-
       MarlinTrk::IMarlinTrack* mtrk = c->ext<MarTrk>()  ;
 
+      trk->ext<MarTrk>()  = mtrk ;
+
+      trk->setdEdx( e/nHit ) ;
+      trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
+      trk->subdetectorHitNumbers()[ 2*ILDDetID::TPC - 1 ] =  nHit ;  // ??used in fit?? 
+      trk->subdetectorHitNumbers()[ 2*ILDDetID::TPC - 2 ] =  nHit ;  
+      
       if( mtrk != 0 ){
 
 	lcio::TrackStateImpl* ts =  new lcio::TrackStateImpl ;
@@ -211,10 +220,6 @@ namespace clupatra_new{
 	}
 
       }
-
-      trk->setdEdx( e/nHit ) ;
-      trk->subdetectorHitNumbers().push_back( 1 ) ;  // workaround for bug in lcio::operator<<( Tracks ) - used for picking ....
- 
 
       return trk ;
     }
@@ -285,16 +290,6 @@ namespace clupatra_new{
 	return trk ;
       }
 
-      // // store mutual pointers between tracks and 'clusters'
-      // trk->setCluster<GCluster>( clu ) ;
-      // if( !  clu->ext<ClusterInfo>() )
-      //  	clu->ext<ClusterInfo>() = new ClusterInfoStruct ;
-      //      clu->ext<ClusterInfo>()->track = trk ;
-      // if( clu->size() < 3 ) 
-      // 	return trk ;
-      //      static HitLayerID tpcLayerID( _ts->indexOfFirstLayer( KalTest::DetID::TPC )  )  ;
-      
-      
       clu->ext<MarTrk>() = trk ;
       
       clu->sort( LayerSortOut() ) ;
@@ -336,15 +331,20 @@ namespace clupatra_new{
     }
   };
 
-
   //-------------------------------------------------------------------------------------
 
   /** Try to add hits from hLV (hit lists per layer) to the cluster. The cluster needs to have a fitted KalTrack associated to it.
    *  Hits are added if the resulting delta Chi2 is less than dChiMax - a maxStep is the maximum number of steps (layers) w/o 
    *  successfully merging a hit.
    */
-  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, 
-			 bool backward=false) ; 
+  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep,  bool backward=false) ; 
+  //------------------------------------------------------------------------------------------
+  
+  /** Try to add a hit from the given HitList in layer of subdetector to the track.
+   *  A hit is added if the resulting delta Chi2 is less than dChiMax.
+   */
+  bool addHitAndFilter( int detectorID, int layer, CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut) ; 
+  
   //------------------------------------------------------------------------------------------
 
   /** Returns the number of rows where cluster clu has i hits in mult[i] for i=1,2,3,4,.... -

@@ -15,7 +15,7 @@
 		    <Xprocessor name="MyFullLDCTracking" />
 		    <Xprocessor name="MyMyProcessor" />
 		    <Xprocessor name="MyGenericViewer" />
-		  <Xprocessor name="MyCEDViewer" />
+		  <processor name="MyCEDViewer" />
 		  <processor name="MyLCIOOutputProcessor" />
 	</execute>
 
@@ -48,7 +48,7 @@
 	</processor>
 
 	<processor name="MyClupatraProcessor" type="ClupatraNew">
-		<parameter name="Verbosity" value="DEBUG MESSAGE DEBUG" />
+		<parameter name="Verbosity" value="DEBUG4 MESSAGE DEBUG" />
 		<!--ClupatraProcessor : simple nearest neighbour clustering-->
 		<!--Name of the input collections-->
 		<parameter name="HitCollections" type="string" lcioInType="TrackerHit"> UsedTPCTrackerHits </parameter>
@@ -123,6 +123,10 @@
 	<processor name="MyCEDViewer" type="CEDViewer">
 	  <!--draw a helix for Track objects-->
 	  <parameter name="DrawHelixForTrack" type="bool"> false </parameter>
+
+	  <!--color scheme to be used for drawing - see MESSAGE for options-->
+	  <parameter name="ColorScheme" type="int">13</parameter>
+
 
 	  <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
 	  <parameter name="DrawDetectorID" type="int">0 </parameter>

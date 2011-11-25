@@ -22,7 +22,6 @@
 #include "UTIL/LCTOOLS.h"
 
 #include "UTIL/CellIDDecoder.h"
-#include "UTIL/ILDConf.h"
 
 #include "LCIterator.h"
 
@@ -31,6 +30,8 @@
 #include "marlin/Global.h"
 #include "gear/GEAR.h"
 #include "gear/TPCParameters.h"
+#include "gear/ZPlanarParameters.h"
+#include "gear/ZPlanarLayerLayout.h"
 #include "gear/PadRowLayout2D.h"
 #include "gear/BField.h"
 
@@ -42,15 +43,16 @@
 
 using namespace lcio ;
 using namespace marlin ;
-using namespace MarlinTrk ;
 
+
+#include <float.h>
 
 #include "clupatra_new.h"
 using namespace clupatra_new ;
 
 
 
-/** helper method cto create a track collections and add it to the event */
+/** helper method to create a track collections and add it to the event */
 inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt ){
 
   LCCollectionVec* col = new LCCollectionVec( LCIO::TRACK ) ;  
@@ -64,6 +66,71 @@ inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt ){
   return col ;
 }
 //----------------------------------------------------------------
+/** helper method to get the collection from the event */
+inline LCCollection* getCollection(  const std::string& name, LCEvent * evt ){
+
+  LCCollection* col = 0 ;
+  try{   col = evt->getCollection( name )  ; 
+  } catch( lcio::DataNotAvailableException& e) { 
+    streamlog_out( DEBUG4 ) <<  " input collection not in event : " << name << "  !!!  " << std::endl ;  
+  } 
+  return col ;
+}
+
+//----------------------------------------------------------------
+
+template <class In, class Pred> In find_smallest(In first, In last, Pred p, double& d){
+  
+  In res =  last ;
+
+  double min = DBL_MAX ;
+ 
+  while( first != last ){
+
+    double val = p( *first) ;
+
+    if(  val < min ){
+
+      res = first ;
+      min = val ;
+    }
+ 
+    ++first ;
+  }
+
+  d = min ;
+
+  streamlog_out( DEBUG4 ) << " found smallest " << *res << " min : " << d << std::endl ;
+
+  return res ;
+}
+//----------------------------------------------------------------
+struct Distance3D2{
+  gear::Vector3D _pos ;
+  Distance3D2( const gear::Vector3D& pos) : _pos( pos ) {}
+  template <class T>
+  double operator()( const T* t) { 
+    gear::Vector3D p( t->getPosition() ) ;
+    return ( p - _pos ).r2() ; 
+
+  }
+};
+//----------------------------------------------------------------
+struct MeanAbsZOfTrack{
+  double operator()( const Track* t){
+    double z = 0 ;
+    int hitCount = 0 ;
+    const TrackerHitVec& hV = t->getTrackerHits() ;
+    for(unsigned i=0, N = hV.size() ; i<N ; ++i){
+      z += hV[i]->getPosition()[2]  ;
+      ++hitCount ;
+    }
+    return std::abs(  z )  / hitCount ;
+  }
+};
+
+//----------------------------------------------------------------
+
 
 ClupatraProcessor aClupatraProcessor ;
 
@@ -112,7 +179,7 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
  			      _rCut ,
  			      (float) 0.0 ) ;
   
-
+  
   registerProcessorParameter( "PadRowRange" , 
 			      "number of pad rows used in initial seed clustering"  ,
 			      _padRowRange ,
@@ -132,7 +199,22 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			     "Smooth All Mesurement Sites in Fit",
 			     _SmoothOn,
 			     bool(false));
+
+  registerProcessorParameter("pickUpSiHits",
+			     "try to pick up hits from Si-trackers",
+			     _pickUpSiHits,
+			     bool(false));
   
+
+  registerOptionalParameter( "SITHitCollection" , 
+			     "name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)"  ,
+			     _sitColName ,
+			     std::string("SITTrackerHits")  ) ;
+
+  registerOptionalParameter( "VXDHitCollection" , 
+			     "name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)"  ,
+			     _vxdColName ,
+			     std::string("VTXTrackerHits")  ) ;
   
 }
 
@@ -144,15 +226,14 @@ void ClupatraProcessor::init() {
   
   _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( "KalTest" , marlin::Global::GEAR , "" ) ;
   
-  _trksystem->setOption( IMarlinTrkSystem::CFG::useQMS,        _MSOn ) ;
-  _trksystem->setOption( IMarlinTrkSystem::CFG::usedEdx,       _ElossOn) ;
-  _trksystem->setOption( IMarlinTrkSystem::CFG::useSmoothing,  _SmoothOn) ;
+  _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::useQMS,        _MSOn ) ;
+  _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::usedEdx,       _ElossOn) ;
+  _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::useSmoothing,  _SmoothOn) ;
   _trksystem->init() ;  
   
   _nRun = 0 ;
   _nEvt = 0 ;
   
-  // //------ register some debugging print functions for picking in CED :
   // CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
   // CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
   // CEDPickingHandler::getInstance().registerFunction( LCIO::SIMTRACKERHIT , &printSimTrackerHit ) ; 
@@ -175,6 +256,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   unsigned t_split      = timer.registerTimer(" split clusters      " ) ;
   unsigned t_finalfit   = timer.registerTimer(" final refit         " ) ;
   unsigned t_merge      = timer.registerTimer(" merge segments      " ) ;
+  unsigned t_pickup     = timer.registerTimer(" pick up Si hits     " ) ;
   
   timer.start() ;
   
@@ -307,8 +389,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   int outerRow = maxTPCLayers - 1 ;
 
-  nnclu::PtrVector<IMarlinTrack> seedTrks ;
-  seedTrks.setOwner() ;
+  nnclu::PtrVector<MarlinTrk::IMarlinTrack> seedTrks ;
+  seedTrks.setOwner() ; // memory mgmt - will delete MarlinTrks at the end
   
   IMarlinTrkFitter fitter( _trksystem ) ;
 
@@ -486,7 +568,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     else if( float( mult[1]) / mult[0]  >= 0.5 &&  mult[1] >  3 ) {    
 
 
-      fitter( *it ) ;
+      seedTrks.push_back( fitter( *it )  );
 
       cluList.push_back( *it ) ;
 
@@ -500,14 +582,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
 
   }
-
-
-
-
+  
   //===============================================================================================
   //  try again to gobble up hits at the ends ....
   //===============================================================================================
-
+  
   for( Clusterer::cluster_list::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
     addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
     static const bool backward = true ;
@@ -517,14 +596,14 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   timer.time( t_split ) ;
 
-  streamlog_out( MESSAGE ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
+  streamlog_out( DEBUG2 ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
 
   //===============================================================================================
   //  now refit the tracks 
   //===============================================================================================
 
-  nnclu::PtrVector<IMarlinTrack> finalTrks ;
-  finalTrks.setOwner() ;
+  nnclu::PtrVector<MarlinTrk::IMarlinTrack> finalTrks ;
+  finalTrks.setOwner() ;  // memory mgmt - will delete MarlinTrks at the end
   finalTrks.reserve( cluList.size() ) ;
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
@@ -600,32 +679,44 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	mergedTrk.push_back( (*itC)->first ) ; 
       }
 
-
+      // create a new LCIO track for the merged cluster ...
       TrackImpl* trk = new TrackImpl ;
       Track* bestTrk = 0 ;
-      double chi2Min = 99999999999999999. ;
+      
+      double min = 1.e99 ;
       int hitCount = 0 ;
-      int hitsInFit = 0 ;
+      
       for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
 	
-	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
-	for(unsigned i=0 ; i < hV.size() ; ++i){
-	  trk->addHit( hV[i] ) ;
-	  ++hitCount ;
-	}
-
-	double chi2ndf = (*itML)->getChi2() / (*itML)->getNdf() ;
+	double z = 0. ;
+      	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
 	
-	if( chi2ndf < chi2Min ){
-	  bestTrk = (*itML) ;
-	  chi2Min = chi2ndf ;
-	}
+      	for(unsigned i=0 ; i < hV.size() ; ++i){
+	  
+      	  trk->addHit( hV[i] ) ;
 
+      	  ++hitCount ;
+
+	  z+= hV[i]->getPosition()[2] ;
+	  
+      	}
+
+	double val = std::abs( z) / hV.size() ;  // take parameters from track segment that is closests to IP .....
+	//double val = (*itML)->getChi2() / (*itML)->getNdf() ; 
+	
+	streamlog_out( DEBUG3 ) << "   ---  " <<   &mergedTrk <<   " new  value : " << val << "   -- " << lcshort( *itML ) << std::endl ;
+
+      	if( val < min ){
+      	  bestTrk = (*itML) ;
+      	  min  = val  ;
+      	}
       }
+      
+      
       if( bestTrk != 0 ){ 
-
-	hitsInFit = trk->getTrackerHits().size() ;
-
+	
+	int hitsInFit = bestTrk->getTrackerHits().size() ;
+	
 	trk->setD0( bestTrk->getD0() ) ;
 	trk->setOmega( bestTrk->getOmega() ) ;
 	trk->setPhi( bestTrk->getPhi() ) ;
@@ -633,16 +724,27 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	trk->setTanLambda( bestTrk->getTanLambda() ) ;
 	trk->setCovMatrix( bestTrk->getCovMatrix()  ) ;
 	// ...
+	trk->ext<MarTrk>() = bestTrk->ext<MarTrk>() ;
 	
+
+	trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
+	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
+	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
+	
+
+	streamlog_out( DEBUG4 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
+				<< "  with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
+				<< std::endl ;
+	
+
+	outCol->addElement( trk )  ;
       }
       else{
 	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
+	delete trk ;
       }
-
-      trk->subdetectorHitNumbers().push_back( hitCount ) ;  
-      trk->subdetectorHitNumbers().push_back( hitsInFit ) ;  
-
-      outCol->addElement( trk )  ;
+      
+      
     }
 
     // add all tracks that have not been merged :
@@ -650,20 +752,42 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
       if( (*it)->second == 0 ){
 	
-	TrackImpl* t =   new TrackImpl( *dynamic_cast<TrackImpl*>( (*it)->first ) ) ;
+	TrackImpl* trk = dynamic_cast<TrackImpl*>( (*it)->first ) ;
+	
+	TrackImpl* t =   new TrackImpl( *trk ) ;
 	
 	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
+
+	t->ext<MarTrk>() = dynamic_cast<TrackImpl*>( (*it)->first )->ext<MarTrk>() ;
+
+
+	// unsigned nHit = trk->getTrackerHits().size() ;
+	// t->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
+	// t->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  nHit ;  
+	// t->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  nHit ;  
+
+	streamlog_out( DEBUG4 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
 	
 	outCol->addElement( t ) ;
       }
     }
     
   }
+  timer.time( t_merge ) ;  
 
   //---------------------------------------------------------------------------------------------------------
+  //    pick up hits from Si trackers
+  //---------------------------------------------------------------------------------------------------------
 
+  if( _pickUpSiHits ){
+    
+    pickUpSiTrackerHits( outCol , evt ) ;
+    
+  }
+  //---------------------------------------------------------------------------------------------------------
 
-  timer.time( t_merge ) ;  
+  timer.time( t_pickup ) ;  
+
   
   streamlog_out( DEBUG4 )  <<  timer.toString () << std::endl ;
 
@@ -672,259 +796,235 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 }
 
 
+
+
 /*************************************************************************************************/
 void ClupatraProcessor::check( LCEvent * evt ) { 
+
   /*************************************************************************************************/
   
-  // //  std::string colName( "MergedKalTracks"  ) ;
-  // std::string colName(  _outColName ) ;
-
-
-  // bool checkForDuplicatePadRows =  false ;
-  // bool checkForMCTruth          =  true  ;
-  // bool checkForSplitTracks      =  true  ; 
-
-  // streamlog_out( MESSAGE ) <<  " check called.... " << std::endl ;
-
-  // const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
-  // const gear::PadRowLayout2D& pL = gearTPC.getPadLayout() ;
-
-
-  // //====================================================================================
-  // // check for duplicate padRows 
-  // //====================================================================================
-
-  // if( checkForDuplicatePadRows ) {
-
-  //   LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
-  //   oddCol->setSubset( true ) ;
-  //   // try iterator class ...
-
-  //   LCIterator<Track> trIt( evt, colName ) ;
-  //   while( Track* tr = trIt.next()  ){
-
-      
-  //     // check for duplicate layer numbers
-  //     std::vector<int> hitsInLayer( pL.getNRows() ) ; 
-  //     const TrackerHitVec& thv = tr->getTrackerHits() ;
-  //     typedef TrackerHitVec::const_iterator THI ;
-  //     for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
-  // 	TrackerHit* th = *it ;
-  // 	++ hitsInLayer.at( th->ext<HitInfo>()->layerID )   ;
-  //     } 
-  //     unsigned nHit = thv.size() ;
-  //     unsigned nDouble = 0 ;
-  //     for(unsigned i=0 ; i < hitsInLayer.size() ; ++i ) {
-  // 	if( hitsInLayer[i] > 1 ){
-  // 	  ++nDouble ;
-  // 	  streamlog_out( DEBUG4 ) << " &&&&&&&&&&&&&&&&&&&&&&&&&& duplicate hit in layer : " << i << std::endl ;
-  // 	}
-  //     }
-  //     if( double(nDouble) / nHit > _duplicatePadRowFraction ){
-  // 	//if( nDouble  > 0){
-  // 	streamlog_out( DEBUG4 ) << " oddTrackCluster found with "<< 100. * double(nDouble) / nHit 
-  // 				<< "% of double hits " << std::endl ;
-  // 	oddCol->addElement( tr ) ;
-  //     }
-  //   }
-  //   evt->addCollection( oddCol , "OddCluTracks" ) ;
-  // }
-  // //====================================================================================
-  // // check Monte Carlo Truth via SimTrackerHits 
-  // //====================================================================================
-
-  // if( checkForMCTruth ) {
- 
-
-  //   LCCollectionVec* oddCol = new LCCollectionVec( LCIO::TRACK ) ;
-  //   oddCol->setSubset( true ) ;
-
-  //   LCCollectionVec* splitCol = new LCCollectionVec( LCIO::TRACK ) ;
-  //   splitCol->setSubset( true ) ;
-    
-  //   typedef std::map<Track* , unsigned > TRKMAP ; 
-    
-  //   typedef std::map< MCParticle* , TRKMAP > MCPTRKMAP ;
-  //   MCPTRKMAP mcpTrkMap ;
-    
-  //   typedef std::map< MCParticle* , unsigned > MCPMAP ;
-  //   MCPMAP hitMap ;
-    
-    
-  //   // if( streamlog_level( DEBUG4) )
-  //   //   LCTOOLS::printTracks( evt->getCollection("KalTestTracks") ) ;
-
-
-  //   LCIterator<Track> trIt( evt, colName  ) ;  
-  //   //    "KalTestTracks" ) ;
-  //   //    LCIterator<Track> trIt( evt, _outColName ) ;
-  //   //    LCIterator<Track> trIt( evt, "TPCTracks" ) ;
-
-  //   while( Track* tr = trIt.next()  ){
-      
-  //     MCPMAP mcpMap ;
-
-  //     const TrackerHitVec& thv = tr->getTrackerHits() ;
-  //     typedef TrackerHitVec::const_iterator THI ;
-
-  //     // get relation between mcparticles and tracks
-  //     for(THI it = thv.begin() ; it  != thv.end() ; ++it ) {
-
-  // 	TrackerHit* th = *it ;
-  // 	// FIXME:
-  // 	// we know that the digitizer puts the sim hit into the raw hit pointer
-  // 	// but of course the proper way is to go through the LCRelation ...
-  // 	SimTrackerHit* sh = (SimTrackerHit*) th->getRawHits()[0] ;
-  // 	MCParticle* mcp = sh->getMCParticle() ;
-
-	
-  // 	hitMap[ mcp ] ++ ;   // count all hits from this mcp
-	
-  // 	mcpMap[ mcp ]++ ;    // count hits from this mcp for this track
-	
-  // 	mcpTrkMap[ mcp ][ tr ]++ ;  // map between mcp, tracks and hits
-	
-  //     } 
-
-  //     // check for tracks with hits from several mcparticles
-  //     unsigned nHit = thv.size() ;
-  //     unsigned maxHit = 0 ; 
-  //     for( MCPMAP::iterator it= mcpMap.begin() ;
-  // 	   it != mcpMap.end() ; ++it ){
-  // 	if( it->second  > maxHit ){
-  // 	  maxHit = it->second ;
-  // 	}
-  //     }
-
-  //     if( double(maxHit) / nHit < 0.95 ){ // What is acceptable here ???
-  // 	//if( nDouble  > 0){
-  // 	streamlog_out( MESSAGE ) << " oddTrackCluster found with only "
-  // 				 << 100.*double(maxHit)/nHit 
-  // 				 << "% of hits  form one MCParticle " << std::endl ;
-  // 	oddCol->addElement( tr ) ;
-  //     }
-  //   }
-  //   evt->addCollection( oddCol , "OddMCPTracks" ) ;
-    
-    
-  //   if( checkForSplitTracks ) {
-      
-  //     streamlog_out( DEBUG ) << " checking for split tracks - mcptrkmap size : " <<  mcpTrkMap.size() << std::endl ;
-      
-  //     // check for split tracks 
-  //     for( MCPTRKMAP::iterator it0 = mcpTrkMap.begin() ; it0 != mcpTrkMap.end() ; ++it0){
-	
-  // 	streamlog_out( DEBUG ) << " checking for split tracks - map size : " <<  it0->second.size() << std::endl ;
-	
-	
-  // 	if( it0->second.size() > 1 ) {
-	  
-	  
-  // 	  typedef std::list< EVENT::Track* > TL ;
-  // 	  TL trkList ;
-	  
-  // 	  for( TRKMAP::iterator it1 = it0->second.begin() ; it1 != it0->second.end() ; ++it1){
-	    
-  // 	    double totalHits = hitMap[ it0->first ]  ; // total hits for this track 
-	    
-  // 	    double thisMCPHits = it1->second ;     //  hits from this mcp
-	    
-  // 	    double ratio =  thisMCPHits / totalHits  ;
-	    
-  // 	    streamlog_out( DEBUG ) << " checking for split tracks - ratio : " 
-  // 				   << thisMCPHits << " / " << totalHits << " = " << ratio << std::endl ;
-	    
-  // 	    if( ratio > 0.05 && ratio < 0.95 ){
-  // 	      // split track
-	      
-  // 	      splitCol->addElement( it1->first ) ; 
-	      
-  // 	      trkList.push_back( it1->first ) ;
-  // 	    } 
-  // 	  }
-  // 	  // chi2 between split track segments :
-  // 	  // for( TRKMAP::iterator ist0 = it0->second.begin() ; ist0 != it0->second.end() ; ++ist0){
-	    
-  // 	  //   KalTrack* sptrk0 = ist0->first->ext<KalTrackLink>() ; 
-	    
-  // 	  //   TRKMAP::iterator ist0_pp = ist0 ;
-  // 	  //   ++ist0_pp ;
-
-  // 	  //   for( TRKMAP::iterator ist1 = ist0_pp ; ist1 != it0->second.end() ; ++ist1){
-	  
-  // 	  //     KalTrack* sptrk1 = ist1->first->ext<KalTrackLink>() ; 
-	      
-  // 	  //     double chi2 =  KalTrack::chi2( *sptrk0 ,  *sptrk1 ) ;
-	      
-  // 	  //     streamlog_out( DEBUG4 ) << " *********************  chi2 between split tracks : "  << chi2 << std::endl 
-  // 	  // 			      << myheader< Track >() << std::endl 
-  // 	  // 			      << lcshort( ist0->first )  << std::endl 
-  // 	  // 			      << lcshort( ist1->first )	 << std::endl ; 
-	      
-  // 	  //   }
-  // 	  // }
-
-
-
-  // 	  streamlog_out( DEBUG2 ) << " ------------------------------------------------------ " << std::endl ;
-	  
-  // 	  for( TL::iterator it0 = trkList.begin() ; it0 != trkList.end() ; ++it0 ){
-	    
-	    
-  // 	    //	    KalTrack* trk0 = (*it0)->ext<KalTrackLink>() ; 
-	    
-  // 	    HelixClass hel ;
-  // 	    hel.Initialize_Canonical( (*it0)->getPhi(),
-  // 				      (*it0)->getD0(),
-  // 				      (*it0)->getZ0(),
-  // 				      (*it0)->getOmega(),
-  // 				      (*it0)->getTanLambda(),
-  // 				      3.50 ) ;
-	    
-  // 	    streamlog_out( DEBUG1 ) << hel.getXC() << "\t"
-  // 				    << hel.getYC() << "\t"
-  // 				    << hel.getRadius() << "\t" 
-  // 				    << hel.getTanLambda() << std::endl ; 
-	    
-	    
-  // 	    // streamlog_out( DEBUG1 ) << (*it0)->getPhi() << "\t"
-  // 	    // 			  << (*it0)->getD0()  << "\t"
-  // 	    // 			  << (*it0)->getOmega()  << "\t"
-  // 	    // 			  << (*it0)->getZ0()  << "\t"
-  // 	    // 			  << (*it0)->getTanLambda()  << "\t"
-  // 	    // 			  << std::endl ;
-	    
-  // 	    //	    streamlog_out( DEBUG1 ) << " trk0 : " << *trk0 << std::endl ;
-	    
-  // 	    // TL::iterator its = it0 ;
-  // 	    // ++its ;
-	    
-  // 	    // for( TL::iterator it1 =  its ; it1 != trkList.end() ; ++it1 ){
-	      
-  // 	    //   KalTrack* trk1 = (*it1)->ext<KalTrackLink>() ; 
-	      
-  // 	    //   streamlog_out( DEBUG1 ) << "    - trk0 : " << *trk0 << std::endl ;
-  // 	    //   streamlog_out( DEBUG1 ) << "    - trk1 : " << *trk1 << std::endl ;
-	      
-  // 	    //   double chi2 =  KalTrack::chi2( *trk0 ,  *trk1 ) ;
-	      
-  // 	    //   streamlog_out( DEBUG1 ) << " +++++++++++++++++  chi2 between split tracks : " 
-  // 	    // 			      << trk0 << " - " << trk1 << " : " << chi2 << std::endl ; 
-	      
-	      
-  // 	    // }
-  // 	  }
-	  
-  // 	}
-  //     }
-  //     evt->addCollection( splitCol , "SplitTracks" ) ;
-  //   }
-
-  // }
-  //====================================================================================
 
 }
 
+/*************************************************************************************************/
+void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCEvent* evt) {
+  
+  /*************************************************************************************************/
+  
+  streamlog_out( DEBUG4  ) << " ************ pickUpSiTrackerHits() called - nTracks : " << trackCol->getNumberOfElements() <<std::endl ;
+  
+  std::map< int , std::list<TrackerHit*> > hLMap ;
+  
+  UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
+  
+
+  if(  parameterSet( "SITHitCollection" ) ) {
+    
+    LCIterator<TrackerHit> it( evt, _sitColName ) ;
+    while( TrackerHit* hit = it.next()  ){
+      
+      hLMap[ hit->getCellID0() ].push_back(  hit ) ;
+    }    
+  }
+  if(  parameterSet( "VXDHitCollection" ) ) {
+    
+    LCIterator<TrackerHit> it( evt, _vxdColName ) ;
+    while( TrackerHit* hit = it.next()  ){
+      
+      hLMap[ hit->getCellID0() ].push_back(  hit ) ;
+    }    
+  }
+
+
+  streamlog_out( DEBUG4 ) << "  *****  hitMap size : " <<   hLMap.size() << std::endl ;
+  
+  for( std::map< int , std::list<TrackerHit*> >::iterator it= hLMap.begin(), End = hLMap.end() ; it != End ; ++it ){
+    
+    encoder.setValue( it->first ) ;
+    
+    streamlog_out( DEBUG4 ) << "  *****  sensor: " << encoder.valueString()  << " - nHits: " <<  it->second.size()  << std::endl ;
+    
+  }
+  
+  int nSITLayers = 0 ;
+  try{
+    const gear::ZPlanarParameters& gearSIT = Global::GEAR->getSITParameters() ;
+    const gear::ZPlanarLayerLayout& gearSITLayout = gearSIT.getZPlanarLayerLayout() ;
+    nSITLayers = gearSITLayout.getNLayers() ;
+  }catch(gear::UnknownParameterException& ){}
+
+  const gear::ZPlanarParameters& gearVXD = Global::GEAR->getVXDParameters() ;
+  const gear::ZPlanarLayerLayout& gearVXDLayout = gearVXD.getZPlanarLayerLayout() ;
+  int nVXDLayers = gearVXDLayout.getNLayers() ;
+
+  int nLayers  = nVXDLayers + nSITLayers  ;
+
+  double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
+
+
+  // ============ sort tracks wrt pt (1./omega) ===============
+  LCCollectionVec* tv  = dynamic_cast<LCCollectionVec*>(trackCol) ;
+
+  std::sort( tv->begin() , tv->end() ,  PtSort()  ) ;
+  
+  for(  LCIterator<TrackImpl> it( trackCol ) ;  TrackImpl* trk = it.next()  ; ) 
+    {
+	
+
+    //--------------------------------------------
+    // create a temporary MarlinTrk
+    //--------------------------------------------
+
+#if 0 //===========================================================================================
+
+      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
+      
+      
+      const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
+      
+      //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
+      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getClosestTrackState( 0., 0., 0. ) ) ;
+      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getTrackState( EVENT::TrackState::AtOther ) ) ;
+      //  // FIXME:  what do we need here EVENT::TrackState::AtIP  or AtFirstHit ??
+      
+      int nHit = trk->getTrackerHits().size() ;
+      
+      if( nHit == 0 || ts ==0 )
+	continue ;
+      
+      streamlog_out( DEBUG4  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+      
+      //need to add a dummy hit to the track
+      mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
+      
+      
+      mTrk->initialise( *ts ,  b ,  MarlinTrk::IMarlinTrack::backward ) ;
+    
+#else  //===========================================================================================
+      // use the MarlinTrk allready stored with the TPC track
+
+
+      MarlinTrk::IMarlinTrack* mTrk = trk->ext<MarTrk>()  ;
+ 
+      //      const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
+
+      if( mTrk == 0 ){
+	
+	streamlog_out( DEBUG4  )  << "  ------ null pointer in ext<MarTrk> ! ?? ..... " << std::endl ;
+	continue ;
+      }
+
+#endif //===========================================================================================
+
+    //--------------------------------------------------
+    // get intersection points with SIT and VXD layers 
+    //-------------------------------------------------
+
+    //    for( int l=nVXDLayers-1 ; l >=0 ; --l) {
+
+    for( int lx=nLayers-1 ; lx >=0 ; --lx) {
+
+      int detID = (  lx >= nVXDLayers  ?  ILDDetID::SIT   :  ILDDetID::VXD  ) ;
+      int layer = (  lx >= nVXDLayers  ?  lx - nVXDLayers  :  lx              ) ;
+
+      encoder.reset() ;
+      encoder[ ILDCellID0::subdet ] = detID ;
+      encoder[ ILDCellID0::layer  ] = layer ;
+      int layerID = encoder.lowWord() ;  
+      
+      gear::Vector3D point ; 
+      
+      int sensorID = -1 ;
+
+      int intersects = mTrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+      
+      encoder.setValue( sensorID )  ;
+
+      streamlog_out( DEBUG4 ) << " *******  pickUpSiTrackerHits - intersection with SIT/VXD layer " << layer 
+			      << " intersects:  " << MarlinTrk::errorCode( intersects ) 
+			      << " sensorID: " << encoder.valueString() 
+			      << std::endl ;
+      
+      if( intersects == MarlinTrk::IMarlinTrack::success ){
+	
+	std::list<TrackerHit*>& hL = hLMap[ sensorID ] ;
+	
+	streamlog_out( DEBUG4 ) << "    **** found candidate hits : " << hL.size()  
+				<< "         for point " << point << std::endl ;
+	
+	double min = 1.e99 ;
+	double maxDist = 1. ; //FIXME: make parameter - what is reasonable here ?
+	 
+	std::list<TrackerHit*>::iterator bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2( point ) , min ) ;
+	
+	if( bestIt == hL.end() || min  > maxDist ){
+
+	  streamlog_out( DEBUG4 ) << " ######### no close by hit found !! " << std::endl ;
+	  continue ; // FIXME: need to limit the number of layers w/o hits !!!!!!
+	}
+
+	double deltaChi ;
+	double dChi2Max = 35. ;
+
+	
+
+	streamlog_out( DEBUG1 ) << " will add best matching hit : " << *bestIt << " with distance : " << min << std::endl ;
+
+	int addHit = mTrk->addAndFit( *bestIt , deltaChi, dChi2Max ) ;
+	    
+	streamlog_out( DEBUG4 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
+				<< "         added : " << MarlinTrk::errorCode( addHit )
+				<< "   deltaChi2: " << deltaChi 
+				<< std::endl ;
+
+	if( addHit ==  MarlinTrk::IMarlinTrack::success ){
+
+
+	  trk->addHit( *bestIt ) ;
+	  hL.erase( bestIt ) ;
+
+	  IMPL::TrackStateImpl tsi ;
+	  double chi2N; int ndfN ;
+
+	  mTrk->getTrackState( tsi , chi2N , ndfN ) ; 
+
+	  streamlog_out( DEBUG4  )  << "  -- extrapolate TrackState : " << lcshort( (TrackState*)&tsi )  << "\n" 
+				    << " chi2: " << chi2N
+				    << " ndfN: " << ndfN    
+				    << std::endl ;
+
+	}
+
+      }
+    }
+
+    // -------------------------   update the track state ----------------------
+    // FIXME: should this be done in processEvent()  ?
+    lcio::TrackStateImpl* tsi =  new lcio::TrackStateImpl ;
+    double chi2 ;
+    int ndf  ;
+    const gear::Vector3D ipv( 0.,0.,0. );
+    
+    
+    // get track state at the IP 
+    int ret = mTrk->propagate(   ipv, *tsi, chi2, ndf ) ;
+    //    int ret = mTrk->extrapolate( ipv, *tsi, chi2, ndf ) ;
+    
+    if( ret == MarlinTrk::IMarlinTrack::success ){
+      
+      tsi->setLocation(  lcio::TrackState::AtIP ) ;
+      
+      delete trk->trackStates().back() ;
+      trk->trackStates().back() =  tsi ;
+
+      trk->setChi2( chi2 ) ;
+      trk->setNdf( ndf ) ;
+    } 
+  }
+}
+
+
+//====================================================================================================
 
 void ClupatraProcessor::end(){ 
   
@@ -933,5 +1033,6 @@ void ClupatraProcessor::end(){
 			    << std::endl ;
   
 }
+
 
 //====================================================================================================

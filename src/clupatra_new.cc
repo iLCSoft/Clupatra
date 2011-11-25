@@ -238,8 +238,115 @@ namespace clupatra_new{
 
   }
 
+  //------------------------------------------------------------------------------------------------------------
+  
+  bool addHitAndFilter( int detectorID, int layer, CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut) {
+    
+    Chi2_RPhi_Z_Hit ch2rzh ;
+    
+    IMarlinTrack* trk =  clu->ext<MarTrk>() ;
+    
+    UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
+    
+    encoder[ ILDCellID0::subdet ] = detectorID ;
+    encoder[ ILDCellID0::layer  ] = layer ;
+    
+    int layerID = encoder.lowWord() ;  
+    
+    gear::Vector3D xv ;
+    
+    int elementID = -1 ;
+    
+    int intersects = trk->intersectionWithLayer( layerID, xv, elementID , IMarlinTrack::modeClosest  ) ; 
+    
+    //  IMarlinTrack::modeBackward , IMarlinTrack::modeForward 
+    
+    streamlog_out( DEBUG4 ) <<  "  ============ addHitAndFilter(): looked for intersection - " 
+			    <<  "  detector : " <<  detectorID 
+			    <<  "  at layer: "   << layer      
+			    <<  "  intersects: " << MarlinTrk::errorCode( intersects )
+			    <<  "  next xing point : " <<  xv  ;
+    
+    bool hitAdded = false ;
+    
+    if( intersects == IMarlinTrack::success ) { // found a crossing point 
+      
+      //FIXME: this is copied from ClupatraProcessor 
+      static const int ZBins = 160 ; 
+      ZIndex zIndex( -2750. , 2750. ,ZBins  ) ; 
+      int zIndCP = zIndex.index( xv[2] ) ;
+      
+      HitList& hLL = hLV.at( layer ) ;
+      
+      double ch2Min = 1.e99 ;
+      Hit* bestHit = 0 ;
+      
+      for( HitList::const_iterator ih = hLL.begin(), end = hLL.end() ; ih != end ; ++ih ){    
+	
+	// if the z indices differ by more than one we can continue
+	if( nnclu::notInRange<-1,1>(  (*ih)->first->zIndex - zIndCP ) ) 
+	  continue ;
+	
+	double ch2 = ch2rzh( (*ih)->first , xv )  ;
+	
+	if( ch2 < ch2Min ){
+	  
+	  ch2Min = ch2 ;
+	  bestHit = (*ih) ;
+	}
+      }//-------------------------------------------------------------------
+      
+      
+      streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
+			     <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
+			     <<   " chi2: " <<  ch2Min 
+			     <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
+      
+      if( bestHit != 0 ){
+	
+	const gear::Vector3D&  hPos = bestHit->first->pos  ;
+	
+	if( ch2Min  < chi2Cut ) { 
+	  
+	  double deltaChi = 0. ;  
+	  
+	  int addHit = trk->addAndFit( bestHit->first->lcioHit, deltaChi, dChi2Max ) ;
+	  
+	  
+	  
+	  streamlog_out( DEBUG3 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
+				 <<   " dist: " <<  (  hPos - xv ).r()
+				 <<   " chi2: " <<  ch2Min 
+				 <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
+									+ bestHit->first->lcioHit->getCovMatrix()[2] ) 
+				 <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
+				 << std::endl ;
+	  
+	  
+	  
+	  
+	  
+	  if( addHit  == IMarlinTrack::success ) {
+	    
+	    hitAdded = true ;
+	    
+	    hLL.remove(  bestHit ) ;
+	    clu->addElement( bestHit ) ;
+	    
+	    
+	    streamlog_out( DEBUG4 ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
+	  }
+	} // chi2Cut 
+      } // bestHit
+      
+    } // intersection found
+
+    return hitAdded ;
+  }
+
 
   //------------------------------------------------------------------------------------------------------------
+
   void getHitMultiplicities( CluTrack* clu, std::vector<int>& mult ){
     
     // int static maxTPCLayerID = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 

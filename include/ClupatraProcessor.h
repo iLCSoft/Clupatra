@@ -52,9 +52,13 @@ class ClupatraProcessor : public Processor {
   
  protected:
 
+  void pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCEvent* evt) ;
+
   /** Input collection name.
    */
   std::string _colName ;
+  std::string _vxdColName ;
+  std::string _sitColName ;
   std::string _outColName ;
 
   float _distCut ;
@@ -66,6 +70,7 @@ class ClupatraProcessor : public Processor {
   bool _MSOn ;
   bool _ElossOn ;
   bool _SmoothOn ;
+  bool _pickUpSiHits ;
 
   int _nRun ;
   int _nEvt ;
