@@ -83,12 +83,12 @@ namespace clupatra_new{
     
     unsigned step = 0 ;
     
-    UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
-    encoder[ILDCellID0::subdet] = ILDDetID::TPC ;
+    UTIL::BitField64 encoder( UTIL::ILDCellID0::encoder_string ) ; 
+    encoder[UTIL::ILDCellID0::subdet] = UTIL::ILDDetID::TPC ;
     
 
     
-    TrackerHit* firstHit =  0 ; 
+    EVENT::TrackerHit* firstHit =  0 ; 
 
     if( backward ) {
 
@@ -114,7 +114,7 @@ namespace clupatra_new{
 	break ;
 
 
-      encoder[ ILDCellID0::layer ]  = layer ;
+      encoder[ UTIL::ILDCellID0::layer ]  = layer ;
       
       gear::Vector3D xv ;
       
@@ -242,10 +242,10 @@ namespace clupatra_new{
     
     IMarlinTrack* trk =  clu->ext<MarTrk>() ;
     
-    UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
+    UTIL::BitField64 encoder( UTIL::ILDCellID0::encoder_string ) ; 
     
-    encoder[ ILDCellID0::subdet ] = detectorID ;
-    encoder[ ILDCellID0::layer  ] = layer ;
+    encoder[ UTIL::ILDCellID0::subdet ] = detectorID ;
+    encoder[ UTIL::ILDCellID0::layer  ] = layer ;
     
     int layerID = encoder.lowWord() ;  
     

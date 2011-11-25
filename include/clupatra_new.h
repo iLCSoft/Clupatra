@@ -104,8 +104,8 @@ namespace clupatra_new{
   //------------------------------------------------------------------------------------------
 
   struct PtSort {  // sort tracks wtr to pt - largest first
-    inline bool operator()( const LCObject* l, const LCObject* r) {      
-      return ( std::abs( ( (const Track*) l )->getOmega() ) < std::abs( ( (const Track*) r )->getOmega() )  );  // pt ~ 1./omega  
+    inline bool operator()( const lcio::LCObject* l, const lcio::LCObject* r) {      
+      return ( std::abs( ( (const lcio::Track*) l )->getOmega() ) < std::abs( ( (const lcio::Track*) r )->getOmega() )  );  // pt ~ 1./omega  
     }
   };
 
@@ -188,38 +188,82 @@ namespace clupatra_new{
       trk->ext<MarTrk>()  = mtrk ;
 
       trk->setdEdx( e/nHit ) ;
-      trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
-      trk->subdetectorHitNumbers()[ 2*ILDDetID::TPC - 1 ] =  nHit ;  // ??used in fit?? 
-      trk->subdetectorHitNumbers()[ 2*ILDDetID::TPC - 2 ] =  nHit ;  
+      trk->subdetectorHitNumbers().resize( 2 * lcio::ILDDetID::ETD ) ;
+      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  nHit ;  // ??used in fit?? 
+      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  nHit ;  
       
       if( mtrk != 0 ){
-
-	lcio::TrackStateImpl* ts =  new lcio::TrackStateImpl ;
+	
+	lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
+	lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
+	lcio::TrackStateImpl* tsLH =  new lcio::TrackStateImpl ;
+	//	lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
+	
+	tsIP->setLocation(  lcio::TrackState::AtIP ) ;
+	tsFH->setLocation(  lcio::TrackState::AtFirstHit ) ;
+	tsLH->setLocation(  lcio::TrackState::AtLastHit) ;
+	//	tsCA->setLocation(  lcio::TrackState::AtCalo ) ;
+	
 	double chi2 ;
 	int ndf  ;
-	const gear::Vector3D ipv( 0.,0.,0. );
+	int code ;
+	
+	Hit* hf = c->front() ;
+	Hit* hb = c->back() ;
+	bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
 
-
-	// get track state at the IP 
-	//  fg: propagate is quite slow  and not really needed for the TPC
-	//  int ret = mtrk->propagate( ipv, *ts, chi2, ndf ) ;
-	//  
-	int ret = mtrk->extrapolate( ipv, *ts, chi2, ndf ) ;
-
-	if( ret == MarlinTrk::IMarlinTrack::success ){
+	lcio::TrackerHit* fHit =  ( reverse_order ?  hb->first->lcioHit  :  hf->first->lcioHit ) ;
+	lcio::TrackerHit* lHit =  ( reverse_order ?  hf->first->lcioHit  :  hb->first->lcioHit ) ;
+	
+	// ======= get TrackState at first hit  ========================
+	
+	code = mtrk->getTrackState( fHit, *tsFH, chi2, ndf ) ;
+	
+	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  ts->setLocation(  lcio::TrackState::AtIP ) ;
-	  
-	  trk->trackStates().push_back( ts ) ;
-	  trk->setChi2( chi2 ) ;
-	  trk->setNdf( ndf ) ;
-	  
-	} else {
-
-	  // ??
+ 	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " << std::endl ; 
 	}
+	
+	// ======= get TrackState at last hit  ========================
+	code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
+	
+	if( code != MarlinTrk::IMarlinTrack::success ){
+	  
+ 	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
+	}
+	
+	// ======= get TrackState at calo face  ========================
+	//
+	//     need ecal face as material layers in KalDet ....
+	//     or define planes and use helix utilitites ....
+	//
+	// ======= get TrackState at IP ========================
+	
+	const gear::Vector3D ipv( 0.,0.,0. );
+	
+	// fg: propagate is quite slow  and not really needed for the TPC
+	// int ret = mtrk->propagate( ipv, *tsIP, chi2, ndf ) ;
+	code = mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ;
+	
+	if( code != MarlinTrk::IMarlinTrack::success ){
+	  
+ 	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+	}
+	
+	trk->trackStates().push_back( tsIP ) ;
+	trk->trackStates().push_back( tsFH ) ;
+	trk->trackStates().push_back( tsLH ) ;
+	//	trk->trackStates().push_back( tsCA ) ;
+	
+	trk->setChi2( chi2 ) ;
+	trk->setNdf( ndf ) ;
+	
 
+      } else {
+	  
+	//	streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter::operator() (CluTrack* c)  :  no MarlinTrk::IMarlinTrack* found for cluster !!?? " << std::endl ; 
       }
+
 
       return trk ;
     }
