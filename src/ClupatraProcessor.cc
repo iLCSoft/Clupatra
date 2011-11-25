@@ -165,21 +165,34 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
   registerProcessorParameter( "MinimumClusterSize" , 
 			      "minimum number of hits per cluster"  ,
 			      _minCluSize ,
-			      (int) 3) ;
+			      (int) 6) ;
   
   
   registerProcessorParameter( "DuplicatePadRowFraction" , 
 			      "allowed fraction of hits in same pad row per track"  ,
 			      _duplicatePadRowFraction,
-			      (float) 0.01 ) ;
+			      (float) 0.1 ) ;
   
+  // registerProcessorParameter( "RCut" , 
+  // 			      "Cut for r_min in mm"  ,
+  // 			      _rCut ,
+  // 			      (float) 0.0 ) ;
   
-  registerProcessorParameter( "RCut" , 
- 			      "Cut for r_min in mm"  ,
- 			      _rCut ,
- 			      (float) 0.0 ) ;
+  registerProcessorParameter( "MaxDeltaChi2" , 
+ 			      "the maximum delta Chi2 for which a hit is added to a track segement"  ,
+ 			      _dChi2Max ,
+ 			      (float) 35. ) ;
+
+  registerProcessorParameter( "Chi2Cut" , 
+ 			      "the maximum chi2-distance for which a hit is considered for merging "  ,
+ 			      _chi2Cut ,
+ 			      (float) 100. ) ;
   
-  
+  registerProcessorParameter( "MaxStepWithoutHit" , 
+ 			      "the maximum number of layers without finding a hit before hit search search is stopped "  ,
+ 			      _maxStep ,
+ 			      (int) 3 ) ;
+
   registerProcessorParameter( "PadRowRange" , 
 			      "number of pad rows used in initial seed clustering"  ,
 			      _padRowRange ,
@@ -189,6 +202,17 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			      "number of bins in z over total length of TPC - hits from different z bins are nver merged"  ,
 			      _nZBins,
 			      (int) 150 ) ;
+
+
+  registerProcessorParameter( "MinLayerFractionWithMultiplicity" , 
+			      "minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters"  ,
+			      _minLayerFractionWithMultiplicity,
+			      (float) 0.5 ) ;
+
+  registerProcessorParameter( "MinLayerNumberWithMultiplicity" , 
+			      "minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters"  ,
+			      _minLayerNumberWithMultiplicity,
+			      (int) 3 ) ;
 
   registerProcessorParameter("MultipleScatteringOn",
 			     "Use MultipleScattering in Fit",
@@ -447,10 +471,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
       
-      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex ) ; 
+
+     addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex ) ; 
       
       static const bool backward = true ;
-      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
+      addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
     } 
 
     // merge the good clusters to final list
@@ -526,8 +551,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 			     << "     m[4] = " <<  mult[4] << std::endl ;
     
     
-    
-    if( float( mult[3]) / mult[0]  >= 0.5 &&  mult[3] >  3 ) {   //FIXME - make parameter
+    if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
       
       Clusterer::cluster_list reclu ; // reclustered leftover clusters
       reclu.setOwner() ;
@@ -540,15 +564,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	streamlog_out( DEBUG2 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
 	
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex) ; 
+	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
 	static const bool backward = true ;
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
-      } 
+	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+      }
       
       cluList.merge( reclu ) ;
     } 
     
-    else if( float( mult[2]) / mult[0]  >= 0.5 &&  mult[2] >  3 ) {   //FIXME - make parameter
+    else if( float( mult[2]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[2] >  _minLayerNumberWithMultiplicity ) {
       
       Clusterer::cluster_list reclu ; // reclustered leftover clusters
       reclu.setOwner() ;
@@ -561,15 +585,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	streamlog_out( DEBUG2 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
 	
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex) ; 
+	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
 	static const bool backward = true ;
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
+	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
       } 
       
       cluList.merge( reclu ) ;
 
     }
-    else if( float( mult[1]) / mult[0]  >= 0.5 &&  mult[1] >  3 ) {    
+    else if( float( mult[1]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[1] >  _minLayerNumberWithMultiplicity ) {    
 
 
       seedTrks.push_back( fitter( *it )  );
@@ -592,9 +616,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //===============================================================================================
   
   for( Clusterer::cluster_list::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
-    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex) ; 
+    addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
     static const bool backward = true ;
-    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
+    addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
   }
   
   
@@ -967,13 +991,10 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	}
 
 	double deltaChi ;
-	double dChi2Max = 35. ;
-
-	
 
 	streamlog_out( DEBUG1 ) << " will add best matching hit : " << *bestIt << " with distance : " << min << std::endl ;
 
-	int addHit = mTrk->addAndFit( *bestIt , deltaChi, dChi2Max ) ;
+	int addHit = mTrk->addAndFit( *bestIt , deltaChi, _dChi2Max ) ;
 	    
 	streamlog_out( DEBUG4 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
 				<< "         added : " << MarlinTrk::errorCode( addHit )

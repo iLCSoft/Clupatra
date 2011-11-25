@@ -62,8 +62,16 @@ class ClupatraProcessor : public Processor {
   std::string _outColName ;
 
   float _distCut ;
-  float _rCut ;
+  //  float _rCut ;
   float _duplicatePadRowFraction ;
+  
+  float  _dChi2Max ;
+  float  _chi2Cut ;
+  int    _maxStep ; 
+
+  float _minLayerFractionWithMultiplicity ;
+  int   _minLayerNumberWithMultiplicity ;
+  
   int   _minCluSize ;
   int   _padRowRange ; 
   int   _nZBins ;
