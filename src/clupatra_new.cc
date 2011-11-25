@@ -61,11 +61,10 @@ namespace clupatra_new{
   //-------------------------------------------------------------------------------
   
 
-  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, bool backward) {
+  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, ZIndex& zIndex, bool backward) {
     
-
-    int static maxTPCLayerID = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
-    
+    const int maxTPCLayerID  = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
+   
     clu->sort( LayerSortIn() ) ;
     
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
@@ -152,18 +151,15 @@ namespace clupatra_new{
       
       if( intersects == IMarlinTrack::success ) { // found a crossing point 
 	
-	//FIXME: this is copied from ClupatraProcessor 
-	static const int ZBins = 160 ; 
-	ZIndex zIndex( -2750. , 2750. ,ZBins  ) ; 
 	int zIndCP = zIndex.index( xv[2] ) ;
-
+	
  	HitList& hLL = hLV.at( layer ) ;
 	
 	double ch2Min = 1.e99 ;
 	Hit* bestHit = 0 ;
 
 	for( HitList::const_iterator ih = hLL.begin(), end = hLL.end() ; ih != end ; ++ih ){    
-
+	  
 	  // if the z indices differ by more than one we can continue
 	  if( nnclu::notInRange<-1,1>(  (*ih)->first->zIndex - zIndCP ) ) 
 	    continue ;

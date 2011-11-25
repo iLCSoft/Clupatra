@@ -185,6 +185,11 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			      _padRowRange ,
 			      (int) 12) ;
  
+  registerProcessorParameter( "NumberOfZBins" , 
+			      "number of bins in z over total length of TPC - hits from different z bins are nver merged"  ,
+			      _nZBins,
+			      (int) 150 ) ;
+
   registerProcessorParameter("MultipleScatteringOn",
 			     "Use MultipleScattering in Fit",
 			     _MSOn,
@@ -274,20 +279,19 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   Clusterer::cluster_list cluList ;    
   cluList.setOwner() ;
   
-  //FIXME: parameter !
-  static const int ZBins = 160 ; // with 200 bins we can miss tracks in the very forward region  
-  ZIndex zIndex( -2750. , 2750. ,ZBins  ) ; 
-  
+
   HitDistance dist( _distCut ) ;
   // HitDistance dist( 20. ) ;
   
   LCIOTrackConverter converter ;
   
-  
   const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
   const gear::PadRowLayout2D& padLayout = gearTPC.getPadLayout() ;
 
   unsigned maxTPCLayers =  padLayout.getNRows() ;
+  
+  double driftLength = gearTPC.getMaxDriftLength() ;
+  ZIndex zIndex( -driftLength , driftLength , _nZBins  ) ; 
   
 
   LCCollection* col = 0 ;
@@ -443,10 +447,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
       
-      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
+      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex ) ; 
       
       static const bool backward = true ;
-      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+      addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
     } 
 
     // merge the good clusters to final list
@@ -536,9 +540,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	streamlog_out( DEBUG2 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
 	
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex) ; 
 	static const bool backward = true ;
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
       } 
       
       cluList.merge( reclu ) ;
@@ -557,9 +561,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	streamlog_out( DEBUG2 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
 	
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 ) ; 
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex) ; 
 	static const bool backward = true ;
-	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+	addHitsAndFilter( *ir , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
       } 
       
       cluList.merge( reclu ) ;
@@ -588,9 +592,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //===============================================================================================
   
   for( Clusterer::cluster_list::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
-    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 ) ; 
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex) ; 
     static const bool backward = true ;
-    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , backward ) ; 
+    addHitsAndFilter( *icv , hitsInLayer , 35. , 100.,  3 , zIndex, backward ) ; 
   }
   
   
@@ -859,8 +863,6 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
   int nLayers  = nVXDLayers + nSITLayers  ;
 
-  double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
-
 
   // ============ sort tracks wrt pt (1./omega) ===============
   LCCollectionVec* tv  = dynamic_cast<LCCollectionVec*>(trackCol) ;
@@ -878,7 +880,8 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 #if 0 //===========================================================================================
 
       std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
-      
+
+      double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
       
       const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
       

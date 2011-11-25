@@ -66,6 +66,7 @@ class ClupatraProcessor : public Processor {
   float _duplicatePadRowFraction ;
   int   _minCluSize ;
   int   _padRowRange ; 
+  int   _nZBins ;
 
   bool _MSOn ;
   bool _ElossOn ;

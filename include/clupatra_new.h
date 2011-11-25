@@ -337,7 +337,7 @@ namespace clupatra_new{
    *  Hits are added if the resulting delta Chi2 is less than dChiMax - a maxStep is the maximum number of steps (layers) w/o 
    *  successfully merging a hit.
    */
-  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep,  bool backward=false) ; 
+  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, ZIndex& zIndex,  bool backward=false) ; 
   //------------------------------------------------------------------------------------------
   
   /** Try to add a hit from the given HitList in layer of subdetector to the track.
