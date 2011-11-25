@@ -180,10 +180,9 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   static const double alpha =  2.99792458e-4 * bField ;  ;
   // p_t[GeV] = alpha / omega[mm] ;
 
-  static const double ptMin = _ptRange[0] ;
-  static const double ptMax = _ptRange[1] ;
-
-  static double ptMean = ( ptMax + ptMin ) / 2. ;
+  //static const double ptMin = _ptRange[0] ;
+  //static const double ptMax = _ptRange[1] ;
+  //static double ptMean = ( ptMax + ptMin ) / 2. ;
 
 
   //----------------------------------------------------------------------
@@ -381,12 +380,12 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     
     double pxmcp =  trm->getMomentum()[0]  ;
     double pymcp =  trm->getMomentum()[1]  ;
-    double pzmcp =  trm->getMomentum()[2]  ;
+    //    double pzmcp =  trm->getMomentum()[2]  ;
     
-    double pmcp  = sqrt( pxmcp*pxmcp + pymcp*pymcp + pzmcp*pzmcp ) ;
+   //    double pmcp  = sqrt( pxmcp*pxmcp + pymcp*pymcp + pzmcp*pzmcp ) ;
     double ptmcp = sqrt( pxmcp*pxmcp + pymcp*pymcp ) ;
     
-    double thmcp  = atan2( ptmcp , pzmcp ) ;
+    // double thmcp  = atan2( ptmcp , pzmcp ) ;
 
     // double d0mcp = 0. ;  //fixme: only true for prompt tracks
     // double phmcp = atan2( pymcp, pxmcp) ;
