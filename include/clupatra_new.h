@@ -250,10 +250,15 @@ namespace clupatra_new{
  	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
 	}
 	
-	trk->trackStates().push_back( tsIP ) ;
-	trk->trackStates().push_back( tsFH ) ;
-	trk->trackStates().push_back( tsLH ) ;
-	//	trk->trackStates().push_back( tsCA ) ;
+	// trk->trackStates().push_back( tsIP ) ;
+	// trk->trackStates().push_back( tsFH ) ;
+	// trk->trackStates().push_back( tsLH ) ;
+	// //	trk->trackStates().push_back( tsCA ) ;
+
+	trk->addTrackState( tsIP ) ;
+	trk->addTrackState( tsFH ) ;
+	trk->addTrackState( tsLH ) ;
+	//	trk->addTrackState( tsCA ) ;
 	
 	trk->setChi2( chi2 ) ;
 	trk->setNdf( ndf ) ;

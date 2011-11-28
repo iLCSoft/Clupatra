@@ -100,7 +100,7 @@ template <class In, class Pred> In find_smallest(In first, In last, Pred p, doub
 
   d = min ;
 
-  streamlog_out( DEBUG4 ) << " found smallest " << *res << " min : " << d << std::endl ;
+  streamlog_out( DEBUG ) << " found smallest " << *res << " min : " << d << std::endl ;
 
   return res ;
 }
@@ -1039,8 +1039,28 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       
       tsi->setLocation(  lcio::TrackState::AtIP ) ;
       
-      delete trk->trackStates().back() ;
-      trk->trackStates().back() =  tsi ;
+
+      // the track state at the IP needs to be the first one
+      //  -> we have to copy the whole vector, and then add 
+      //     all track states except the old one at the IP ....
+      TrackStateVec tsv  = trk->trackStates() ;
+      trk->trackStates().clear() ;
+      
+      trk->addTrackState( tsi ) ;
+      
+      for( int i=0, N=tsv.size() ; i<N ; ++i ){
+
+	if( tsv[i]->getLocation() == lcio::TrackState::AtIP ) {
+
+	  delete  tsv[i] ;
+
+	}else{
+
+	  trk->addTrackState( tsv[i] ) ;
+	}
+      } //-----------------------------------------------------------------
+
+
 
       trk->setChi2( chi2 ) ;
       trk->setNdf( ndf ) ;
