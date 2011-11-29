@@ -636,6 +636,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
   
+  std::for_each( finalTrks.begin() , finalTrks.end() , std::mem_fun_t< int, MarlinTrk::IMarlinTrack >( &MarlinTrk::IMarlinTrack::smooth )  ) ;
+
+
   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
 
   
@@ -690,93 +693,163 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     nntrkclu.cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), trkMerge , 2  ) ;
 
 
-    streamlog_out( DEBUG3 ) << " ===== merged tracks - # cluster: " << trkCluVec.size()   
+    streamlog_out( DEBUG4 ) << " ===== merged tracks - # cluster: " << trkCluVec.size()   
 			    << " from " << tsCol->size() << " track segments "    << "  ============================== " << std::endl ;
     
     for(  TrackClusterer::cluster_vector::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
       
-      streamlog_out( DEBUG2 ) <<  lcio::header<Track>() << std::endl ;
+      streamlog_out( DEBUG4 ) <<  lcio::header<Track>() << std::endl ;
       
       TrackClusterer::cluster_type*  trkClu = *it ;
 
       std::list<Track*> mergedTrk ;
+
       for( TrackClusterer::cluster_type::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
 	
-	streamlog_out( DEBUG2 ) << lcshort(  (*itC)->first ) << std::endl ; 
-
+	streamlog_out( DEBUG4 ) << lcshort(  (*itC)->first ) << std::endl ; 
+	
 	mergedTrk.push_back( (*itC)->first ) ; 
       }
-
-      // create a new LCIO track for the merged cluster ...
+      
+      //      std::sort(  mergedTrk.begin() , mergedTrk.end() , TrackZSort() ) ;
+      mergedTrk.sort( TrackZSort() ) ;
+      
+      // ====== create a new LCIO track for the merged cluster ...
       TrackImpl* trk = new TrackImpl ;
-      Track* bestTrk = 0 ;
       
-      double min = 1.e99 ;
-      int hitCount = 0 ;
-      
+      // == and copy all the hits 
+      unsigned hitCount = 0 ;
       for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
 	
-	double z = 0. ;
       	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
-	
-      	for(unsigned i=0 ; i < hV.size() ; ++i){
+	for(unsigned i=0, n=hV.size() ; i<n ; ++i){
 	  
       	  trk->addHit( hV[i] ) ;
-
-      	  ++hitCount ;
-
-	  z+= hV[i]->getPosition()[2] ;
-	  
       	}
-
-	double val = std::abs( z) / hV.size() ;  // take parameters from track segment that is closests to IP .....
-
-	//double val = (*itML)->getChi2() / (*itML)->getNdf() ; 
-	
-	streamlog_out( DEBUG ) << "   ---  " <<   &mergedTrk <<   " new  value : " << val << "   -- " << lcshort( *itML ) << std::endl ;
-
-      	if( val < min ){
-      	  bestTrk = (*itML) ;
-      	  min  = val  ;
-      	}
+	hitCount  += hV.size()  ;
       }
       
+      // take track states from first and last track :
+      Track* firstTrk = mergedTrk.front() ;
+      Track* lastTrk  = mergedTrk.back() ;
       
-      if( bestTrk != 0 ){ 
-	
-	int hitsInFit = bestTrk->getTrackerHits().size() ;
-	
-	trk->setD0( bestTrk->getD0() ) ;
-	trk->setOmega( bestTrk->getOmega() ) ;
-	trk->setPhi( bestTrk->getPhi() ) ;
-	trk->setZ0( bestTrk->getZ0() ) ;
-	trk->setTanLambda( bestTrk->getTanLambda() ) ;
-	trk->setCovMatrix( bestTrk->getCovMatrix()  ) ;
-	// ...
-	trk->ext<MarTrk>() = bestTrk->ext<MarTrk>() ;
-	
+      const TrackState* ts = 0 ; 
+      ts = firstTrk->getTrackState( lcio::TrackState::AtIP  ) ;
+      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
 
-	trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
-	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
-	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
-	
+      ts = firstTrk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
 
-	streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
-				<< "  with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
-				<< std::endl ;
-	
+      ts = lastTrk->getTrackState( lcio::TrackState::AtLastHit  ) ;
+      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
 
-	outCol->addElement( trk )  ;
-      }
-      else{
-	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
-	delete trk ;
-      }
+      ts = lastTrk->getTrackState( lcio::TrackState::AtCalorimeter  ) ;
+      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+
+
+      trk->ext<MarTrk>() = firstTrk->ext<MarTrk>() ;
       
+      int hitsInFit = firstTrk->getTrackerHits().size() ;
+
+      trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
+      trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
+      trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
       
+
+      streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
+			      << "   with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
+			      << std::endl ;
+      
+
+      outCol->addElement( trk )  ;
     }
 
+    // for(  TrackClusterer::cluster_vector::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
+      
+    //   streamlog_out( DEBUG2 ) <<  lcio::header<Track>() << std::endl ;
+      
+    //   TrackClusterer::cluster_type*  trkClu = *it ;
+
+    //   std::list<Track*> mergedTrk ;
+    //   for( TrackClusterer::cluster_type::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
+	
+    // 	streamlog_out( DEBUG2 ) << lcshort(  (*itC)->first ) << std::endl ; 
+
+    // 	mergedTrk.push_back( (*itC)->first ) ; 
+    //   }
+
+    //   // create a new LCIO track for the merged cluster ...
+    //   TrackImpl* trk = new TrackImpl ;
+    //   Track* bestTrk = 0 ;
+      
+    //   double min = 1.e99 ;
+    //   int hitCount = 0 ;
+      
+    //   for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
+	
+    // 	double z = 0. ;
+    //   	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
+	
+    //   	for(unsigned i=0 ; i < hV.size() ; ++i){
+	  
+    //   	  trk->addHit( hV[i] ) ;
+
+    //   	  ++hitCount ;
+
+    // 	  z+= hV[i]->getPosition()[2] ;
+	  
+    //   	}
+
+    // 	double val = std::abs( z) / hV.size() ;  // take parameters from track segment that is closests to IP .....
+
+    // 	//double val = (*itML)->getChi2() / (*itML)->getNdf() ; 
+	
+    // 	streamlog_out( DEBUG ) << "   ---  " <<   &mergedTrk <<   " new  value : " << val << "   -- " << lcshort( *itML ) << std::endl ;
+
+    //   	if( val < min ){
+    //   	  bestTrk = (*itML) ;
+    //   	  min  = val  ;
+    //   	}
+    //   }
+      
+      
+    //   if( bestTrk != 0 ){ 
+	
+    // 	int hitsInFit = bestTrk->getTrackerHits().size() ;
+	
+    // 	trk->setD0( bestTrk->getD0() ) ;
+    // 	trk->setOmega( bestTrk->getOmega() ) ;
+    // 	trk->setPhi( bestTrk->getPhi() ) ;
+    // 	trk->setZ0( bestTrk->getZ0() ) ;
+    // 	trk->setTanLambda( bestTrk->getTanLambda() ) ;
+    // 	trk->setCovMatrix( bestTrk->getCovMatrix()  ) ;
+    // 	// ...
+    // 	trk->ext<MarTrk>() = bestTrk->ext<MarTrk>() ;
+	
+
+    // 	trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
+    // 	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
+    // 	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
+	
+
+    // 	streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
+    // 				<< "  with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
+    // 				<< std::endl ;
+	
+
+    // 	outCol->addElement( trk )  ;
+    //   }
+    //   else{
+    // 	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
+    // 	delete trk ;
+    //   }
+      
+      
+    // }
+
+    //---------------------------------------------------------------------------------------------
     // add all tracks that have not been merged :
+
     for( TrackClusterer::element_vector::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
 
       if( (*it)->second == 0 ){

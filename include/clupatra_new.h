@@ -165,12 +165,17 @@ namespace clupatra_new{
   
 
 
-  //------------------------------------------------------------------------------------------
+  //-----------------------------------------------
   
   struct LCIOTrackConverter{
     
+    bool UsePropagate ;
+    LCIOTrackConverter() : UsePropagate(false ) {} 
+
     lcio::Track* operator() (CluTrack* c) {  
     
+      static lcio::BitField64 encoder( lcio::ILDCellID0::encoder_string ) ; 
+
       lcio::TrackImpl* trk = new lcio::TrackImpl ;
  
    
@@ -197,12 +202,12 @@ namespace clupatra_new{
 	lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
 	lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
 	lcio::TrackStateImpl* tsLH =  new lcio::TrackStateImpl ;
-	//	lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
+	lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
 	
 	tsIP->setLocation(  lcio::TrackState::AtIP ) ;
 	tsFH->setLocation(  lcio::TrackState::AtFirstHit ) ;
 	tsLH->setLocation(  lcio::TrackState::AtLastHit) ;
-	//	tsCA->setLocation(  lcio::TrackState::AtCalo ) ;
+	tsCA->setLocation(  lcio::TrackState::AtCalorimeter ) ;
 	
 	double chi2 ;
 	int ndf  ;
@@ -237,28 +242,57 @@ namespace clupatra_new{
 	//     need ecal face as material layers in KalDet ....
 	//     or define planes and use helix utilitites ....
 	//
+	encoder.reset() ;
+	encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
+	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
+	encoder[ lcio::ILDCellID0::side   ] =  0  ;
+	int layerID = encoder.lowWord() ;  
+	int sensorID = -1 ;
+	gear::Vector3D point ;
+	
+	code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	
+	if( code == MarlinTrk::IMarlinTrack::success ){
+	  
+	  code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
+	  
+	} else { // try endcap
+	  
+	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   1.  :  -1   ) ;
+	  layerID = encoder.lowWord() ;
+	  
+	  code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	  if( code == MarlinTrk::IMarlinTrack::success ){
+	    
+	    code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
+	    
+	  } else {
+	    
+	    streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " 
+				   << std::endl ;
+	    
+	  }
+	}
+	
+
+
 	// ======= get TrackState at IP ========================
 	
 	const gear::Vector3D ipv( 0.,0.,0. );
 	
-	// fg: propagate is quite slow  and not really needed for the TPC
-	// int ret = mtrk->propagate( ipv, *tsIP, chi2, ndf ) ;
-	code = mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ;
+	// fg: propagate is quite slow  and might not really be needed for the TPC
+	
+	code = ( UsePropagate ?   mtrk->propagate( ipv, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
  	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
 	}
 	
-	// trk->trackStates().push_back( tsIP ) ;
-	// trk->trackStates().push_back( tsFH ) ;
-	// trk->trackStates().push_back( tsLH ) ;
-	// //	trk->trackStates().push_back( tsCA ) ;
-
 	trk->addTrackState( tsIP ) ;
 	trk->addTrackState( tsFH ) ;
 	trk->addTrackState( tsLH ) ;
-	//	trk->addTrackState( tsCA ) ;
+	trk->addTrackState( tsCA ) ;
 	
 	trk->setChi2( chi2 ) ;
 	trk->setNdf( ndf ) ;
@@ -581,7 +615,15 @@ namespace clupatra_new{
     float _dCut ;
   } ; 
 
-
+  //=======================================================================================
+  
+  struct TrackZSort {  // sort tracks wtr to abs(z_average )  
+    inline bool operator()( lcio::Track* l, lcio::Track* r) {      
+      return (  std::abs( l->ext<TrackInfo>()->zAvg )   <   std::abs( r ->ext<TrackInfo>()->zAvg )  ) ; 
+    }
+  };
+  
+  
   //=======================================================================================
   
   /** Helper class that creates an Elements for an LCOjects of type T.
