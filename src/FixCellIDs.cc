@@ -2,7 +2,7 @@
 #include <iostream>
 
 #include <EVENT/LCCollection.h>
-#include <Impl/TrackerHitImpl.h>
+#include <IMPL/TrackerHitImpl.h>
 #include <UTIL/BitField64.h>
 #include <UTIL/ILDConf.h>
 #include <UTIL/LCTOOLS.h>
