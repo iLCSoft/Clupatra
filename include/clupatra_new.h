@@ -240,42 +240,42 @@ namespace clupatra_new{
 	
 	// ======= get TrackState at calo face  ========================
 	//
-	//     need ecal face as material layers in KalDet ....
-	//     or define planes and use helix utilitites ....
-	//
 	encoder.reset() ;
 	encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
 	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
-	encoder[ lcio::ILDCellID0::side   ] =  0  ;
-	int layerID = encoder.lowWord() ;  
+	encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
+	int layerID  = encoder.lowWord() ;  
 	int sensorID = -1 ;
-	gear::Vector3D point ;
+
+	///	gear::Vector3D point ;
+	// code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	// if( code == MarlinTrk::IMarlinTrack::success ){
+	//   code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
+	// } else { // try endcap
+	//   encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   1.  :  -1   ) ;
+	//   layerID = encoder.lowWord() ;
+	//   code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	//   if( code == MarlinTrk::IMarlinTrack::success ){
+	//     code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
+	//   } else {
+	//     streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " 
+	// 			   << std::endl ;
+	//   }
+	// }
 	
-	code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
 	
-	if( code == MarlinTrk::IMarlinTrack::success ){
+	if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
 	  
-	  code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
-	  
-	} else { // try endcap
-	  
-	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   1.  :  -1   ) ;
+	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
 	  layerID = encoder.lowWord() ;
 	  
-	  code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
-	  if( code == MarlinTrk::IMarlinTrack::success ){
-	    
-	    code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
-	    
-	  } else {
-	    
-	    streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " 
-				   << std::endl ;
-	    
-	  }
+	  code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
 	}
-	
+	if ( code !=MarlinTrk::IMarlinTrack::success ) {
 
+	  streamlog_out( WARNING ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
+	}
 
 	// ======= get TrackState at IP ========================
 	
@@ -283,7 +283,7 @@ namespace clupatra_new{
 	
 	// fg: propagate is quite slow  and might not really be needed for the TPC
 	
-	code = ( UsePropagate ?   mtrk->propagate( ipv, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
+	code = ( UsePropagate ?   mtrk->propagate( ipv, fHit, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
