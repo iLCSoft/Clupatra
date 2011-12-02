@@ -2,6 +2,7 @@
 #define clupatra_new_h
 
 #include <cmath>
+#include <algorithm>
 #include <time.h>
 #include <math.h>
 #include <sstream>
