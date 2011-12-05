@@ -245,6 +245,11 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			     _vxdColName ,
 			     std::string("VTXTrackerHits")  ) ;
   
+  registerProcessorParameter("CreateDebugCollections",
+			     "optionally create some debug collection with intermediate track segments and used and unused hits",
+			     _createDebugCollections,
+			     bool(false));
+  
 }
 
 
@@ -382,20 +387,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //---------------------------------------------------------------------------------------------------------
 
   //===============================================================================================
-  //   create some additional (optional) output collections
+  //   create output collections  ( some optional )
   //===============================================================================================
 
+  const bool writeSeedCluster      = _createDebugCollections ;
+  const bool writeCluTrackSegments = _createDebugCollections ;
+  const bool writeLeftoverClusters = _createDebugCollections ;
+  
+  LCCollectionVec* seedCol =  ( writeSeedCluster      ?  newTrkCol( "ClupatraSeedCluster"      , evt )  :   0   )  ; 
+  LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "ClupatraInitialTrackSegments" , evt )  :   0   )  ; 
+  LCCollectionVec* locCol  =  ( writeCluTrackSegments ?  newTrkCol( "ClupatraLeftoverClusters" , evt )  :   0   )  ; 
+  
 
-  static const bool writeSeedCluster = true ;
-  static const bool writeCluTrackSegments = true ;
-  static const bool writeLeftoverClusters = true ;
-  
-  LCCollectionVec* seedCol =  ( writeSeedCluster      ?  newTrkCol( "SeedCluster"      , evt )  :   0   )  ; 
-  
-  LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "CluTrackSegments" , evt )  :   0   )  ; 
-  
-  LCCollectionVec* locCol  =  ( writeCluTrackSegments ?  newTrkCol( "LeftoverClusters" , evt )  :   0   )  ; 
-  
   LCCollectionVec* tsCol  =  newTrkCol( "ClupatraTrackSegments" , evt ) ;
   
   LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
@@ -645,25 +648,26 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   timer.time( t_finalfit) ;
   
   //===============================================================================================
-  //   create collections of used and unused TPC hits 
+  //   optionally create collections of used and unused TPC hits 
   //===============================================================================================
   
-  LCCollectionVec* usedHits   = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
-  LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
-  evt->addCollection( usedHits ,   "UsedTPCCluTrackerHits"   ) ;
-  evt->addCollection( unUsedHits , "UnUsedTPCCluTrackerHits" ) ;
-  usedHits->setSubset() ;
-  unUsedHits->setSubset() ;
-  usedHits->reserve(   nncluHits.size() ) ;
-  unUsedHits->reserve( nncluHits.size() ) ;
-  
-  for( HitVec::iterator it = nncluHits.begin(), end = nncluHits.end(); it!=end;++it ){
+  if( _createDebugCollections ) {
+    LCCollectionVec* usedHits   = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+    LCCollectionVec* unUsedHits = new LCCollectionVec( LCIO::TRACKERHIT ) ;   ;
+    evt->addCollection( usedHits ,   "ClupatraUsedTPCHits"   ) ;
+    evt->addCollection( unUsedHits , "ClupatraUnUsedTPCHits" ) ;
+    usedHits->setSubset() ;
+    unUsedHits->setSubset() ;
+    usedHits->reserve(   nncluHits.size() ) ;
+    unUsedHits->reserve( nncluHits.size() ) ;
     
-    if( (*it)->second != 0 ){   usedHits->push_back( (*it)->first->lcioHit ) ;
-    } else {                  unUsedHits->push_back( (*it)->first->lcioHit ) ;          
+    for( HitVec::iterator it = nncluHits.begin(), end = nncluHits.end(); it!=end;++it ){
+      
+      if( (*it)->second != 0 ){   usedHits->push_back( (*it)->first->lcioHit ) ;
+      } else {                  unUsedHits->push_back( (*it)->first->lcioHit ) ;          
+      }
     }
   }
-  
 
   //===============================================================================================
   //  merge track segements 
@@ -913,7 +917,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   
   /*************************************************************************************************/
   
-  streamlog_out( DEBUG2  ) << " ************ pickUpSiTrackerHits() called - nTracks : " << trackCol->getNumberOfElements() <<std::endl ;
+  streamlog_out( DEBUG3  ) << " ************ pickUpSiTrackerHits() called - nTracks : " << trackCol->getNumberOfElements() <<std::endl ;
   
   std::map< int , std::list<TrackerHit*> > hLMap ;
   
@@ -938,13 +942,13 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   }
 
 
-  streamlog_out( DEBUG2 ) << "  *****  hitMap size : " <<   hLMap.size() << std::endl ;
+  streamlog_out( DEBUG3 ) << "  *****  hitMap size : " <<   hLMap.size() << std::endl ;
   
   for( std::map< int , std::list<TrackerHit*> >::iterator it= hLMap.begin(), End = hLMap.end() ; it != End ; ++it ){
     
     encoder.setValue( it->first ) ;
     
-    streamlog_out( DEBUG2 ) << "  *****  sensor: " << encoder.valueString()  << " - nHits: " <<  it->second.size()  << std::endl ;
+    streamlog_out( DEBUG3 ) << "  *****  sensor: " << encoder.valueString()  << " - nHits: " <<  it->second.size()  << std::endl ;
     
   }
   
@@ -993,7 +997,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 //       if( nHit == 0 || ts ==0 )
 // 	continue ;
       
-//       streamlog_out( DEBUG2  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+//       streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
       
 //       //need to add a dummy hit to the track
 //       mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
@@ -1011,7 +1015,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
       if( mTrk == 0 ){
 	
-	streamlog_out( DEBUG2  )  << "  ------ null pointer in ext<MarTrk> ! ?? ..... " << std::endl ;
+	streamlog_out( DEBUG3  )  << "  ------ null pointer in ext<MarTrk> ! ?? ..... " << std::endl ;
 	continue ;
       }
 
@@ -1041,7 +1045,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       
       encoder.setValue( sensorID )  ;
 
-      streamlog_out( DEBUG2 ) << " *******  pickUpSiTrackerHits - intersection with SIT/VXD layer " << layer 
+      streamlog_out( DEBUG3 ) << " *******  pickUpSiTrackerHits - intersection with SIT/VXD layer " << layer 
 			      << " intersects:  " << MarlinTrk::errorCode( intersects ) 
 			      << " sensorID: " << encoder.valueString() 
 			      << std::endl ;
@@ -1050,7 +1054,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	
 	std::list<TrackerHit*>& hL = hLMap[ sensorID ] ;
 	
-	streamlog_out( DEBUG2 ) << "    **** found candidate hits : " << hL.size()  
+	streamlog_out( DEBUG3 ) << "    **** found candidate hits : " << hL.size()  
 				<< "         for point " << point << std::endl ;
 	
 	double min = 1.e99 ;
@@ -1060,17 +1064,17 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	
 	if( bestIt == hL.end() || min  > maxDist ){
 
-	  streamlog_out( DEBUG2 ) << " ######### no close by hit found !! " << std::endl ;
+	  streamlog_out( DEBUG3 ) << " ######### no close by hit found !! " << std::endl ;
 	  continue ; // FIXME: need to limit the number of layers w/o hits !!!!!!
 	}
 
 	double deltaChi ;
 
-	streamlog_out( DEBUG1 ) << " will add best matching hit : " << *bestIt << " with distance : " << min << std::endl ;
+	streamlog_out( DEBUG3 ) << " will add best matching hit : " << *bestIt << " with distance : " << min << std::endl ;
 
 	int addHit = mTrk->addAndFit( *bestIt , deltaChi, _dChi2Max ) ;
 	    
-	streamlog_out( DEBUG2 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
+	streamlog_out( DEBUG3 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
 				<< "         added : " << MarlinTrk::errorCode( addHit )
 				<< "   deltaChi2: " << deltaChi 
 				<< std::endl ;
@@ -1086,7 +1090,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	  mTrk->getTrackState( tsi , chi2N , ndfN ) ; 
 
-	  streamlog_out( DEBUG2  )  << "  -- extrapolate TrackState : " << lcshort( (TrackState*)&tsi )  << "\n" 
+	  streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( (TrackState*)&tsi )  << "\n" 
 				    << " chi2: " << chi2N
 				    << " ndfN: " << ndfN    
 				    << std::endl ;
