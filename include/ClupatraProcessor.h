@@ -81,6 +81,8 @@ class ClupatraProcessor : public Processor {
   bool _SmoothOn ;
   bool _pickUpSiHits ;
 
+  bool _createDebugCollections ;
+
   int _nRun ;
   int _nEvt ;
 
