@@ -180,13 +180,9 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
       
       h->setCellID0(  layerID ) ;
       
-      vxdCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
     }
+    vxdCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
 
-    // if( streamlog_level( DEBUG )  ) {
-    //   UTIL::LCTOOLS::printTrackerHits(  vxdCol ) ;
-    // }
-    
   }
 
 
