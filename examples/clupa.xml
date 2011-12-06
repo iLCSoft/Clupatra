@@ -71,6 +71,8 @@
 	  <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
 	  <!--the maximum chi2-distance for which a hit is considered for merging -->
 	  <parameter name="Chi2Cut" type="float">100 </parameter>
+	  <!--optionally create some debug collection with intermediate track segments and used and unused hits-->
+	  <parameter name="CreateDebugCollections" type="bool">true</parameter>
 	  <!--Cut for distance between hits in mm-->
 	  <parameter name="DistanceCut" type="float">40 </parameter>
 	  <!--allowed fraction of hits in same pad row per track-->
@@ -97,11 +99,11 @@
 	  <parameter name="PadRowRange" type="int">15 </parameter>
 
 	  <!--try to pick up hits from Si-trackers-->
-	  <parameter name="pickUpSiHits" type="bool">false </parameter>
+	  <parameter name="pickUpSiHits" type="bool">true false </parameter>
 	  <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
 	  <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter>
 	  <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
-	  <parameter name="VXDHitCollection" type="string">VTXTrackerHits </parameter>
+	  <parameter name="VXDHitCollection" type="string">VTXTrackerHitsPlanar </parameter>
 
 	  <!--Smooth All Mesurement Sites in Fit-->
 	  <parameter name="SmoothOn" type="bool">false </parameter>
@@ -114,8 +116,8 @@
 
 
 	<processor name="MyCEDViewer" type="CEDViewer">
-	  <!--draw a helix for Track objects-->
-	  <parameter name="DrawHelixForTrack" type="bool"> true  false </parameter>
+           <!--draw a helix for Track objects:0 none, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
+           <parameter name="DrawHelixForTrack" type="int"> 1 </parameter>
 
 	  <!--color scheme to be used for drawing - see MESSAGE for options-->
 	  <parameter name="ColorScheme" type="int">12</parameter>
@@ -126,25 +128,27 @@
 	  <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
 		<parameter name="DrawInLayer"> 
 		  TPCTracks 0 3 0
-		  SeedCluster 0 4 1 
-		  LeftoverClusters 0 3 2
+		  ClupatraSeedCluster 0 4 1 
+		  ClupatraLeftoverClusters 0 3 2
 
 		  PandoraPFOs 0 2 3
-		  VTXTrackerHitsPlanar  0 3 4
+		  VTXTrackerHits  0 6 4
+		  SITTrackerHits  0 6 4
 
 		  ClupatraTrackSegments 0 4 6
-		  CluTrackSegments 0 3 7 
+		  ClupatraInitialTrackSegments 0 3 7 
 
-		  UsedTPCCluTrackerHits   0 2  8
-		  UnUsedTPCCluTrackerHits 0 3 9
+		  ClupatraUsedTPCHits   0 2  8
+		  ClupatraUnUsedTPCHits 0 3 9
 
 		  LDCTracks 0 5 11
 
-		  OddMCPTracks 0 3 14
+		  MCParticle  0 3 15
+		  
 
-		  UsedTPCTrackerHits 0 3 17
+		  MarlinTrkTracks 2 20 18
+		  ClupatraTracks 0 6 19
 
-		  ClupatraTracks 0 4 19
 		</parameter>
 	</processor>
 
