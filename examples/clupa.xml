@@ -15,8 +15,6 @@
 		<processor name="MySimplePlanarDigiProcessor"/>
 		<processor name="MyClupatraProcessor" />
 
-		<XXprocessor name="MyGenericViewer" />
-
 		<processor name="MyCEDViewer" />
 		<processor name="MyLCIOOutputProcessor" />
 	</execute>
@@ -27,7 +25,7 @@
 		<parameter name="MaxRecordNumber" value="10" />
 		<parameter name="SkipNEvents" value="0" />
 		<parameter name="SupressCheck" value="false true false" />
-		<parameter name="Verbosity" value="DEBUG4 MESSAGE" />
+		<parameter name="Verbosity" value="MESSAGE" />
 	</global>
 
  	<processor name="MyEventSelector" type="EventSelector">
@@ -42,7 +40,7 @@
 	  <!--Name of the TPC TrackerHit collection-->
 	  <parameter name="TPCCollectionName" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
 	  <!--Name of the VXD TrackerHit collection-->
-	  <parameter name="VXDCollectionName" type="string" lcioInType="TrackerHit">VTXTrackerHits </parameter>
+	  <parameter name="VXDCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHits </parameter>
 	  <!--Name of the SIT TrackerHit collection-->
 	  <parameter name="SITCollectionName" type="string" lcioInType="TrackerHit">SITTrackerHits </parameter>
 	  <parameter name="Verbosity" value="WARNING" />
@@ -62,7 +60,9 @@
 	  <!--ID of Sub-Detector using UTIL/ILDConf.h from lcio. Either VXD, SIT or SET-->
 	  <parameter name="Sub_Detector_ID" type="int">1 </parameter>
 	  <!--Name of the TrackerHit output collection-->
-	  <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHit">VTXTrackerHitsPlanar </parameter>
+	  <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHit">VXDTrackerHitsPlanar </parameter>
+	  <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
+	  <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">VXDTrackerHitRelations </parameter>
 	  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
 	  <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
 	</processor>
@@ -103,7 +103,7 @@
 	  <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
 	  <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter>
 	  <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
-	  <parameter name="VXDHitCollection" type="string">VTXTrackerHitsPlanar </parameter>
+	  <parameter name="VXDHitCollection" type="string">VXDTrackerHitsPlanar </parameter>
 
 	  <!--Smooth All Mesurement Sites in Fit-->
 	  <parameter name="SmoothOn" type="bool">false </parameter>
@@ -111,7 +111,7 @@
 	  <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
 
 	  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-	  <parameter name="Verbosity" type="string">DEBUG3 </parameter>
+	  <parameter name="Verbosity" type="string">MESSAGE </parameter>
 	</processor>
 
 
@@ -132,7 +132,7 @@
 		  ClupatraLeftoverClusters 0 3 2
 
 		  PandoraPFOs 0 2 3
-		  VTXTrackerHits  0 6 4
+		  VXDTrackerHits  0 6 4
 		  SITTrackerHits  0 6 4
 
 		  ClupatraTrackSegments 0 4 6
@@ -152,61 +152,6 @@
 		</parameter>
 	</processor>
 
-
-	<processor name="MyGenericViewer" type="GenericViewer">
-		<!--Drawing Utility-->
-		<!--Calo Hit Collection Names-->
-		<parameter name="CaloHitCollections" type="StringVec"
-			lcioInType="CalorimeterHit"> BCAL ECALBarrel ECALEndcap ECAL HCALBarrel HCALEndcap HCALOther LCAL LHCAL MUON </parameter>
-		<!--Cluster Collection Name-->
-		<parameter name="ClusterCollection" type="string"
-			lcioInType="Cluster"> NNClusters </parameter>
-		<!--Particle Collection Name-->
-		<parameter name="ParticleCollection" type="string"
-			lcioInType="ReconstructedParticle"> PandoraPFOs </parameter>
-		<!--Sim Calo Hit Collection Names-->
-		<parameter name="SimCaloHitCollections" type="StringVec"
-			lcioInType="SimCalorimeterHit"> BeamCalCollection EcalBar EcalBarrelPreShowerCollection EcalEndcapCollection EcalEndcapPreShowerCollection EcalEndcapRingCollect ion EcalEndcapRingPreShowerCollection HcalBarrelRegCollection HcalEndCapRingsCollection HcalEndCapsCollection LHcalC ollection LumiCalCollection MuonBarrelCollection MuonEndCapCollection </parameter>
-		<!--Sim Tracker Hit Collection Names-->
-		<parameter name="SimTrackerHitCollections" type="StringVec"
-			lcioInType="SimTrackerHit"> TPCCollection </parameter>
-<!--ETDCollection FTDCollectio SETCollection SITCollection TPCCollection TPCSpacePointCollection VXDCollection </parameter-->
-		<!--Track Collection Name-->
-		<parameter name="TrackCollection" type="string" lcioInType="Track"> TPCTracks LDCTracks </parameter>
-		<!--Tracker Hit Collection Names-->
-		<parameter name="TrackerHitCollections" type="StringVec"
-			lcioInType="TrackerHit"> AllTPCTrackerHits ETDTrackerHits FTDTrackerHits SETTrackerHits SITTrackerHits VTXTrackerHits </parameter>
-		<!--True Cluster Collection Name-->
-		<parameter name="TrueClusterCollection" type="string"
-			lcioInType="Cluster"> NNCluster </parameter>
-		<!--True Track Collection Name-->
-		<parameter name="TrueTrackCollection" type="string"
-			lcioInType="Track"> TrueTracks </parameter>
-		<!--Detector Model-->
-		<parameter name="DetectorModel" type="int" value="0" />
-		<!--Layer for Calo Hits-->
-		<parameter name="LayerCaloHit" type="int" value="-1" />
-		<!--Layer for Reco Clusters-->
-		<parameter name="LayerClusters" type="int" value="-1" />
-		<!--Layer for Reco Particles-->
-		<parameter name="LayerReco" type="int" value="-1 " />
-		<!--Layer for Sim Calo Hits-->
-		<parameter name="LayerSimCaloHit" type="int" value="-1" />
-		<!--Layer for Sim Tracker Hits-->
-		<parameter name="LayerSimTrackerHit" type="int" value="4" />
-		<!--Layer for Tracker Hits-->
-		<parameter name="LayerTrackerHit" type="int" value="-1" />
-		<!--Layer for Tracks-->
-		<parameter name="LayerTracks" type="int" value="-1" />
-		<!--Layer for True Clusters-->
-		<parameter name="LayerTrueClusters" type="int" value="-1 " />
-		<!--Layer for True Tracks-->
-		<parameter name="LayerTrueTracks" type="int" value="-1 " />
-		<!--Magnetic Field-->
-		<parameter name="MagneticField" type="float" value="3.5 " />
-		<!--Wait for Keyboard before proceed-->
-		<parameter name="WaitForKeyboard" type="int" value="1 " />
-	</processor>
 
 	<processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
 		<!--
