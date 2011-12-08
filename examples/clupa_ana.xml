@@ -10,6 +10,7 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
   
   <execute>
     <processor name="MyAIDAProcessor" />
+    <processor name="MyFixCellIDs" />
     <processor name="MyClupatraProcessor" />
     <processor name="MyRecoMCTruthLinker" />
     <processor name="TPCRecoMCTruthLinker" />
@@ -33,6 +34,16 @@ href="http://ilcsoft.desy.de/marlin/marlin.xsl"?
   </global>
   
   
+  <processor name="MyFixCellIDs" type="FixCellIDs">
+      <!--Name of the TPC TrackerHit collection-->
+      <parameter name="TPCCollectionName" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
+      <!--Name of the VXD TrackerHit collection-->
+      <parameter name="VXDCollectionName" type="string" lcioInType="TrackerHit">VTXTrackerHits </parameter>
+      <!--Name of the SIT TrackerHit collection-->
+      <parameter name="SITCollectionName" type="string" lcioInType="TrackerHit">SITTrackerHits </parameter>
+      <parameter name="Verbosity" value="WARNING" />
+    </processor>
+
   <processor name="MyClupatraProcessor" type="ClupatraProcessor">
     <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
     <!--the maximum chi2-distance for which a hit is considered for merging -->
