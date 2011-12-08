@@ -227,7 +227,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
- 	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " << std::endl ; 
+ 	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " << std::endl ; 
 	}
 	
 	// ======= get TrackState at last hit  ========================
@@ -235,7 +235,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
- 	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
+ 	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
 	}
 	
 	// ======= get TrackState at calo face  ========================
@@ -274,7 +274,7 @@ namespace clupatra_new{
 	}
 	if ( code !=MarlinTrk::IMarlinTrack::success ) {
 
-	  streamlog_out( WARNING ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
+	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
 	}
 
 	// ======= get TrackState at IP ========================
@@ -287,7 +287,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
- 	  streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+ 	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
 	}
 	
 	trk->addTrackState( tsIP ) ;
