@@ -627,11 +627,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   timer.time( t_split ) ;
 
-  streamlog_out( DEBUG2 ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
-
   //===============================================================================================
   //  now refit the tracks 
   //===============================================================================================
+
+  streamlog_out( DEBUG2 ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
 
   nnclu::PtrVector<MarlinTrk::IMarlinTrack> finalTrks ;
   finalTrks.setOwner() ;  // memory mgmt - will delete MarlinTrks at the end
@@ -683,6 +683,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     TrackClusterer nntrkclu ;
 
     TrackClusterer::element_vector trkVec ;
+    trkVec.setOwner() ;
     TrackClusterer::cluster_vector trkCluVec ;
 
     trkVec.reserve( tsCol->size()  ) ;
