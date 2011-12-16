@@ -310,7 +310,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
 
   HitDistance dist( _distCut ) ;
-  // HitDistance dist( 20. ) ;
   
   LCIOTrackConverter converter ;
   
@@ -499,118 +498,143 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   
   timer.time( t_seedtracks ) ;
-
+  
+  timer.time( t_recluster ) ;
+  
   //===============================================================================================
   //  do a global reclustering in all leftover hits
   //===============================================================================================
-
-  Clusterer::cluster_list loclu ; // leftover clusters
-  loclu.setOwner() ;
   
-  HitVec hits ;
-
-  //  CluTrack debug ;
+  outerRow = maxTPCLayers - 1 ;
   
-  for(unsigned iRow = 0 ; iRow <  maxTPCLayers ; ++iRow ) {
+  int padRangeRecluster = 50 ; // FIXME: make parameter 
+  
+  while( outerRow > 0 ) {
     
-    std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
 
-    //    std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( debug )  ) ;    
-  }
-  
-  nncl.cluster( hits.begin(), hits.end() , std::back_inserter( loclu ),  dist , _minCluSize ) ;
-  
-  //loclu.push_back( &debug ) ;
+    Clusterer::cluster_list loclu ; // leftover clusters
+    loclu.setOwner() ;
+    
+    HitVec hits ;
 
-  if( writeLeftoverClusters )
+
+    int  minRow = ( ( outerRow - padRangeRecluster ) > -1 ?  ( outerRow - padRangeRecluster ) : -1 ) ;
+
+    streamlog_out( DEBUG4 ) << "   recluster in the range : " << outerRow << " - " <<  minRow << std::endl ;
+
+    // add all hits in pad row range to hits
+    for(int iRow = outerRow ; iRow > minRow ; --iRow ) {
+      
+      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+    }
+    
+    
+    
+    //  CluTrack debug ;
+    
+    // int startRowRecluster = 100 ; // FIXME: make parameter 
+    // for(unsigned iRow = startRowRecluster ; iRow <  maxTPCLayers ; ++iRow ) {
+    
+    //   std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+    // }
+    
+    HitDistance distSmall( _distCut ) ; //   / 2. ) ;
+    nncl.cluster( hits.begin(), hits.end() , std::back_inserter( loclu ),  distSmall , _minCluSize ) ;
+    
+    
+    if( writeLeftoverClusters )
     std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
-  
+    
+    
+    
+    // timer.time( t_recluster ) ;
+    
+    //===============================================================================================
+    //  now we split the clusters based on their hit multiplicities
+    //===============================================================================================
+    
+    
+    _dChi2Max = 5. * _dChi2Max ; //FIXME !!!!!!!!!
 
-
-  timer.time( t_recluster ) ;
-
-  //===============================================================================================
-  //  now we split the clusters based on their hit multiplicities
-  //===============================================================================================
-
-  
-  
-  for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
-    
-    CluTrack* clu = *it ;
-
-    streamlog_out(  DEBUG2 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
-    
-    std::vector<int> mult(5) ; 
-    // get hit multiplicities up to 3 ( 4 means 4 or higher ) 
-    
-    getHitMultiplicities( clu , mult ) ;
-    
-    streamlog_out(  DEBUG2 ) << " **** left over cluster with hit multiplicities: " 
-			     << "     m[0] = " <<  mult[0] << "\n" 
-			     << "     m[1] = " <<  mult[1] << "\n"
-			     << "     m[2] = " <<  mult[2] << "\n"
-			     << "     m[3] = " <<  mult[3] << "\n"
-			     << "     m[4] = " <<  mult[4] << std::endl ;
-    
-    
-    if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
+    for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
       
-      Clusterer::cluster_list reclu ; // reclustered leftover clusters
-      reclu.setOwner() ;
+      CluTrack* clu = *it ;
       
-      create_three_clusters( *clu , reclu ) ;
+      streamlog_out(  DEBUG4 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
       
-      std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+      std::vector<int> mult(8) ; 
+      // get hit multiplicities up to 6 ( 7 means 7 or higher ) 
       
-      for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
-	
-	streamlog_out( DEBUG2 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
-	
-	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	static const bool backward = true ;
-	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+      getHitMultiplicities( clu , mult ) ;
+      
+      streamlog_out(  DEBUG4 ) << " **** left over cluster with hit multiplicities: \n" ;
+      for( unsigned i=0,n=mult.size() ; i<n ; ++i) {
+	streamlog_out(  DEBUG4 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
       }
       
-      cluList.merge( reclu ) ;
-    } 
-    
-    else if( float( mult[2]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[2] >  _minLayerNumberWithMultiplicity ) {
       
-      Clusterer::cluster_list reclu ; // reclustered leftover clusters
-      reclu.setOwner() ;
-      
-      create_two_clusters( *clu , reclu ) ;
-      
-      std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
-      
-      for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+      if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
 	
-	streamlog_out( DEBUG2 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
+	Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	reclu.setOwner() ;
 	
-	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	static const bool backward = true ;
-	addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	create_three_clusters( *clu , reclu ) ;
+	
+	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	  streamlog_out( DEBUG4 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	  static const bool backward = true ;
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	}
+	
+	cluList.merge( reclu ) ;
       } 
       
-      cluList.merge( reclu ) ;
-
-    }
-    else if( float( mult[1]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[1] >  _minLayerNumberWithMultiplicity ) {    
-
-
-      seedTrks.push_back( fitter( *it )  );
-
-      cluList.push_back( *it ) ;
-
-      it = loclu.erase( it ) ;
-      --it ; // erase returns iterator to next element 
-
-    } else {
+      else if( float( mult[2]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[2] >  _minLayerNumberWithMultiplicity ) {
+	
+	Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	reclu.setOwner() ;
+	
+	create_two_clusters( *clu , reclu ) ;
+	
+	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	  streamlog_out( DEBUG4 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	  static const bool backward = true ;
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	} 
+	
+	cluList.merge( reclu ) ;
+	
+      }
+      else if( float( mult[1]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[1] >  _minLayerNumberWithMultiplicity ) {    
+	
+	
+	seedTrks.push_back( fitter( *it )  );
+	
+	cluList.push_back( *it ) ;
+	
+	it = loclu.erase( it ) ;
+	--it ; // erase returns iterator to next element 
+	
+      } else {
+	
+	//  discard cluster and free hits
+	clu->freeElements() ; 
+      }
       
-      //  discard cluster and free hits
-      clu->freeElements() ; 
     }
+
+  
+    outerRow -=  padRangeRecluster ; 
 
   }
   
