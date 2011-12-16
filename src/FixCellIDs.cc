@@ -90,7 +90,7 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
 
   } catch( lcio::DataNotAvailableException& e) { 
     
-    streamlog_out( WARNING ) <<  " input collection not in event : " << _tpcColName << "   - nothing to do for TPC hits  !!! " << std::endl ;  
+    streamlog_out( DEBUG5 ) <<  " input collection not in event : " << _tpcColName << "   - nothing to do for TPC hits  !!! " << std::endl ;  
   } 
   
   if( tpcCol ) {
@@ -140,7 +140,7 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
     
   } catch( lcio::DataNotAvailableException& e) { 
     
-    streamlog_out( WARNING ) <<  " input collection not in event : " << _vxdColName << "   - nothing to do for VXD hits  !!! " << std::endl ;  
+    streamlog_out( DEBUG5 ) <<  " input collection not in event : " << _vxdColName << "   - nothing to do for VXD hits  !!! " << std::endl ;  
   } 
   
   if( vxdCol ) { 
@@ -163,8 +163,8 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
 
       if( !hitOnLadder ) {
 	
-	streamlog_out( WARNING ) <<  " hit not in sensitive volume  - distance: " << gearVXD.distanceToNearestSensitive( pos ).r() 
-				 <<  " pos : " << pos << std::endl ;
+	streamlog_out( DEBUG5 ) <<  " hit not in sensitive volume  - distance: " << gearVXD.distanceToNearestSensitive( pos ).r() 
+				<<  " pos : " << pos << std::endl ;
       }
      //-------------------------------------
       
