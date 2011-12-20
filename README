@@ -41,6 +41,14 @@
 
 
  =============================================================================================================
+  --------
+ | v00-04 |
+  --------
+    - src/ClupatraProcessor.cc: - improved re-clustering:
+      - now also loop in (larger) pad row range
+      - increase maxdeltaChi2
+    - src/FixCellIDs.cc: - reduced verbosity level from WARNING to
+      DEBUG5 for missing collections
 
   --------
  | v00-03 |
