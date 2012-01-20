@@ -709,6 +709,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     TrackClusterer::element_vector trkVec ;
     trkVec.setOwner() ;
     TrackClusterer::cluster_vector trkCluVec ;
+    trkCluVec.setOwner() ;
 
     trkVec.reserve( tsCol->size()  ) ;
     trkCluVec.reserve(  tsCol->size() ) ;
