@@ -30,9 +30,9 @@
 
   <global>
     <parameter name="LCIOInputFiles"> recfile_ild01.slcio </parameter>
-    <parameter name="GearXMLFile" value="gear_ILD_01pre02.xml" />
-    <parameter name="MaxRecordNumber" value="10" />
-    <parameter name="SkipNEvents" value="0" />
+    <parameter name="GearXMLFile" value="gear_ILD_01_dev.xml" />
+    <parameter name="MaxRecordNumber" value="1" />
+    <parameter name="SkipNEvents" value="25" />
     <parameter name="SupressCheck" value="false true false" />
     <parameter name="Verbosity" value="MESSAGE" />
   </global>
@@ -96,8 +96,8 @@
     <parameter name="Sub_Detector_ID" type="int">2 </parameter>
     <!--Name of the TrackerHit output collection-->
     <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHit">SITTrackerHits </parameter>
-  <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
-  <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">SITTrackerHitRelations </parameter>
+    <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
+    <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">SITTrackerHitRelations </parameter>
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
     <parameter name="Verbosity" type="string"> MESSAGE </parameter>
   </processor>
@@ -473,7 +473,7 @@
     <parameter name="nEventPrintout" type="int">1000 </parameter>
   </processor>
 
- <processor name="MyCEDViewer" type="CEDViewer">
+  <processor name="MyCEDViewer" type="CEDViewer">
 
     <!--draw a helix for Track objects:0 none, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
     <parameter name="DrawHelixForTrack" type="int"> 1 </parameter>
@@ -483,6 +483,9 @@
 
     <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
     <parameter name="DrawDetectorID" type="int">0 </parameter>
+    
+    <!--Wait for Keyboard before proceed-->
+    <parameter name="WaitForKeyboard" type="int">1</parameter>
 
     <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
     <parameter name="DrawInLayer"> 
