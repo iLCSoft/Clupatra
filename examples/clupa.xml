@@ -5,208 +5,211 @@
 	xsi:noNamespaceSchemaLocation="http://ilcsoft.desy.de/marlin/marlin.xsd">
 
 
-	<execute>
-	        <XXprocessor name="MyEventSelector"/>
-                <XXif condition="MyEventSelector">
-		</XXif>
-		<processor name="MyAIDAProcessor" />
+  <execute>
+    <XXprocessor name="MyEventSelector"/>
+    <XXif condition="MyEventSelector">
+    </XXif>
+    <processor name="MyAIDAProcessor" />
 
-		<processor name="MyFixCellIDs"/>
-		<processor name="MySimplePlanarDigiProcessor"/>
-		<processor name="MyClupatraProcessor" />
+    <processor name="MyFixCellIDs"/>
+    <processor name="MySimplePlanarDigiProcessor"/>
+    <processor name="MyClupatraProcessor" />
 
-		<processor name="MyCEDViewer" />
-		<processor name="MyLCIOOutputProcessor" />
-	</execute>
+    <processor name="MyCEDViewer" />
+    <processor name="MyLCIOOutputProcessor" />
+  </execute>
 
-	<global>
-		<parameter name="LCIOInputFiles"> recfile.slcio </parameter>
-		<parameter name="GearXMLFile" value="gear_ILD_00.xml" />
-		<parameter name="MaxRecordNumber" value="10" />
-		<parameter name="SkipNEvents" value="0" />
-		<parameter name="SupressCheck" value="false true false" />
-		<parameter name="Verbosity" value="MESSAGE" />
-	</global>
+  <global>
+    <parameter name="LCIOInputFiles"> recfile.slcio </parameter>
+    <parameter name="GearXMLFile" value="gear_ILD_00.xml" />
+    <parameter name="MaxRecordNumber" value="10" />
+    <parameter name="SkipNEvents" value="0" />
+    <parameter name="SupressCheck" value="false true false" />
+    <parameter name="Verbosity" value="MESSAGE" />
+  </global>
 
- 	<processor name="MyEventSelector" type="EventSelector">
-	  <!--EventSelector returns true if given event was specified in EvenList-->
-	  <!--event list - pairs of Eventnumber RunNumber-->
-	  <parameter name="EventList" type="IntVec">
-	    0   0 
-	  </parameter>
-	</processor>
+  <processor name="MyEventSelector" type="EventSelector">
+    <!--EventSelector returns true if given event was specified in EvenList-->
+    <!--event list - pairs of Eventnumber RunNumber-->
+    <parameter name="EventList" type="IntVec">
+      0   0 
+    </parameter>
+  </processor>
 
-	<processor name="MyFixCellIDs" type="FixCellIDs">
-	  <!--Name of the TPC TrackerHit collection-->
-	  <parameter name="TPCCollectionName" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
-	  <!--Name of the VXD TrackerHit collection-->
-	  <parameter name="VXDCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHits </parameter>
-	  <!--Name of the SIT TrackerHit collection-->
-	  <parameter name="SITCollectionName" type="string" lcioInType="TrackerHit">SITTrackerHits </parameter>
-	  <parameter name="Verbosity" value="WARNING" />
-	</processor>
+  <processor name="MyFixCellIDs" type="FixCellIDs">
+    <!--Name of the TPC TrackerHit collection-->
+    <parameter name="TPCCollectionName" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
+    <!--Name of the VXD TrackerHit collection-->
+    <parameter name="VXDCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHits </parameter>
+    <!--Name of the SIT TrackerHit collection-->
+    <parameter name="SITCollectionName" type="string" lcioInType="TrackerHit">SITTrackerHits </parameter>
+    <parameter name="Verbosity" value="WARNING" />
+  </processor>
 
-	<processor name="MySimplePlanarDigiProcessor" type="SimplePlanarDigiProcessor">
-	  <!--SimplePlanarDigiProcessor creates TrackerHits from SimTrackerHits, smearing them according to the input parameters.
-               The plannar geometry should be either VXD, SIT or SET described using ZPlannarLayout-->
-	  <!--Mokka has encoded the ladder number in the cellID-->
-	  <parameter name="Ladder_Number_encoded_in_cellID" type="bool">false </parameter>
-	  <!--R-Phi Resolution-->
-	  <parameter name="PointResolutionRPhi" type="float">0.004 </parameter>
-	  <!--Z Resolution-->
-	  <parameter name="PointResolutionZ" type="float">0.004 </parameter>
-	  <!--Name of the Input SimTrackerHit collection-->
-	  <parameter name="SimTrackHitCollectionName" type="string" lcioInType="SimTrackerHit">VXDCollection </parameter>
-	  <!--ID of Sub-Detector using UTIL/ILDConf.h from lcio. Either VXD, SIT or SET-->
-	  <parameter name="Sub_Detector_ID" type="int">1 </parameter>
-	  <!--Name of the TrackerHit output collection-->
-	  <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHit">VXDTrackerHitsPlanar </parameter>
-	  <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
-	  <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">VXDTrackerHitRelations </parameter>
-	  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-	  <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
-	</processor>
+  <processor name="MySimplePlanarDigiProcessor" type="SimplePlanarDigiProcessor">
+    <!--SimplePlanarDigiProcessor creates TrackerHits from SimTrackerHits, smearing them according to the input parameters.
+	The plannar geometry should be either VXD, SIT or SET described using ZPlannarLayout-->
+    <!--Mokka has encoded the ladder number in the cellID-->
+    <parameter name="Ladder_Number_encoded_in_cellID" type="bool">false </parameter>
+    <!--R-Phi Resolution-->
+    <parameter name="PointResolutionRPhi" type="float">0.004 </parameter>
+    <!--Z Resolution-->
+    <parameter name="PointResolutionZ" type="float">0.004 </parameter>
+    <!--Name of the Input SimTrackerHit collection-->
+    <parameter name="SimTrackHitCollectionName" type="string" lcioInType="SimTrackerHit">VXDCollection </parameter>
+    <!--ID of Sub-Detector using UTIL/ILDConf.h from lcio. Either VXD, SIT or SET-->
+    <parameter name="Sub_Detector_ID" type="int">1 </parameter>
+    <!--Name of the TrackerHit output collection-->
+    <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHit">VXDTrackerHitsPlanar </parameter>
+    <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
+    <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">VXDTrackerHitRelations </parameter>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
+  </processor>
 
-	<processor name="MyClupatraProcessor" type="ClupatraProcessor">
-	  <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
-	  <!--the maximum chi2-distance for which a hit is considered for merging -->
-	  <parameter name="Chi2Cut" type="float">100 </parameter>
-	  <!--optionally create some debug collection with intermediate track segments and used and unused hits-->
-	  <parameter name="CreateDebugCollections" type="bool">true</parameter>
-	  <!--Cut for distance between hits in mm-->
-	  <parameter name="DistanceCut" type="float">40 </parameter>
-	  <!--allowed fraction of hits in same pad row per track-->
-	  <parameter name="DuplicatePadRowFraction" type="float">0.1 </parameter>
-	  <!--Use Energy Loss in Fit-->
-	  <parameter name="EnergyLossOn" type="bool">true </parameter>
-	  <!--the maximum delta Chi2 for which a hit is added to a track segement-->
-	  <parameter name="MaxDeltaChi2" type="float">35 </parameter>
-	  <!--the maximum number of layers without finding a hit before hit search search is stopped -->
-	  <parameter name="MaxStepWithoutHit" type="int">3 </parameter>
-	  <!--minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
-	  <parameter name="MinLayerFractionWithMultiplicity" type="float">0.5 </parameter>
-	  <!--minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
-	  <parameter name="MinLayerNumberWithMultiplicity" type="int">3 </parameter>
-	  <!--minimum number of hits per cluster-->
-	  <parameter name="MinimumClusterSize" type="int">6 </parameter>
-	  <!--Use MultipleScattering in Fit-->
-	  <parameter name="MultipleScatteringOn" type="bool">true </parameter>
-	  <!--number of bins in z over total length of TPC - hits from different z bins are nver merged-->
-	  <parameter name="NumberOfZBins" type="int">150 </parameter>
-	  <!--Name of the output collection-->
-	  <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
-	  <!--number of pad rows used in initial seed clustering-->
-	  <parameter name="PadRowRange" type="int">15 </parameter>
+  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
+    <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
+    <!--the maximum chi2-distance for which a hit is considered for merging -->
+    <parameter name="Chi2Cut" type="float">100 </parameter>
+    <!--optionally create some debug collection with intermediate track segments and used and unused hits-->
+    <parameter name="CreateDebugCollections" type="bool">true</parameter>
+    <!--Cut for distance between hits in mm-->
+    <parameter name="DistanceCut" type="float">40 </parameter>
+    <!--allowed fraction of hits in same pad row per track-->
+    <parameter name="DuplicatePadRowFraction" type="float">0.1 </parameter>
+    <!--Use Energy Loss in Fit-->
+    <parameter name="EnergyLossOn" type="bool">true </parameter>
+    <!--the maximum delta Chi2 for which a hit is added to a track segement-->
+    <parameter name="MaxDeltaChi2" type="float">35 </parameter>
+    <!--the maximum number of layers without finding a hit before hit search search is stopped -->
+    <parameter name="MaxStepWithoutHit" type="int">3 </parameter>
+    <!--minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
+    <parameter name="MinLayerFractionWithMultiplicity" type="float">0.5 </parameter>
+    <!--minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
+    <parameter name="MinLayerNumberWithMultiplicity" type="int">3 </parameter>
+    <!--minimum number of hits per cluster-->
+    <parameter name="MinimumClusterSize" type="int">6 </parameter>
+    <!--Use MultipleScattering in Fit-->
+    <parameter name="MultipleScatteringOn" type="bool">true </parameter>
+    <!--number of bins in z over total length of TPC - hits from different z bins are nver merged-->
+    <parameter name="NumberOfZBins" type="int">150 </parameter>
+    <!--Name of the output collection-->
+    <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
+    <!--number of pad rows used in initial seed clustering-->
+    <parameter name="PadRowRange" type="int">15 </parameter>
 
-	  <!--try to pick up hits from Si-trackers-->
-	  <parameter name="pickUpSiHits" type="bool">true false </parameter>
-	  <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
-	  <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter>
-	  <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
-	  <parameter name="VXDHitCollection" type="string">VXDTrackerHitsPlanar </parameter>
+    <!--try to pick up hits from Si-trackers-->
+    <parameter name="pickUpSiHits" type="bool">true false </parameter>
+    <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
+    <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter>
+    <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
+    <parameter name="VXDHitCollection" type="string">VXDTrackerHitsPlanar </parameter>
 
-	  <!--Smooth All Mesurement Sites in Fit-->
-	  <parameter name="SmoothOn" type="bool">false </parameter>
-	  <!--Name of the tpc hit input collections-->
-	  <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
+    <!--Smooth All Mesurement Sites in Fit-->
+    <parameter name="SmoothOn" type="bool">false </parameter>
+    <!--Name of the tpc hit input collections-->
+    <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">AllTPCTrackerHits </parameter>
 
-	  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-	  <parameter name="Verbosity" type="string">MESSAGE </parameter>
-	</processor>
-
-
-	<processor name="MyCEDViewer" type="CEDViewer">
-           <!--draw a helix for Track objects:0 none, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
-           <parameter name="DrawHelixForTrack" type="int"> 1 </parameter>
-
-	  <!--color scheme to be used for drawing - see MESSAGE for options-->
-	  <parameter name="ColorScheme" type="int">12</parameter>
-
-	  <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
-	  <parameter name="DrawDetectorID" type="int">0 </parameter>
-
-	  <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
-		<parameter name="DrawInLayer"> 
-		  TPCTracks 0 3 0
-		  ClupatraSeedCluster 0 4 1 
-		  ClupatraLeftoverClusters 0 3 2
-
-		  PandoraPFOs 0 2 3
-		  VXDTrackerHits  0 6 4
-		  SITTrackerHits  0 6 4
-
-		  ClupatraTrackSegments 0 4 6
-		  ClupatraInitialTrackSegments 0 3 7 
-
-		  ClupatraUsedTPCHits   0 2  8
-		  ClupatraUnUsedTPCHits 0 3 9
-
-		  LDCTracks 0 5 11
-
-		  MCParticle  0 3 15
-		  
-
-		  MarlinTrkTracks 2 20 18
-		  ClupatraTracks 0 6 19
-
-		</parameter>
-	</processor>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string">MESSAGE </parameter>
+  </processor>
 
 
-	<processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
-		<!--
-			Writes the current event to the specified LCIO outputfile. Needs to
-			be the last ActiveProcessor.
-		-->
-		<!--drops the named collections from the event-->
-		<!--
-			parameter name="DropCollectionNames" type="StringVec"> TPCHits
-			HCalHits </parameter
-		-->
-		<!--drops all collections of the given type from the event-->
-		<!--
-			parameter name="DropCollectionTypes" type="StringVec"> SimTrackerHit
-			SimCalorimeterHit </parameter
-		-->
-		<!--
-			write complete objects in subset collections to the file (i.e. ignore
-			subset flag)
-		-->
-		<!--
-			parameter name="FullSubsetCollections" type="StringVec"
-			value="MCParticlesSkimmed"/
-		-->
-		<!--
-			force keep of the named collections - overrules DropCollectionTypes
-			(and DropCollectionNames)
-		-->
-		<!--
-			parameter name="KeepCollectionNames" type="StringVec"
-			value="MyPreciousSimTrackerHits"/
-		-->
-		<!-- name of output file -->
-		<parameter name="LCIOOutputFile" type="string" value="outputfile.slcio" />
-		<!--write mode for output file:  WRITE_APPEND or WRITE_NEW-->
-		<parameter name="LCIOWriteMode" type="string" value="WRITE_NEW" />
-		<!--
-			will split output file if size in kB exceeds given value - doesn't
-			work with APPEND and NEW
-		-->
-		<!--parameter name="SplitFileSizekB" type="int" value="1992294"/-->
-	</processor>
+  <processor name="MyCEDViewer" type="CEDViewer">
+    <!--draw a helix for Track objects:0 none, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
+    <parameter name="DrawHelixForTrack" type="int"> 1 </parameter>
 
-        <processor name="MyAIDAProcessor" type="AIDAProcessor">
-                <!--
-                        Processor that handles AIDA files. Creates on directory per
-                        processor. Processors only need to create and fill the histograms,
-                        clouds and tuples. Needs to be the first ActiveProcessor
-                -->
-                <!-- compression of output file 0: false >0: true (default) -->
-                <parameter name="Compress" type="int" value="1" />
-                <!-- filename without extension-->
-                <parameter name="FileName" type="string" value="clupatra" />
-                <!-- type of output file xml (default) or root ( only OpenScientist)-->
-                <parameter name="FileType" type="string" value="root" />
-        </processor>
+    <!--color scheme to be used for drawing - see MESSAGE for options-->
+    <parameter name="ColorScheme" type="int">12</parameter>
+
+    <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
+    <parameter name="DrawDetectorID" type="int">0 </parameter>
+
+    <!--Wait for Keyboard before proceed-->
+    <parameter name="WaitForKeyboard" type="int">1 </parameter>
+
+    <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
+    <parameter name="DrawInLayer"> 
+      TPCTracks 0 3 0
+      ClupatraSeedCluster 0 4 1 
+      ClupatraLeftoverClusters 0 3 2
+
+      PandoraPFOs 0 2 3
+      VXDTrackerHits  0 6 4
+      SITTrackerHits  0 6 4
+
+      ClupatraTrackSegments 0 4 6
+      ClupatraInitialTrackSegments 0 3 7 
+
+      ClupatraUsedTPCHits   0 2  8
+      ClupatraUnUsedTPCHits 0 3 9
+
+      LDCTracks 0 5 11
+
+      MCParticle  0 3 15
+      
+
+      MarlinTrkTracks 2 20 18
+      ClupatraTracks 0 6 19
+
+    </parameter>
+  </processor>
+
+
+  <processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
+    <!--
+	Writes the current event to the specified LCIO outputfile. Needs to
+	be the last ActiveProcessor.
+    -->
+    <!--drops the named collections from the event-->
+    <!--
+	parameter name="DropCollectionNames" type="StringVec"> TPCHits
+	HCalHits </parameter
+    -->
+    <!--drops all collections of the given type from the event-->
+    <!--
+	parameter name="DropCollectionTypes" type="StringVec"> SimTrackerHit
+	SimCalorimeterHit </parameter
+    -->
+    <!--
+	write complete objects in subset collections to the file (i.e. ignore
+	subset flag)
+    -->
+    <!--
+	parameter name="FullSubsetCollections" type="StringVec"
+	value="MCParticlesSkimmed"/
+    -->
+    <!--
+	force keep of the named collections - overrules DropCollectionTypes
+	(and DropCollectionNames)
+    -->
+    <!--
+	parameter name="KeepCollectionNames" type="StringVec"
+	value="MyPreciousSimTrackerHits"/
+    -->
+    <!-- name of output file -->
+    <parameter name="LCIOOutputFile" type="string" value="outputfile.slcio" />
+    <!--write mode for output file:  WRITE_APPEND or WRITE_NEW-->
+    <parameter name="LCIOWriteMode" type="string" value="WRITE_NEW" />
+    <!--
+	will split output file if size in kB exceeds given value - doesn't
+	work with APPEND and NEW
+    -->
+    <!--parameter name="SplitFileSizekB" type="int" value="1992294"/-->
+  </processor>
+
+  <processor name="MyAIDAProcessor" type="AIDAProcessor">
+    <!--
+	Processor that handles AIDA files. Creates on directory per
+	processor. Processors only need to create and fill the histograms,
+	clouds and tuples. Needs to be the first ActiveProcessor
+    -->
+    <!-- compression of output file 0: false >0: true (default) -->
+    <parameter name="Compress" type="int" value="1" />
+    <!-- filename without extension-->
+    <parameter name="FileName" type="string" value="clupatra" />
+    <!-- type of output file xml (default) or root ( only OpenScientist)-->
+    <parameter name="FileType" type="string" value="root" />
+  </processor>
 
 </marlin>
