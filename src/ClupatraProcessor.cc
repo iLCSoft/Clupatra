@@ -309,8 +309,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   cluList.setOwner() ;
   
 
-  HitDistance dist( _distCut ) ;
-  
   LCIOTrackConverter converter ;
   
   const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
@@ -417,77 +415,90 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   Clusterer nncl ;
   
-  int outerRow = maxTPCLayers - 1 ;
-
+  int outerRow = 0 ;
+  
   nnclu::PtrVector<MarlinTrk::IMarlinTrack> seedTrks ;
   seedTrks.setOwner() ; // memory mgmt - will delete MarlinTrks at the end
   
   IMarlinTrkFitter fitter( _trksystem ) ;
 
-  
-  while( outerRow > _padRowRange ) {
+
+  // ---- introduce a loop over increasing distance cuts for finding the tracks seeds
+  //      -> should fix (some of) the problems seen @ 3 TeV with extremely boosted jets
+  //
+  int NLoop = 4 ;
+  double dcut =  _distCut / NLoop ;
+  for(int nloop=1 ; nloop <= NLoop ; ++nloop){ 
+
+    HitDistance dist( nloop * dcut ) ;
+
+    outerRow = maxTPCLayers - 1 ;
     
-    HitVec hits ;
-    hits.reserve( nHit ) ;
     
-    // add all hits in pad row range to hits
-    for(int iRow = outerRow ; iRow > ( outerRow - _padRowRange) ; --iRow ) {
+    while( outerRow > _padRowRange ) {
+    
+      HitVec hits ;
+      hits.reserve( nHit ) ;
+    
+      // add all hits in pad row range to hits
+      for(int iRow = outerRow ; iRow > ( outerRow - _padRowRange) ; --iRow ) {
       
-      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
-    }
-    
-    //-----  cluster in given pad row range  -----------------------------
-    Clusterer::cluster_list sclu ;    
-    sclu.setOwner() ;  
-    
-    nncl.cluster_sorted( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
-    
-    if( writeSeedCluster ) {
-      std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
-    }
-    
-    // remove clusters whith too many duplicate hits per pad row
-    Clusterer::cluster_list bclu ;    // bad clusters  
-    bclu.setOwner() ;      
-    
-    split_list( sclu, std::back_inserter(bclu),  DuplicatePadRows( maxTPCLayers, _duplicatePadRowFraction  ) ) ;
-    
-    // free hits from bad clusters 
-    std::for_each( bclu.begin(), bclu.end(), std::mem_fun( &CluTrack::freeElements ) ) ;
-    
-    
-    // ---- now we also need to remove the hits from good cluster seeds from the hitsInLayers:
-    for( Clusterer::cluster_list::iterator sci=sclu.begin(), end= sclu.end() ; sci!=end; ++sci ){
-      for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
-	
-	// this is not cheap ...
-	hitsInLayer[ (*ci)->first->layer ].remove( *ci )  ; 
+	std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
       }
-    }
+    
+      //-----  cluster in given pad row range  -----------------------------
+      Clusterer::cluster_list sclu ;    
+      sclu.setOwner() ;  
+    
+      nncl.cluster_sorted( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
+    
+      if( writeSeedCluster ) {
+	std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
+      }
+    
+      // remove clusters whith too many duplicate hits per pad row
+      Clusterer::cluster_list bclu ;    // bad clusters  
+      bclu.setOwner() ;      
+    
+      split_list( sclu, std::back_inserter(bclu),  DuplicatePadRows( maxTPCLayers, _duplicatePadRowFraction  ) ) ;
+    
+      // free hits from bad clusters 
+      std::for_each( bclu.begin(), bclu.end(), std::mem_fun( &CluTrack::freeElements ) ) ;
+    
+    
+      // ---- now we also need to remove the hits from good cluster seeds from the hitsInLayers:
+      for( Clusterer::cluster_list::iterator sci=sclu.begin(), end= sclu.end() ; sci!=end; ++sci ){
+	for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
+	
+	  // this is not cheap ...
+	  hitsInLayer[ (*ci)->first->layer ].remove( *ci )  ; 
+	}
+      }
     
     
     
     
-    std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+      std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
     
     
-    for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
+      for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
       
 
-     addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex ) ; 
+	addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex ) ; 
       
-      static const bool backward = true ;
-      addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
-    } 
+	static const bool backward = true ;
+	addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+      } 
 
-    // merge the good clusters to final list
-    cluList.merge( sclu ) ;
+      // merge the good clusters to final list
+      cluList.merge( sclu ) ;
 
-    outerRow -= _padRowRange ;
+      outerRow -= _padRowRange ;
     
-  } //while outerRow > padRowRange 
+    } //while outerRow > padRowRange 
   
- 
+  }// nloop
+
   //---------------------------------------------------------------------------------------------------------
 
   //  ---- store track segments from the first main step  -----  
