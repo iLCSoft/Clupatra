@@ -543,7 +543,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     
     if( writeLeftoverClusters )
-    std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
+      std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
     
     
     
@@ -573,7 +573,49 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       }
       
       
-      if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
+      if( float( mult[5]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[5] >  _minLayerNumberWithMultiplicity ) {
+	
+	Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	reclu.setOwner() ;
+	
+	create_n_clusters( *clu , reclu , 5 ) ;
+	
+	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	  streamlog_out( DEBUG4 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	  static const bool backward = true ;
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	}
+	
+	cluList.merge( reclu ) ;
+      } 
+      
+      else if( float( mult[4]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[4] >  _minLayerNumberWithMultiplicity ) {
+	
+	Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	reclu.setOwner() ;
+	
+	create_n_clusters( *clu , reclu , 4 ) ;
+	
+	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	  streamlog_out( DEBUG4 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	  static const bool backward = true ;
+	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	}
+	
+	cluList.merge( reclu ) ;
+      } 
+      
+      else if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
 	
 	Clusterer::cluster_list reclu ; // reclustered leftover clusters
 	reclu.setOwner() ;

@@ -449,6 +449,10 @@ namespace clupatra_new{
   void create_three_clusters( Clusterer::cluster_type& clu, Clusterer::cluster_list& cluVec ) ;
 
 
+  /** Split the cluster into N clusters.
+   */
+  void create_n_clusters( Clusterer::cluster_type& clu, Clusterer::cluster_list& cluVec ,  unsigned n ) ;
+
 
 
   //=======================================================================================

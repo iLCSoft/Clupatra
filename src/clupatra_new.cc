@@ -2,6 +2,8 @@
 #include "gear/GEAR.h"
 
 #include <set>
+#include <vector>
+
 
 #include <UTIL/BitField64.h>
 #include <UTIL/ILDConf.h>
@@ -376,6 +378,153 @@ namespace clupatra_new{
 
 
   //------------------------------------------------------------------------------------------------------------------------- 
+
+  void create_n_clusters( Clusterer::cluster_type& hV, Clusterer::cluster_list& cluVec , unsigned n ) {
+    
+    if( n < 4 ){
+      
+      streamlog_out( ERROR ) <<  " create_n_clusters called for n = " << n << std::endl ;
+      return ;
+    }
+    
+    // copy of the algorithm for creating three clusters (minimize angle between hits as seen from IP)
+    
+    hV.freeElements() ;
+    
+    static const int tpcNRow = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() ; 
+    
+    HitListVector hitsInLayer( tpcNRow )  ; 
+    addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
+    
+    std::vector< CluTrack*> clu(n)  ;
+    
+    std::vector< gear::Vector3D > lastp(n) ;
+    
+    for(unsigned i=0; i<n; ++i){
+      
+      clu[i] = new CluTrack ;
+      
+      cluVec.push_back( clu[i] ) ;
+    }    
+    
+    for( int l=tpcNRow-1 ; l >= 0 ; --l){
+      
+      HitList& hL = hitsInLayer[ l ] ;
+      
+      streamlog_out(  DEBUG ) << " create_n_clusters  --- layer " << l  <<  " size: " << hL.size() << std::endl ;
+      
+      if( hL.size() != n ){  // ignore layers with different hit numbers
+	
+	continue ;
+      }
+      
+      HitList::iterator iH = hL.begin() ;
+      
+      std::vector<Hit*> h(n) ;
+      std::vector< gear::Vector3D>  p(n) ;
+      
+
+      streamlog_out(  DEBUG4 ) << " create_n_clusters  ---  layer " << l << std::endl ;
+      
+      for(unsigned i=0; i<n; ++i){
+      
+	h[i] = *iH++ ;
+	
+	p[i] = h[i]->first->pos ;
+
+	streamlog_out(  DEBUG4 ) << "              h"<< i << ": " << p[i] << std::endl ; 
+      }
+      
+      streamlog_out(  DEBUG4 ) << " ---------------------------- " << std::endl ;
+
+      
+      if( clu[0]->empty() ){ // first hit tuple
+	
+  	streamlog_out(  DEBUG ) << " create_n_clusters  --- initialize clusters " << std::endl ;
+	
+	for(unsigned i=0; i<n; ++i){
+	  
+	  clu[i]->addElement( h[i] ) ;
+	  
+	  lastp[i] = ( 1. / p[i].r() ) * p[i] ;
+	}
+	
+  	continue ;   //----------  that's all for the first layer w/ hits
+      }
+      
+      
+      // unit vector in direction of current hits
+      std::vector< gear::Vector3D > pu(n) ;
+
+      for(unsigned i=0; i<n; ++i){
+
+	pu[i] = ( 1. / p[i].r() ) * p[i] ;  
+      }
+      
+      std::list< CDot > cDot ; 
+      
+      // create list of dot products between last hit in cluster and current hit 
+      // cos( angle between  hits as seen from IP ) 
+      for( unsigned i = 0 ; i < n ; ++i ){	         
+  	for( unsigned j = 0 ; j < n ; ++j ){
+	  
+  	  cDot.push_back( CDot( i , j , lastp[i].dot( pu[ j ] ) )) ;
+	}   
+      }   
+      
+      // sort dot products in descending order 
+      cDot.sort( sort_CDot ) ;
+      
+      // assign hits to clusters with largest dot product ( smallest angle )
+      
+      std::set<int> cluIdx ;
+      std::set<int> hitIdx ;
+      
+      for( std::list<CDot>::iterator it = cDot.begin() ; it != cDot.end() ; ++ it ) {
+	
+  	streamlog_out(  DEBUG4 ) << " I : " << it->I  
+				 << " J : " << it->J 
+				 << " d : " << it->Dot 
+				 << std::endl ;
+	unsigned i =  it->I ;
+  	unsigned j =  it->J ;
+	
+  	// ignore clusters or hits that hvae already been assigned
+  	if( cluIdx.find( i ) == cluIdx.end()  && hitIdx.find( j ) == hitIdx.end() ){
+	  
+  	  cluIdx.insert( i ) ;
+  	  hitIdx.insert( j ) ;
+	  
+  	  clu[ i ]->addElement( h[ j ] ) ;
+	  
+  	  // cluDir[i] = - ( p[j] - lastp[i] ) ;
+  	  // cluDir[i] =  (  1. / cluDir[i].r() ) * cluDir[i]  ;
+	  
+  	  lastp[i] =  p[j] ;
+	  
+  	  streamlog_out(  DEBUG4 ) << " **** adding to cluster : " << it->I  
+				   << " hit  : " << it->J 
+				   << " d : " << it->Dot 
+				   << std::endl ;
+  	}
+	
+      }
+    }
+
+
+    streamlog_out(  DEBUG ) << " create_three_clusters  --- clu[0] " << clu[0]->size() 
+  			    <<  " clu[1] " << clu[1]->size() 
+  			    <<  " clu[2] " << clu[2]->size() 
+  			    << std::endl ;
+
+
+
+
+    return ;
+  }
+
+
+//======================================================================================================================
 
   void create_three_clusters( Clusterer::cluster_type& hV, Clusterer::cluster_list& cluVec ) {
     
