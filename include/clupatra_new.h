@@ -198,7 +198,7 @@ namespace clupatra_new{
       trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  nHit ;  // ??used in fit?? 
       trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  nHit ;  
       
-      if( mtrk != 0 ){
+      if( mtrk != 0 && ! c->empty() ){
 	
 	lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
 	lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
