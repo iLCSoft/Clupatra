@@ -505,6 +505,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   if( writeCluTrackSegments )
     std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
 
+  // // free memory :
+  // for( nnclu::PtrVector<MarlinTrk::IMarlinTrack>::reverse_iterator it= seedTrks.rbegin(), end = seedTrks.rend() ; it < end ; ++it ){
+  //   delete *it ;
+  // }
+  // seedTrks.clear() ;
+
   //---------------------------------------------------------------------------------------------------------
   
   
@@ -695,7 +701,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //  try again to gobble up hits at the ends ....
   //===============================================================================================
   
-  for( Clusterer::cluster_list::iterator icv = cluList.begin() ; icv != cluList.end() ; ++ icv ) {
+  for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
     addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
     static const bool backward = true ;
     addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
@@ -708,19 +714,23 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //  now refit the tracks 
   //===============================================================================================
 
-  streamlog_out( DEBUG2 ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
+  streamlog_out( DEBUG5 ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
 
-  nnclu::PtrVector<MarlinTrk::IMarlinTrack> finalTrks ;
-  finalTrks.setOwner() ;  // memory mgmt - will delete MarlinTrks at the end
-  finalTrks.reserve( cluList.size() ) ;
-  
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
-  
-  std::for_each( finalTrks.begin() , finalTrks.end() , std::mem_fun_t< int, MarlinTrk::IMarlinTrack >( &MarlinTrk::IMarlinTrack::smooth )  ) ;
+  // nnclu::PtrVector<MarlinTrk::IMarlinTrack> finalTrks ;
+  // finalTrks.setOwner() ;  // memory mgmt - will delete MarlinTrks at the end
+  // finalTrks.reserve( cluList.size() ) ;
+  // std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
+  // std::for_each( finalTrks.begin() , finalTrks.end() , std::mem_fun_t< int, MarlinTrk::IMarlinTrack >( &MarlinTrk::IMarlinTrack::smooth )  ) ;
+  // std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
 
-
-  std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
-
+  //---- refit cluster tracks individually to save memory ( KalTest tracks have ~1MByte each)
+  IMarlinTrkFitter fit(_trksystem) ;
+  for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
+    MarlinTrk::IMarlinTrack* trk = fit( *icv ) ;
+    trk->smooth() ;
+    tsCol->push_back(  converter( *icv ) ) ;
+    delete trk ;
+  }
   
   timer.time( t_finalfit) ;
   
@@ -974,9 +984,17 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   timer.time( t_pickup ) ;  
 
   
-  streamlog_out( DEBUG4 )  <<  timer.toString () << std::endl ;
+  streamlog_out( MESSAGE )  <<  timer.toString () << std::endl ;
 
   _nEvt ++ ;
+
+
+
+  //DEBuG (check memory usage)
+  // streamlog_out( MESSAGE5 )  << "\n hit return to continue " << std::endl ; 
+  // char tmp ;
+  // std::cin.getline(  &tmp,1 );
+
 
 }
 
@@ -1054,37 +1072,40 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     {
 	
 
-    //--------------------------------------------
-    // create a temporary MarlinTrk
-    //--------------------------------------------
+      // ------------------------------------------
+#if 1 // this code works for plain lcio tracks, i.e. in the case where the corresponding KalTrack
+      // has laready been deleted 
+      //===========================================================================================
 
-// #if 0 //===========================================================================================
+      //--------------------------------------------
+      // create a temporary MarlinTrk
+      //--------------------------------------------
+      
+      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
 
-//       std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
-
-//       double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
+      double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
       
-//       const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
+      const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
       
-//       //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
-//       //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getClosestTrackState( 0., 0., 0. ) ) ;
-//       //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getTrackState( EVENT::TrackState::AtOther ) ) ;
-//       //  // FIXME:  what do we need here EVENT::TrackState::AtIP  or AtFirstHit ??
+      //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
+      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getClosestTrackState( 0., 0., 0. ) ) ;
+      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getTrackState( EVENT::TrackState::AtOther ) ) ;
+      //  // FIXME:  what do we need here EVENT::TrackState::AtIP  or AtFirstHit ??
       
-//       int nHit = trk->getTrackerHits().size() ;
+      int nHit = trk->getTrackerHits().size() ;
       
-//       if( nHit == 0 || ts ==0 )
-// 	continue ;
+      if( nHit == 0 || ts ==0 )
+	continue ;
       
-//       streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+      streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
       
-//       //need to add a dummy hit to the track
-//       mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
+      //need to add a dummy hit to the track
+      mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
       
       
-//       mTrk->initialise( *ts ,  b ,  MarlinTrk::IMarlinTrack::backward ) ;
+      mTrk->initialise( *ts ,  b ,  MarlinTrk::IMarlinTrack::backward ) ;
     
-// #else  //===========================================================================================
+#else  //===========================================================================================
       // use the MarlinTrk allready stored with the TPC track
 
 
@@ -1097,8 +1118,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	streamlog_out( DEBUG3  )  << "  ------ null pointer in ext<MarTrk> ! ?? ..... " << std::endl ;
 	continue ;
       }
-
-      //#endif //===========================================================================================
+#endif //===========================================================================================
 
     //--------------------------------------------------
     // get intersection points with SIT and VXD layers 
