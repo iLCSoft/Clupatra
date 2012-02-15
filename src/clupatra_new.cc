@@ -82,6 +82,11 @@ namespace clupatra_new{
     Chi2_RPhi_Z_Hit ch2rzh ;
     
     IMarlinTrack* trk =  clu->ext<MarTrk>() ;
+
+    if(  trk == 0 ){
+      streamlog_out( DEBUG2 ) <<  "  addHitsAndFilter called with null pointer to MarlinTrk  - won't do anything " << std::endl ;
+      return  ;
+    } 
     
     unsigned step = 0 ;
     

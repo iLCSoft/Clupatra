@@ -475,19 +475,27 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	}
       }
     
-    
-    
-    
-      std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
-    
+
+      //      std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+      // reduce memory footprint: deal with one KalTest track at a time and delete it, when done
     
       for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
       
+	MarlinTrk::IMarlinTrack* mTrk = fitter( *icv ) ;
 
 	addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex ) ; 
       
 	static const bool backward = true ;
 	addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+
+	
+	if( writeCluTrackSegments )  //  ---- store track segments from the first main step  ----- 
+	  cluCol->addElement(  converter( *icv ) );
+	
+	// reset the pointer to the KalTest track - as we are done with this track
+	(*icv)->ext<MarTrk>() = 0 ;
+	
+	delete mTrk ;
       } 
 
       // merge the good clusters to final list
@@ -502,18 +510,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //---------------------------------------------------------------------------------------------------------
 
   //  ---- store track segments from the first main step  -----  
-  if( writeCluTrackSegments )
-    std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
+  // if( writeCluTrackSegments )
+  //   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
 
-  // // free memory :
-  // for( nnclu::PtrVector<MarlinTrk::IMarlinTrack>::reverse_iterator it= seedTrks.rbegin(), end = seedTrks.rend() ; it < end ; ++it ){
-  //   delete *it ;
-  // }
-  // seedTrks.clear() ;
-
-  //---------------------------------------------------------------------------------------------------------
-  
-  
+    
   timer.time( t_seedtracks ) ;
   
   timer.time( t_recluster ) ;
@@ -679,6 +679,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	seedTrks.push_back( fitter( *it )  );
 	
+	addHitsAndFilter( *it , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	static const bool backward = true ;
+	addHitsAndFilter( *it , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	
 	cluList.push_back( *it ) ;
 	
 	it = loclu.erase( it ) ;
@@ -698,14 +702,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   }
   
   //===============================================================================================
-  //  try again to gobble up hits at the ends ....
+  //  try again to gobble up hits at the ends ....   - Not needed anymore
   //===============================================================================================
-  
-  for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
-    addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-    static const bool backward = true ;
-    addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
-  }
+  // for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
+  //   addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+  //   static const bool backward = true ;
+  //   addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+  // }
   
   
   timer.time( t_split ) ;
@@ -857,89 +860,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       outCol->addElement( trk )  ;
     }
 
-    // for(  TrackClusterer::cluster_vector::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
-      
-    //   streamlog_out( DEBUG2 ) <<  lcio::header<Track>() << std::endl ;
-      
-    //   TrackClusterer::cluster_type*  trkClu = *it ;
-
-    //   std::list<Track*> mergedTrk ;
-    //   for( TrackClusterer::cluster_type::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
-	
-    // 	streamlog_out( DEBUG2 ) << lcshort(  (*itC)->first ) << std::endl ; 
-
-    // 	mergedTrk.push_back( (*itC)->first ) ; 
-    //   }
-
-    //   // create a new LCIO track for the merged cluster ...
-    //   TrackImpl* trk = new TrackImpl ;
-    //   Track* bestTrk = 0 ;
-      
-    //   double min = 1.e99 ;
-    //   int hitCount = 0 ;
-      
-    //   for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
-	
-    // 	double z = 0. ;
-    //   	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
-	
-    //   	for(unsigned i=0 ; i < hV.size() ; ++i){
-	  
-    //   	  trk->addHit( hV[i] ) ;
-
-    //   	  ++hitCount ;
-
-    // 	  z+= hV[i]->getPosition()[2] ;
-	  
-    //   	}
-
-    // 	double val = std::abs( z) / hV.size() ;  // take parameters from track segment that is closests to IP .....
-
-    // 	//double val = (*itML)->getChi2() / (*itML)->getNdf() ; 
-	
-    // 	streamlog_out( DEBUG ) << "   ---  " <<   &mergedTrk <<   " new  value : " << val << "   -- " << lcshort( *itML ) << std::endl ;
-
-    //   	if( val < min ){
-    //   	  bestTrk = (*itML) ;
-    //   	  min  = val  ;
-    //   	}
-    //   }
-      
-      
-    //   if( bestTrk != 0 ){ 
-	
-    // 	int hitsInFit = bestTrk->getTrackerHits().size() ;
-	
-    // 	trk->setD0( bestTrk->getD0() ) ;
-    // 	trk->setOmega( bestTrk->getOmega() ) ;
-    // 	trk->setPhi( bestTrk->getPhi() ) ;
-    // 	trk->setZ0( bestTrk->getZ0() ) ;
-    // 	trk->setTanLambda( bestTrk->getTanLambda() ) ;
-    // 	trk->setCovMatrix( bestTrk->getCovMatrix()  ) ;
-    // 	// ...
-    // 	trk->ext<MarTrk>() = bestTrk->ext<MarTrk>() ;
-	
-
-    // 	trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
-    // 	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
-    // 	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
-	
-
-    // 	streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
-    // 				<< "  with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
-    // 				<< std::endl ;
-	
-
-    // 	outCol->addElement( trk )  ;
-    //   }
-    //   else{
-    // 	streamlog_out( ERROR ) << "   no best track found for merged tracks ... !? " << std::endl ; 
-    // 	delete trk ;
-    //   }
-      
-      
-    // }
-
     //---------------------------------------------------------------------------------------------
     // add all tracks that have not been merged :
 
@@ -990,7 +910,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
 
-  //DEBuG (check memory usage)
+  // //DEBUG (check memory usage)
   // streamlog_out( MESSAGE5 )  << "\n hit return to continue " << std::endl ; 
   // char tmp ;
   // std::cin.getline(  &tmp,1 );
