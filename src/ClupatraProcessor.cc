@@ -8,6 +8,7 @@
 
 #include <math.h>
 #include <cmath>
+#include <memory>
 
 //---- MarlinUtil 
 #include "MarlinCED.h"
