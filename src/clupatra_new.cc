@@ -7,6 +7,7 @@
 
 #include <UTIL/BitField64.h>
 #include <UTIL/ILDConf.h>
+#include <UTIL/BitSet32.h>
 
 ///---- GEAR ----
 #include "marlin/Global.h"
@@ -14,6 +15,7 @@
 #include "gear/PadRowLayout2D.h"
 //#include "gear/BField.h"
 
+#include "IMPL/TrackerHitImpl.h"
 
 using namespace MarlinTrk ;
 
@@ -381,6 +383,69 @@ namespace clupatra_new{
     }
   }
 
+  //------------------------------------------------------------------------------------------------------------------------- 
+  void split_multiplicity( Clusterer::cluster_list& cluList, int layerWithMultiplicity , int N) {
+
+    for( Clusterer::cluster_list::iterator it= cluList.begin(), end= cluList.end() ; it != end ; ++it ){
+ 
+      CluTrack* clu = *it ;
+      
+      std::vector<int> mult( N + 2 ) ; 
+      // get hit multiplicities up to N ( N+1 means N+1 or higher ) 
+      getHitMultiplicities( clu , mult ) ;
+      
+
+      streamlog_out(  DEBUG4 ) << " **** split_multiplicity -  hit multiplicities: \n" ;
+      
+      for( unsigned i=0,n=mult.size() ; i<n ; ++i) {
+      	streamlog_out(  DEBUG4 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
+      }
+      
+      
+      if(  mult[1] >= layerWithMultiplicity ) 
+	continue ;
+      
+      bool split_cluster = false  ;
+      
+      for( int m=2 ; m<N ; ++m){
+	
+	if( m == 2 && mult[m] >= layerWithMultiplicity ){
+	  
+	  streamlog_out(  DEBUG5 ) << " **** split_multiplicity - create_two_clusters \n" ;
+	  
+ 	  create_two_clusters( *clu , cluList  ) ;
+	  
+	  split_cluster = true  ;
+	}
+	else if( m == 3 && mult[m] >= layerWithMultiplicity ){
+	  
+	  streamlog_out(  DEBUG5 ) << " **** split_multiplicity - create_three_clusters \n" ;
+	  
+	  create_three_clusters( *clu , cluList  ) ;
+	  
+	  split_cluster = true  ;
+	}
+	else if(  mult[m] >= layerWithMultiplicity ){
+	  
+	  streamlog_out(  DEBUG5 ) << " **** split_multiplicity - create_n_clusters \n" ;
+	  
+	  create_n_clusters( *clu ,cluList , m  ) ;
+	  
+	  split_cluster = true  ;
+	}
+
+      }
+      if( split_cluster ){
+	
+	clu->clear() ;
+
+	it = cluList.erase( it ) ;
+	--it ; // erase returns iterator to next element 
+      }
+      
+      
+    }
+  }
 
   //------------------------------------------------------------------------------------------------------------------------- 
 
@@ -866,4 +931,159 @@ namespace clupatra_new{
 
  
   
+  lcio::Track* LCIOTrackConverter::operator() (CluTrack* c) {  
+    
+    static lcio::BitField64 encoder( lcio::ILDCellID0::encoder_string ) ; 
+
+    lcio::TrackImpl* trk = new lcio::TrackImpl ;
+ 
+   
+    double e = 0.0 ;
+    int nHit = 0 ;
+    for( CluTrack::iterator hi = c->begin(); hi != c->end() ; hi++) {
+      
+      // reset outliers (not used in fit)  bit
+      IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> (  (*hi)->first->lcioHit )  ;
+      thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 0 )  ;
+
+      trk->addHit(  (*hi)->first->lcioHit ) ;
+      e += (*hi)->first->lcioHit->getEDep() ;
+      nHit++ ;
+    }
+
+    MarlinTrk::IMarlinTrack* mtrk = c->ext<MarTrk>()  ;
+
+    trk->ext<MarTrk>()  = mtrk ;
+
+    trk->setdEdx( e/nHit ) ;
+    trk->subdetectorHitNumbers().resize( 2 * lcio::ILDDetID::ETD ) ;
+
+    trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  0 ; 
+    trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  nHit ;  
+      
+    if( mtrk != 0 && ! c->empty() ){
+      
+
+      std::vector<std::pair<EVENT::TrackerHit*, double> > hitsInFit ;
+      mtrk->getHitsInFit( hitsInFit ) ;
+      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  hitsInFit.size() ;  
+     
+      // store the delta chi2 for the given hit
+      for(unsigned i=0, N=hitsInFit.size() ; i<N ; ++i){
+
+	hitsInFit[i].first->ext<DChi2>() = hitsInFit[i].second ;
+
+	IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( hitsInFit[i].first ) ;
+	thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 1 )  ;
+      }
+      // // reset the bit for outliers
+      // std::vector<std::pair<EVENT::TrackerHit*, double> > outliers ;
+      // mtrk->getOutliers( outliers ) ;
+      // for(unsigned i=0, N=outliers.size() ; i<N ; ++i){
+
+      // 	outliers[i].first->ext<DChi2>() = outliers[i].second ;
+
+      // 	IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( outliers[i].first ) ;
+      // 	thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 0 )  ;
+      // }
+
+
+      lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
+      lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
+      lcio::TrackStateImpl* tsLH =  new lcio::TrackStateImpl ;
+      lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
+	
+      tsIP->setLocation(  lcio::TrackState::AtIP ) ;
+      tsFH->setLocation(  lcio::TrackState::AtFirstHit ) ;
+      tsLH->setLocation(  lcio::TrackState::AtLastHit) ;
+      tsCA->setLocation(  lcio::TrackState::AtCalorimeter ) ;
+	
+      double chi2 ;
+      int ndf  ;
+      int code ;
+      
+      // Hit* hf = c->front() ;
+      // Hit* hb = c->back() ;
+      // bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
+      // lcio::TrackerHit* fHit =  ( reverse_order ?  hb->first->lcioHit  :  hf->first->lcioHit ) ;
+      // lcio::TrackerHit* lHit =  ( reverse_order ?  hf->first->lcioHit  :  hb->first->lcioHit ) ;
+      
+      lcio::TrackerHit* fHit = hitsInFit.back().first ;
+      lcio::TrackerHit* lHit = hitsInFit.front().first ;
+      //order of hits in fit is reversed wrt time  (we fit inwards)
+      
+      // ======= get TrackState at first hit  ========================
+	
+      code = mtrk->getTrackState( fHit, *tsFH, chi2, ndf ) ;
+	
+      if( code != MarlinTrk::IMarlinTrack::success ){
+	  
+	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
+				<< " error code : " << MarlinTrk::errorCode( code ) 
+				<< std::endl ; 
+      }
+	
+      // ======= get TrackState at last hit  ========================
+      code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
+	
+      if( code != MarlinTrk::IMarlinTrack::success ){
+	  
+	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
+      }
+	
+      // ======= get TrackState at calo face  ========================
+      //
+      encoder.reset() ;
+      encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
+      encoder[ lcio::ILDCellID0::layer  ] =  0  ;
+      encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
+      int layerID  = encoder.lowWord() ;  
+      int sensorID = -1 ;
+
+      code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	
+      if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
+	  
+	encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
+	layerID = encoder.lowWord() ;
+	  
+	code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+      }
+      if ( code !=MarlinTrk::IMarlinTrack::success ) {
+
+	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
+      }
+
+      // ======= get TrackState at IP ========================
+	
+      const gear::Vector3D ipv( 0.,0.,0. );
+	
+      // fg: propagate is quite slow  and might not really be needed for the TPC
+	
+      code = ( UsePropagate ?   mtrk->propagate( ipv, fHit, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
+	
+      if( code != MarlinTrk::IMarlinTrack::success ){
+	  
+	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+      }
+	
+      trk->addTrackState( tsIP ) ;
+      trk->addTrackState( tsFH ) ;
+      trk->addTrackState( tsLH ) ;
+      trk->addTrackState( tsCA ) ;
+	
+      trk->setChi2( chi2 ) ;
+      trk->setNdf( ndf ) ;
+	
+
+    } else {
+	  
+      //	streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter::operator() (CluTrack* c)  :  no MarlinTrk::IMarlinTrack* found for cluster !!?? " << std::endl ; 
+    }
+
+
+    return trk ;
+  }
+
+
 }//namespace

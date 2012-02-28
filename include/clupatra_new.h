@@ -70,6 +70,10 @@ namespace clupatra_new{
 
   //------------------------------------------------------------------------------------------
   
+  struct DChi2 : lcrtrel::LCFloatExtension<DChi2> {} ; 
+
+  //----------------------------------------------------------------
+
   /** Simple predicate class for computing an index from N bins of the z-coordinate of LCObjects
    *  that have a float/double* getPostion() method.
    */
@@ -173,140 +177,7 @@ namespace clupatra_new{
     bool UsePropagate ;
     LCIOTrackConverter() : UsePropagate(false ) {} 
 
-    lcio::Track* operator() (CluTrack* c) {  
-    
-      static lcio::BitField64 encoder( lcio::ILDCellID0::encoder_string ) ; 
-
-      lcio::TrackImpl* trk = new lcio::TrackImpl ;
- 
-   
-      double e = 0.0 ;
-      int nHit = 0 ;
-      for( CluTrack::iterator hi = c->begin(); hi != c->end() ; hi++) {
-      
-	trk->addHit(  (*hi)->first->lcioHit ) ;
-	e += (*hi)->first->lcioHit->getEDep() ;
-	nHit++ ;
-      }
-
-      MarlinTrk::IMarlinTrack* mtrk = c->ext<MarTrk>()  ;
-
-      trk->ext<MarTrk>()  = mtrk ;
-
-      trk->setdEdx( e/nHit ) ;
-      trk->subdetectorHitNumbers().resize( 2 * lcio::ILDDetID::ETD ) ;
-      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  nHit ;  // ??used in fit?? 
-      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  nHit ;  
-      
-      if( mtrk != 0 && ! c->empty() ){
-	
-	lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
-	lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
-	lcio::TrackStateImpl* tsLH =  new lcio::TrackStateImpl ;
-	lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
-	
-	tsIP->setLocation(  lcio::TrackState::AtIP ) ;
-	tsFH->setLocation(  lcio::TrackState::AtFirstHit ) ;
-	tsLH->setLocation(  lcio::TrackState::AtLastHit) ;
-	tsCA->setLocation(  lcio::TrackState::AtCalorimeter ) ;
-	
-	double chi2 ;
-	int ndf  ;
-	int code ;
-	
-	Hit* hf = c->front() ;
-	Hit* hb = c->back() ;
-	bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
-
-	lcio::TrackerHit* fHit =  ( reverse_order ?  hb->first->lcioHit  :  hf->first->lcioHit ) ;
-	lcio::TrackerHit* lHit =  ( reverse_order ?  hf->first->lcioHit  :  hb->first->lcioHit ) ;
-	
-	// ======= get TrackState at first hit  ========================
-	
-	code = mtrk->getTrackState( fHit, *tsFH, chi2, ndf ) ;
-	
-	if( code != MarlinTrk::IMarlinTrack::success ){
-	  
- 	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " << std::endl ; 
-	}
-	
-	// ======= get TrackState at last hit  ========================
-	code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
-	
-	if( code != MarlinTrk::IMarlinTrack::success ){
-	  
- 	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
-	}
-	
-	// ======= get TrackState at calo face  ========================
-	//
-	encoder.reset() ;
-	encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
-	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
-	encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
-	int layerID  = encoder.lowWord() ;  
-	int sensorID = -1 ;
-
-	///	gear::Vector3D point ;
-	// code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
-	// if( code == MarlinTrk::IMarlinTrack::success ){
-	//   code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
-	// } else { // try endcap
-	//   encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   1.  :  -1   ) ;
-	//   layerID = encoder.lowWord() ;
-	//   code = mtrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
-	//   if( code == MarlinTrk::IMarlinTrack::success ){
-	//     code = ( UsePropagate ?  mtrk->propagate( point, *tsCA, chi2, ndf ) : mtrk->extrapolate( point, *tsCA, chi2, ndf )  );
-	//   } else {
-	//     streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " 
-	// 			   << std::endl ;
-	//   }
-	// }
-	
-	code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
-	
-	if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
-	  
-	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
-	  layerID = encoder.lowWord() ;
-	  
-	  code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
-	}
-	if ( code !=MarlinTrk::IMarlinTrack::success ) {
-
-	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
-	}
-
-	// ======= get TrackState at IP ========================
-	
-	const gear::Vector3D ipv( 0.,0.,0. );
-	
-	// fg: propagate is quite slow  and might not really be needed for the TPC
-	
-	code = ( UsePropagate ?   mtrk->propagate( ipv, fHit, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
-	
-	if( code != MarlinTrk::IMarlinTrack::success ){
-	  
- 	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
-	}
-	
-	trk->addTrackState( tsIP ) ;
-	trk->addTrackState( tsFH ) ;
-	trk->addTrackState( tsLH ) ;
-	trk->addTrackState( tsCA ) ;
-	
-	trk->setChi2( chi2 ) ;
-	trk->setNdf( ndf ) ;
-	
-
-      } else {
-	  
-	//	streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter::operator() (CluTrack* c)  :  no MarlinTrk::IMarlinTrack* found for cluster !!?? " << std::endl ; 
-      }
-
-
-      return trk ;
-    }
+    lcio::Track* operator() (CluTrack* c) ;
 
   } ;
 
@@ -359,9 +230,12 @@ namespace clupatra_new{
 
   struct IMarlinTrkFitter{
     
-    MarlinTrk::IMarlinTrkSystem* _ts ; 
+    MarlinTrk::IMarlinTrkSystem* _ts ;
+    double _maxChi2Increment ; 
     
-    IMarlinTrkFitter(MarlinTrk::IMarlinTrkSystem* ts) : _ts( ts ) {}
+    IMarlinTrkFitter(MarlinTrk::IMarlinTrkSystem* ts, double maxChi2Increment=DBL_MAX ) : 
+      _ts( ts ) , 
+      _maxChi2Increment(maxChi2Increment) {}
     
     MarlinTrk::IMarlinTrack* operator() (CluTrack* clu) {  
       
@@ -409,7 +283,16 @@ namespace clupatra_new{
       }
 
 
-      trk->fit() ;
+      int code = trk->fit(_maxChi2Increment) ;
+
+      if( code != MarlinTrk::IMarlinTrack::success ){
+	
+	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMarlinTrkFitter :  problem fitting track "
+				<< " error code : " << MarlinTrk::errorCode( code ) 
+				<< std::endl ; 
+
+      }
+      
 
       return trk;
     }
@@ -430,7 +313,11 @@ namespace clupatra_new{
   bool addHitAndFilter( int detectorID, int layer, CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut) ; 
   
   //------------------------------------------------------------------------------------------
+  /** Split up clusters that have a hit multiplicity of 2,3,4,...,N in at least layersWithMultiplicity. 
+   */
+  void split_multiplicity( Clusterer::cluster_list& cluList, int layersWithMultiplicity , int N=5) ;
 
+  //------------------------------------------------------------------------------------------
   /** Returns the number of rows where cluster clu has i hits in mult[i] for i=1,2,3,4,.... -
    *  mult[0] counts all rows that have hits
    */
@@ -553,6 +440,10 @@ namespace clupatra_new{
       double tl0 = std::abs( trk0->getTanLambda() ) ;
       double tl1 = std::abs( trk1->getTanLambda() ) ;
       
+      if( trk0->getTanLambda() * trk1->getTanLambda()   < 0. ) 
+	return false ; // require the same sign
+
+
       double dtl = 2. * std::abs( tl0 - tl1 ) / ( tl0 + tl1 ) ;
 
       streamlog_out( DEBUG ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
