@@ -21,10 +21,14 @@
 #include "IMPL/LCFlagImpl.h"
 #include "UTIL/Operators.h"
 #include "UTIL/LCTOOLS.h"
-
 #include "UTIL/CellIDDecoder.h"
+#include "UTIL/ILDConf.h"
 
 #include "LCIterator.h"
+
+//-------gsl -----
+#include "gsl/gsl_randist.h"
+#include "gsl/gsl_cdf.h"
 
 
 //---- GEAR ----
@@ -54,7 +58,7 @@ using namespace clupatra_new ;
 
 
 /** helper method to create a track collections and add it to the event */
-inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt ){
+inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt , bool isSubset=false){
 
   LCCollectionVec* col = new LCCollectionVec( LCIO::TRACK ) ;  
 
@@ -63,6 +67,8 @@ inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt ){
   col->setFlag( hitFlag.getFlag()  ) ;
 
   evt->addCollection( col , name ) ;
+
+  col->setSubset( isSubset ) ;
 
   return col ;
 }
@@ -131,6 +137,24 @@ struct MeanAbsZOfTrack{
 };
 
 //----------------------------------------------------------------
+void printTrackerHit(const EVENT::LCObject* o){
+  
+  lcio::TrackerHit* hit = const_cast<lcio::TrackerHit*> ( dynamic_cast<const lcio::TrackerHit*> (o) ) ;
+  
+  if( hit == 0 ) {
+    
+    streamlog_out( ERROR ) << " printTrackerHit : dynamic_cast<TrackerHit*> failed for LCObject : " << o << std::endl ;
+    return ;
+    
+  } else {
+    
+    streamlog_out( MESSAGE )  << " --- TrackerHit: " << *hit  
+			      << "\n --- delta Chi2 = " << hit->ext<DChi2>() << std::endl ;
+  }
+}
+//----------------------------------------------------------------
+
+
 
 
 ClupatraProcessor aClupatraProcessor ;
@@ -250,7 +274,6 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			     "optionally create some debug collection with intermediate track segments and used and unused hits",
 			     _createDebugCollections,
 			     bool(false));
-  
 }
 
 
@@ -269,7 +292,9 @@ void ClupatraProcessor::init() {
   _nRun = 0 ;
   _nEvt = 0 ;
   
-  // CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT , &printTrackerHit ) ; 
+
+  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT  , &printTrackerHit ) ; 
+
   // CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK , &printTrackShort ) ; 
   // CEDPickingHandler::getInstance().registerFunction( LCIO::SIMTRACKERHIT , &printSimTrackerHit ) ; 
   
@@ -388,15 +413,25 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //   create output collections  ( some optional )
   //===============================================================================================
 
-  const bool writeSeedCluster      = _createDebugCollections ;
-  const bool writeCluTrackSegments = _createDebugCollections ;
-  const bool writeLeftoverClusters = _createDebugCollections ;
+  const bool writeSeedCluster        = _createDebugCollections ;
+  const bool writeCluTrackSegments   = _createDebugCollections ;
+  const bool writeLeftoverClusters   = _createDebugCollections ;
+  const bool writeQualityTracks      = _createDebugCollections ;
   
-  LCCollectionVec* seedCol =  ( writeSeedCluster      ?  newTrkCol( "ClupatraSeedCluster"      , evt )  :   0   )  ; 
-  LCCollectionVec* cluCol  =  ( writeCluTrackSegments ?  newTrkCol( "ClupatraInitialTrackSegments" , evt )  :   0   )  ; 
-  LCCollectionVec* locCol  =  ( writeCluTrackSegments ?  newTrkCol( "ClupatraLeftoverClusters" , evt )  :   0   )  ; 
-  
+  LCCollectionVec* seedCol =  ( writeSeedCluster        ?  newTrkCol( "ClupatraSeedCluster"          , evt )  :   0   )  ; 
+  LCCollectionVec* cluCol  =  ( writeCluTrackSegments   ?  newTrkCol( "ClupatraInitialTrackSegments" , evt )  :   0   )  ; 
+  LCCollectionVec* locCol  =  ( writeCluTrackSegments   ?  newTrkCol( "ClupatraLeftoverClusters"     , evt )  :   0   )  ; 
+  LCCollectionVec* fsegCol  = ( writeCluTrackSegments   ?  newTrkCol( "ClupatraFinalTrackSegments"   , evt , true )  :   0   )  ; 
 
+  //LCCollectionVec* goodCol  = ( writeQualityTracks ?  newTrkCol( "ClupatraGoodQualityTracks" , evt ,true )  :   0   )  ; 
+  //LCCollectionVec* fairCol  = ( writeQualityTracks ?  newTrkCol( "ClupatraFairQualityTracks" , evt ,true )  :   0   )  ; 
+  LCCollectionVec* poorCol  = ( writeQualityTracks ?  newTrkCol( "ClupatraPoorQualityTracks" , evt ,true )  :   0   )  ; 
+
+  LCCollectionVec* outerCol  = ( _createDebugCollections ?  newTrkCol( "ClupatraOuterSegments" , evt ,true )  :   0   )  ; 
+  LCCollectionVec* innerCol  = ( _createDebugCollections ?  newTrkCol( "ClupatraInnerSegments" , evt ,true )  :   0   )  ; 
+  LCCollectionVec* middleCol = ( _createDebugCollections ?  newTrkCol( "ClupatraMiddleSegments" , evt ,true )  :   0   )  ; 
+
+  
   LCCollectionVec* tsCol  =  newTrkCol( "ClupatraTrackSegments" , evt ) ;
   
   LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
@@ -427,7 +462,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   // ---- introduce a loop over increasing distance cuts for finding the tracks seeds
   //      -> should fix (some of) the problems seen @ 3 TeV with extremely boosted jets
   //
-  int NLoop = 4 ;
+  int NLoop = 4 ; // fixme make parameter
   double dcut =  _distCut / NLoop ;
   for(int nloop=1 ; nloop <= NLoop ; ++nloop){ 
 
@@ -436,15 +471,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     outerRow = maxTPCLayers - 1 ;
     
     
-    while( outerRow > _padRowRange ) {
+    while( outerRow > _padRowRange * .5 ) {
     
       HitVec hits ;
       hits.reserve( nHit ) ;
     
       // add all hits in pad row range to hits
       for(int iRow = outerRow ; iRow > ( outerRow - _padRowRange) ; --iRow ) {
-      
-	std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+	if( iRow > -1 ) 
+	  std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
       }
     
       //-----  cluster in given pad row range  -----------------------------
@@ -453,10 +488,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
       nncl.cluster_sorted( hits.begin(), hits.end() , std::back_inserter( sclu ), dist , _minCluSize ) ;
     
-      if( writeSeedCluster ) {
-	std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
-      }
-    
+      // try to split up clusters according to multiplicity
+      int layerWithMultiplicity = _padRowRange - 2  ; // fixme: make parameter 
+      split_multiplicity( sclu , layerWithMultiplicity , 10 ) ;
+
       // remove clusters whith too many duplicate hits per pad row
       Clusterer::cluster_list bclu ;    // bad clusters  
       bclu.setOwner() ;      
@@ -465,8 +500,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
       // free hits from bad clusters 
       std::for_each( bclu.begin(), bclu.end(), std::mem_fun( &CluTrack::freeElements ) ) ;
-    
-    
+
+     
       // ---- now we also need to remove the hits from good cluster seeds from the hitsInLayers:
       for( Clusterer::cluster_list::iterator sci=sclu.begin(), end= sclu.end() ; sci!=end; ++sci ){
 	for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
@@ -476,7 +511,11 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	}
       }
     
-
+      // now we have 'clean' seed clusters
+      if( writeSeedCluster ) {
+	std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
+      }
+      
       //      std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
       // reduce memory footprint: deal with one KalTest track at a time and delete it, when done
     
@@ -520,12 +559,20 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   timer.time( t_recluster ) ;
   
   //===============================================================================================
-  //  do a global reclustering in all leftover hits
+  //  do a global reclustering in leftover hits
   //===============================================================================================
   
   outerRow = maxTPCLayers - 1 ;
   
   int padRangeRecluster = 50 ; // FIXME: make parameter 
+  // define an inner cylinder where we exclude hits from re-clustering:
+  double zMaxInnerHits   = driftLength * .67 ;   // FIXME: make parameter 
+  double rhoMaxInnerHits = padLayout.getPlaneExtent()[0] + (  padLayout.getPlaneExtent()[1] - padLayout.getPlaneExtent()[0] ) * .67 ;// FIXME: make parameter 
+  
+  streamlog_out( DEBUG5 ) << "  ===========================================================================\n"
+			  << "      recluster in leftover hits - outside a clyinder of :  z =" << zMaxInnerHits << " rho = " <<  rhoMaxInnerHits << "\n"
+			  << "  ===========================================================================\n" << std::endl ;
+
   
   while( outerRow > 0 ) {
     
@@ -543,7 +590,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     // add all hits in pad row range to hits
     for(int iRow = outerRow ; iRow > minRow ; --iRow ) {
       
-      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+      //      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
+
+      for( HitList::iterator hlIt=hitsInLayer[ iRow ].begin() , end = hitsInLayer[ iRow ].end() ; hlIt != end ; ++hlIt ) {
+	if( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits ) 
+	  hits.push_back( *hlIt ) ;
+      }
+
     }
     
     
@@ -572,17 +625,16 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     //===============================================================================================
     
     
-    _dChi2Max = 5. * _dChi2Max ; //FIXME !!!!!!!!!
+    //    _dChi2Max = 5. * _dChi2Max ; //FIXME !!!!!!!!!
 
     for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
       
       CluTrack* clu = *it ;
       
-      streamlog_out(  DEBUG4 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
+      streamlog_out(  DEBUG5 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
       
       std::vector<int> mult(8) ; 
       // get hit multiplicities up to 6 ( 7 means 7 or higher ) 
-      
       getHitMultiplicities( clu , mult ) ;
       
       streamlog_out(  DEBUG4 ) << " **** left over cluster with hit multiplicities: \n" ;
@@ -602,7 +654,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
 	  
-	  streamlog_out( DEBUG4 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  streamlog_out( DEBUG5 ) << " extending mult-5 clustre  of length " << (*ir)->size() << std::endl ;
 	  
 	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
 	  static const bool backward = true ;
@@ -623,7 +675,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
 	  
-	  streamlog_out( DEBUG4 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  streamlog_out( DEBUG5 ) << " extending mult-4 clustre  of length " << (*ir)->size() << std::endl ;
 	  
 	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
 	  static const bool backward = true ;
@@ -644,7 +696,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
 	  
-	  streamlog_out( DEBUG4 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  streamlog_out( DEBUG5 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
 	  
 	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
 	  static const bool backward = true ;
@@ -665,7 +717,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
 	  
-	  streamlog_out( DEBUG4 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
+	  streamlog_out( DEBUG5 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
 	  
 	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
 	  static const bool backward = true ;
@@ -728,11 +780,15 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   // std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
 
   //---- refit cluster tracks individually to save memory ( KalTest tracks have ~1MByte each)
-  IMarlinTrkFitter fit(_trksystem) ;
+
+  IMarlinTrkFitter fit(_trksystem,  _dChi2Max) ; // fixme: do we need a different chi2 max here ????
+
   for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
     MarlinTrk::IMarlinTrack* trk = fit( *icv ) ;
     trk->smooth() ;
-    tsCol->push_back(  converter( *icv ) ) ;
+    Track* lcioTrk = converter( *icv ) ; 
+    tsCol->push_back(  lcioTrk ) ;
+    lcioTrk->ext<MarTrk>() = 0 ;
     delete trk ;
   }
   
@@ -783,8 +839,47 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
     std::for_each( tsCol->begin() , tsCol->end() , ComputeTrackerInfo()  ) ;
     
-    std::transform( tsCol->begin() , tsCol->end() , std::back_inserter( trkVec ) , MakeLCIOElement<Track>() ) ; 
 
+    // std::transform( tsCol->begin() , tsCol->end() , std::back_inserter( trkVec ) , MakeLCIOElement<Track>() ) ; 
+    //
+    // ----  exclude already complete tracks from merging: -------
+    MakeLCIOElement<Track> em ;
+    float r_inner = padLayout.getPlaneExtent()[0] ;
+    float r_outer = padLayout.getPlaneExtent()[1] ;
+    
+    // for( LCCollectionVec::iterator it= tsCol->begin() , end = tsCol->end() ; it!= end ; ++it ){
+    //   Track* trk = (Track*)( *it ) ;
+    for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ){
+      
+      TrackImpl* trk = (TrackImpl*) tsCol->getElementAt(i) ;
+      
+      
+      const TrackState* tsF = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+      const TrackState* tsL = trk->getTrackState( lcio::TrackState::AtLastHit  ) ;
+      
+      gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
+      gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
+      
+      bool isCentral =  std::abs( lhPos.rho() - r_outer ) < 25. ; // last hit close to outer field cage
+      bool isForward =  ( driftLength - std::abs( lhPos.z() )  ) < 40.  ;	// or close to endcap
+      bool isCurler  =  std::abs( tsF->getOmega() ) > 0.001  ;  
+
+      bool isCompleteTrack =  ( std::abs( fhPos.rho() - r_inner ) <  25. )   // first hit close to inner field cage 
+	&&                    ( ( isCentral && !isCurler )   ||  isForward ) ;  
+      
+      if( !isCompleteTrack ){
+	
+	trkVec.push_back(  em( trk )  ) ; 
+
+      } else { // add a copy to the final tracks collection 
+
+	if( writeCluTrackSegments ) 
+	  fsegCol->addElement( trk ) ;
+
+	outCol->addElement( new TrackImpl( *trk )  ) ;
+      }
+    }
+    
     TrackCircleDistance trkMerge( 0.1 ) ; 
 
     nntrkclu.cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), trkMerge , 2  ) ;
@@ -846,8 +941,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
       trk->ext<MarTrk>() = firstTrk->ext<MarTrk>() ;
       
-      int hitsInFit = firstTrk->getTrackerHits().size() ;
-
+      int hitsInFit  =  firstTrk->getSubdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] ;
+      trk->setChi2(     firstTrk->getChi2()     ) ;
+      trk->setNdf(      firstTrk->getNdf()      ) ;
+      trk->setdEdx(     firstTrk->getdEdx()     ) ;
+      trk->setdEdxError(firstTrk->getdEdxError()) ;
+      
       trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
       trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
       trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
@@ -862,34 +961,83 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
 
     //---------------------------------------------------------------------------------------------
-    // add all tracks that have not been merged :
-
+    // // add all tracks that have not been merged :
+    
     for( TrackClusterer::element_vector::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
-
+      
       if( (*it)->second == 0 ){
 	
-	TrackImpl* trk = dynamic_cast<TrackImpl*>( (*it)->first ) ;
+    	TrackImpl* trk = dynamic_cast<TrackImpl*>( (*it)->first ) ;
 	
-	TrackImpl* t =   new TrackImpl( *trk ) ;
+    	TrackImpl* t =   new TrackImpl( *trk ) ;
 	
-	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
-
-	t->ext<MarTrk>() = dynamic_cast<TrackImpl*>( (*it)->first )->ext<MarTrk>() ;
-
-
-	// unsigned nHit = trk->getTrackerHits().size() ;
-	// t->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
-	// t->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  nHit ;  
-	// t->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  nHit ;  
-
-	streamlog_out( DEBUG2 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
+    	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
 	
-	outCol->addElement( t ) ;
+    	t->ext<MarTrk>() = 0 ; // dynamic_cast<TrackImpl*>( (*it)->first )->ext<MarTrk>() ;
+	
+    	streamlog_out( DEBUG2 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
+	
+    	outCol->addElement( t ) ;
       }
     }
     
   }
   timer.time( t_merge ) ;  
+
+
+
+  //===============================================================================================
+  //  create some debug collections ....
+  //===============================================================================================
+  if( _createDebugCollections ) {
+
+    float r_inner = padLayout.getPlaneExtent()[0] ;
+    float r_outer = padLayout.getPlaneExtent()[1] ;
+
+    for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
+      
+
+      const TrackState* tsF = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+      const TrackState* tsL = trk->getTrackState( lcio::TrackState::AtLastHit  ) ;
+      
+      gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
+      gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
+      
+
+      bool endsCentral  =  std::abs( lhPos.rho() - r_outer ) < 25. ; // last hit close to outer field cage
+
+      bool endsForward  =  ( driftLength - std::abs( lhPos.z() )  ) < 40.  ;	// or close to endcap
+
+      bool isCurler     =  std::abs( tsF->getOmega() ) > 0.002  ;  
+      
+      bool endsInOuter = ( endsCentral ) || endsForward  ; 
+      
+      bool startsInInner  =  ( std::abs( fhPos.rho() - r_inner ) <  25. )  ;
+
+
+
+      if( isCurler )  continue ;
+
+
+      if( !startsInInner && endsInOuter ) {
+	
+	outerCol->addElement( trk ) ;
+      } 
+      if( startsInInner &&  !endsInOuter ) {
+	
+	innerCol->addElement( trk ) ;
+      } 
+      if( !startsInInner &&  !endsInOuter ) {    
+	
+	middleCol->addElement( trk ) ;
+      }
+      
+    }  
+  }
+ //---------------------------------------------------------------------------------------------------------
+
+
+
 
   //---------------------------------------------------------------------------------------------------------
   //    pick up hits from Si trackers
@@ -905,6 +1053,33 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   timer.time( t_pickup ) ;  
 
   
+  //---------------------------------------------------------------------------------------------------------
+  //===============================================================================================
+  //  apply some track quality cuts
+  //===============================================================================================
+  
+  for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
+    
+    // — Function: double gsl_cdf_chisq_P (double x, double nu)
+    // — Function: double gsl_cdf_chisq_Q (double x, double nu)
+    //cumulative distribution functions P(x) - lower , Q(x)  - upper 
+    
+    
+    double prob = ( trk->getNdf() > 0 ? gsl_cdf_chisq_Q(  trk->getChi2() ,  (double) trk->getNdf() )  : 0. ) ;
+    
+    streamlog_out( DEBUG2 ) << " gsl_cdf_chisq_Q( "<< trk->getChi2() << ", " <<  (double) trk->getNdf()  << " ) = " << prob << std::endl ;
+    if( prob < .01 ) // fixme - parameter ??
+      poorCol->addElement( trk ) ;
+
+
+
+
+  }
+  //---------------------------------------------------------------------------------------------------------
+
+
+
+
   streamlog_out( MESSAGE )  <<  timer.toString () << std::endl ;
 
   _nEvt ++ ;
@@ -919,16 +1094,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 }
 
-
-
-
-/*************************************************************************************************/
-void ClupatraProcessor::check( LCEvent * evt ) { 
-
-  /*************************************************************************************************/
-  
-
-}
 
 /*************************************************************************************************/
 void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCEvent* evt) {
@@ -1164,6 +1329,14 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     } 
   }
 }
+
+
+/*************************************************************************************************/
+void ClupatraProcessor::check( LCEvent * evt ) { 
+  
+  /*************************************************************************************************/
+}
+
 
 
 //====================================================================================================
