@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="us-ascii"?>
+<?xml version="1.0" encoding="us-ascii"?>
 <!--?xml-stylesheet type="text/xsl" href="http://ilcsoft.desy.de/marlin/marlin.xsl"?-->
 
 <marlin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -13,18 +14,23 @@
     <processor name="MyAIDAProcessor" />
 
     <!-- ========== track digitization and tracking  =======================================  -->
-    <processor name="VXDSimplePlanarDigiProcessor"/>
-    <processor name="SITSimplePlanarDigiProcessor"/>
-    <processor name="FTDSimpleDiscDigiProcessor"/>
+    <XXprocessor name="VXDSimplePlanarDigiProcessor"/>
+    <XXprocessor name="SITSimplePlanarDigiProcessor"/>
+    <XXprocessor name="FTDSimpleDiscDigiProcessor"/>
     <processor name="MyTPCDigiProcessor"/>
 
     <XXprocessor name="MyFixCellIDs" />
+
+    <XXprocessor name="MyTrackFinderFTF" />
 
     <processor name="MyClupatraProcessor" />
     <XXprocessor name="MySiliconTracking_MarlinTrk"/>
     <XXprocessor name="MyFullLDCTracking_MarlinTrk"/>
 
     <XXXprocessor name="MyTruthTracker" />
+
+    <processor name="ClupatraMCTruthLinker" />
+    <processor name="TruthCheck" />
 
     <processor name="MyCEDViewer" />
     <processor name="MyLCIOOutputProcessor" />
@@ -33,11 +39,12 @@
   <global>
     <parameter name="LCIOInputFiles"> recfile_clic.slcio </parameter>
     <parameter name="GearXMLFile" value="gear_CLIC_CDR.xml" />
-    <parameter name="MaxRecordNumber" value="10" />
-    <parameter name="SkipNEvents" value="8" />
+    <parameter name="MaxRecordNumber" value="2" />
+    <parameter name="SkipNEvents" value="0 8" />
     <parameter name="SupressCheck" value="false true false" />
     <parameter name="Verbosity" value="MESSAGE" />
   </global>
+
 
   <processor name="MyEventSelector" type="EventSelector">
     <!--EventSelector returns true if given event was specified in EvenList-->
@@ -138,15 +145,15 @@
     <!--Z Diffusion Coefficent in TPC-->
     <parameter name="DiffusionCoeffZ" type="float">0.08 </parameter>
     <!--Defines the minimum distance for two seperable hits in RPhi-->
-    <parameter name="DoubleHitResolutionRPhi" type="float">2 </parameter>
+    <parameter name="DoubleHitResolutionRPhi" type="float"> 2 </parameter>
     <!--Defines the minimum distance for two seperable hits in Z-->
-    <parameter name="DoubleHitResolutionZ" type="float">5 </parameter>
+    <parameter name="DoubleHitResolutionZ" type="float"> 5 </parameter>
     <!--Defines spatial slice in RP-->
     <parameter name="HitSortingBinningRPhi" type="float">2 </parameter>
     <!--Defines spatial slice in Z-->
     <parameter name="HitSortingBinningZ" type="float">5 </parameter>
     <!--Defines the maximum number of adjacent hits which can be merged-->
-    <parameter name="MaxClusterSizeForMerge" type="int">3 </parameter>
+    <parameter name="MaxClusterSizeForMerge" type="int">5 </parameter>
     <!--Number of Effective electrons per pad in TPC-->
     <parameter name="N_eff" type="int">22 </parameter>
     <!--Pad Phi Resolution constant in TPC-->
@@ -174,7 +181,7 @@
   <processor name="MyClupatraProcessor" type="ClupatraProcessor">
     <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
     <!--the maximum chi2-distance for which a hit is considered for merging -->
-    <parameter name="Chi2Cut" type="float">100 </parameter>
+    <parameter name="Chi2Cut" type="float"> 35 100 </parameter>
     <!--optionally create some debug collection with intermediate track segments and used and unused hits-->
     <parameter name="CreateDebugCollections" type="bool">true  </parameter>
     <!--Cut for distance between hits in mm-->
@@ -215,11 +222,79 @@
     <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">TPCTrackerHits </parameter>
     
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-    <parameter name="Verbosity" type="string">MESSAGE DEBUG3 </parameter>
+    <parameter name="Verbosity" type="string"> DEBUG5 </parameter>
   </processor>
   
 
-  <processor name="MySiliconTracking_MarlinTrk" type="SiliconTracking_MarlinTrk">
+ <processor name="MyTrackFinderFTF" type="TrackFinderFTF">
+ <!--TrackFinderFTF uses FTF to find tracks-->
+  <parameter name="InputFTDTrackerHitCollectionName" type="string" lcioInType="TrackerHitPlane">FTDTrackerHits </parameter>
+  <!--Name of the input tracker hit collection-->
+  <parameter name="InputSETTrackerHitCollectionName" type="string" lcioInType="TrackerHitPlane">SETTrackerHits </parameter>
+  <!--Name of the input tracker hit collection-->
+  <parameter name="InputSITTrackerHitCollectionName" type="string" lcioInType="TrackerHitPlane">SITTrackerHits </parameter>
+  <!--Name of the input tracker hit collection-->
+  <parameter name="InputTPCTrackerHitCollectionName" type="string" lcioInType="TrackerHit">TPCTrackerHits </parameter>
+  <!--Name of the input tracker hit collection-->
+  <parameter name="InputVXDTrackerHitCollectionName" type="string" lcioInType="TrackerHitPlane">VXDTrackerHitsPlanar  </parameter>
+  <!--Name of the output track collection-->
+  <parameter name="OutputTrackCollectionName" type="string" lcioOutType="Track">FTFTracks </parameter>
+  <!--Use Parameter-->
+  <parameter name="Parameter1" type="bool">true </parameter>
+  <parameter name="ParameterFile" type="string"> FTF_clic_parameters.txt</parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">DEBUG4 </parameter>
+</processor>
+
+
+  <processor name="ClupatraMCTruthLinker" type="RecoMCTruthLinker">
+    <!--Name of the MCParticle input collection-->
+    <parameter name="MCParticleCollection" type="string" lcioInType="MCParticle">MCParticle </parameter>
+    <!--Names of the SimTrackerHits input collection-->
+    <parameter name="SimTrackerHitCollections" type="StringVec" lcioInType="SimTrackerHit"> TPCCollection </parameter>
+        <!--Name of the Tracks input collection-->
+    <parameter name="TrackCollection" type="string" lcioInType="Track">ClupatraTracks </parameter>
+    <!--Name of the trackMCTruthLink output collection-->
+    <parameter name="TrackMCTruthLinkName" type="string" lcioOutType="LCRelation">ClupatraMCTruthLink </parameter>
+    <!--Name of the MCParticle to Track relation output collection - not created if empty()-->
+    <parameter name="MCTruthTrackLinkName" type="string" lcioOutType="LCRelation"> MCTruthClupatraLink</parameter>
+    <!--Name of the  SimTrackerHit - TrackerHit relation-->
+    <parameter name="TPCTrackerHitRelInputCollection" type="string" lcioInType="LCRelation">TPCTrackerHitRelations </parameter>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string"> DEBUG3 </parameter>
+ </processor>
+
+ <processor name="TruthCheck" type="TrackCheckMCTruth">
+   <!--TrackCheckMCTruth: analysis plots for Tracks-->
+   <!--maximal fractions of hits that are allowed to be missing for a merged track-->
+   <parameter name="HitFractionMerged" type="float">0.05 </parameter>
+   <!--maximal fractions of hits that are allowed to be missing for a split track-->
+   <parameter name="HitFractionSplit" type="float">0.05 </parameter>
+   <!--Name of the input collections with MCParticles-->
+   <parameter name="MCParticlesCollection" type="string" lcioInType="MCParticle">MCParticle </parameter>
+   <!--Name of the output collections with merged Tracks-->
+   <parameter name="MergedTrackCollection" type="string" lcioOutType="Track">ClupatraMergedTracks </parameter>
+    <!--Name of the MCParticle to Track relation output collection - not created if empty()-->
+    <parameter name="MCPTrackRelation" type="string" lcioOutType="LCRelation"> MCTruthClupatraLink</parameter>
+   <!--Min and max value of pt range [GeV]-->
+   <parameter name="PtRange" type="FloatVec">0 1000  </parameter>
+   <!--Name of the input collections with SimTrackerHits-->
+   <parameter name="SimTrackerHitCollection" type="StringVec" lcioInType="SimTrackerHit">TPCCollection  </parameter>
+   <!--Name of the output collections with split Tracks-->
+   <parameter name="SplitTrackCollection" type="string" lcioOutType="Track">ClupatraSplitTracks </parameter>
+   <!--Name of the input collections with  Tracks-->
+   <parameter name="TrackCollection" type="string" lcioInType="Track">ClupatraTracks </parameter>
+   <!--Name of the input collections with LCRelation Tracks to MCParticles-->
+   <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation">ClupatraMCTruthLink </parameter>
+   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+   <parameter name="Verbosity" type="string">DEBUG4 </parameter>
+ </processor>
+
+
+
+
+
+<processor name="MySiliconTracking_MarlinTrk" type="SiliconTracking_MarlinTrk">
     <!--Pattern recognition in silicon trackers-->
     <!--Angle Cut For Merging-->
     <parameter name="AngleCutForMerging" type="float">0.1 </parameter>
@@ -499,14 +574,39 @@
    <!--Wait for Keyboard before proceed-->
    <parameter name="WaitForKeyboard" type="int">1</parameter>
 
-    <!--collection to be displayed ( ColName, marker type[0-2], size, layer)-->
+    <!--collection to be displayed ( ColName, marker type[0-2], size, layer)
+      PandoraPFOs 0 2 3
+      VXDTrackerHitsPlanar  0 6 4
+      SITTrackerHits  0 6 4
+
+      OddMCPTracks 0 3 14
+      MCParticle  0 3 15
+
+      MCParticleTracks_MyTrackCheckMCTruthMCParticle 0 3 13
+      MCParticleTracksFound_MyTrackCheckMCTruthMCParticle 0 3 14
+
+      FTFTracks 4 3 16
+      ClupatraPoorQualityTracks 4 3 17
+
+      ClupatraTracksLowMCPWeight    0 3 13
+      ClupatraTracksOkMCPWeight     0 3 14
+      ClupatraTracksLargeMCPWeight  0 3 15
+
+      ClupatraTracksLowWeight    0 3 3
+      ClupatraTracksOkWeight     0 3 4
+      ClupatraTracksLargeWeight  0 3 5
+
+      ClupatraGoodQualityTracks  0 3 3
+      ClupatraFairQualityTracks  0 3 4
+      ClupatraPoorQualityTracks  0 3 5
+    -->
     <parameter name="DrawInLayer"> 
       ClupatraSeedCluster 0 4 1 
       ClupatraLeftoverClusters 0 3 2
 
-      PandoraPFOs 0 2 3
-      VXDTrackerHitsPlanar  0 6 4
-      SITTrackerHits  0 6 4
+      ClupatraOuterSegments   0 3 3
+      ClupatraInnerSegments   0 3 4
+      ClupatraMiddleSegments  0 3 5
 
       ClupatraTrackSegments 0 4 6
       ClupatraInitialTrackSegments 0 3 7 
@@ -514,12 +614,18 @@
       ClupatraUsedTPCHits   0 2  8
       ClupatraUnUsedTPCHits 0 3 9
 
-      OddMCPTracks 0 3 14
+      ClupatraFinalTrackSegments 0 3 10
 
-      MCParticle  0 3 15
+      TPCCollection 0 2 11
+      TPCTrackerHits 0 2 12
+
+      ClupatraSplitTracks 0 3 13
+
+      MCParticleTracks_TruthCheck 0 3 16
+      MCParticleTracksFound_TruthCheck 0 3 17
 
       MarlinTrkTracks 2 20 18
-      ClupatraTracks 0 3 19
+      ClupatraTracks 0 4 19
 
     </parameter>
   </processor>
@@ -557,7 +663,7 @@
 	value="MyPreciousSimTrackerHits"/
     -->
     <!-- name of output file -->
-    <parameter name="LCIOOutputFile" type="string" value="outputfile.slcio" />
+    <parameter name="LCIOOutputFile" type="string" value="outputfile_clic.slcio" />
     <!--write mode for output file:  WRITE_APPEND or WRITE_NEW-->
     <parameter name="LCIOWriteMode" type="string" value="WRITE_NEW" />
     <!--

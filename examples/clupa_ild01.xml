@@ -24,15 +24,15 @@
 
     <XXXprocessor name="MyTruthTracker" />
 
-    <processor name="MyCEDViewer" />
+    <XXXprocessor name="MyCEDViewer" />
     <processor name="MyLCIOOutputProcessor" />
   </execute>
 
   <global>
     <parameter name="LCIOInputFiles"> recfile_ild01.slcio </parameter>
     <parameter name="GearXMLFile" value="gear_ILD_01_dev.xml" />
-    <parameter name="MaxRecordNumber" value="1" />
-    <parameter name="SkipNEvents" value="25" />
+    <parameter name="MaxRecordNumber" value="2" />
+    <parameter name="SkipNEvents" value="0 25" />
     <parameter name="SupressCheck" value="false true false" />
     <parameter name="Verbosity" value="MESSAGE" />
   </global>
@@ -170,7 +170,7 @@
     <!--allowed fraction of hits in same pad row per track-->
     <parameter name="DuplicatePadRowFraction" type="float">0.1 </parameter>
     <!--Use Energy Loss in Fit-->
-    <parameter name="EnergyLossOn" type="bool">true </parameter>
+    <parameter name="EnergyLossOn" type="bool">false true </parameter>
     <!--the maximum delta Chi2 for which a hit is added to a track segement-->
     <parameter name="MaxDeltaChi2" type="float">35 </parameter>
     <!--the maximum number of layers without finding a hit before hit search search is stopped -->
@@ -182,7 +182,7 @@
     <!--minimum number of hits per cluster-->
     <parameter name="MinimumClusterSize" type="int">6 </parameter>
     <!--Use MultipleScattering in Fit-->
-    <parameter name="MultipleScatteringOn" type="bool">true </parameter>
+    <parameter name="MultipleScatteringOn" type="bool">false true </parameter>
     <!--number of bins in z over total length of TPC - hits from different z bins are nver merged-->
     <parameter name="NumberOfZBins" type="int">150 </parameter>
     <!--Name of the output collection-->
@@ -191,7 +191,7 @@
     <parameter name="PadRowRange" type="int">15 </parameter>
     
     <!--try to pick up hits from Si-trackers-->
-    <parameter name="pickUpSiHits" type="bool">true false </parameter>
+    <parameter name="pickUpSiHits" type="bool">true  false </parameter>
     <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
     <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter>
     <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
@@ -203,7 +203,7 @@
     <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">TPCTrackerHits </parameter>
     
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-    <parameter name="Verbosity" type="string">MESSAGE DEBUG3 </parameter>
+    <parameter name="Verbosity" type="string">DEBUG5 </parameter>
   </processor>
   
 
