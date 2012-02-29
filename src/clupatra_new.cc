@@ -967,114 +967,106 @@ namespace clupatra_new{
       std::vector<std::pair<EVENT::TrackerHit*, double> > hitsInFit ;
       mtrk->getHitsInFit( hitsInFit ) ;
       trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  hitsInFit.size() ;  
-     
-      // store the delta chi2 for the given hit
-      for(unsigned i=0, N=hitsInFit.size() ; i<N ; ++i){
-
-	hitsInFit[i].first->ext<DChi2>() = hitsInFit[i].second ;
-
-	IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( hitsInFit[i].first ) ;
-	thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 1 )  ;
-      }
-      // // reset the bit for outliers
-      // std::vector<std::pair<EVENT::TrackerHit*, double> > outliers ;
-      // mtrk->getOutliers( outliers ) ;
-      // for(unsigned i=0, N=outliers.size() ; i<N ; ++i){
-
-      // 	outliers[i].first->ext<DChi2>() = outliers[i].second ;
-
-      // 	IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( outliers[i].first ) ;
-      // 	thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 0 )  ;
-      // }
-
-
-      lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
-      lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
-      lcio::TrackStateImpl* tsLH =  new lcio::TrackStateImpl ;
-      lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
-	
-      tsIP->setLocation(  lcio::TrackState::AtIP ) ;
-      tsFH->setLocation(  lcio::TrackState::AtFirstHit ) ;
-      tsLH->setLocation(  lcio::TrackState::AtLastHit) ;
-      tsCA->setLocation(  lcio::TrackState::AtCalorimeter ) ;
-	
-      double chi2 ;
-      int ndf  ;
-      int code ;
       
-      // Hit* hf = c->front() ;
-      // Hit* hb = c->back() ;
-      // bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
-      // lcio::TrackerHit* fHit =  ( reverse_order ?  hb->first->lcioHit  :  hf->first->lcioHit ) ;
-      // lcio::TrackerHit* lHit =  ( reverse_order ?  hf->first->lcioHit  :  hb->first->lcioHit ) ;
-      
-      lcio::TrackerHit* fHit = hitsInFit.back().first ;
-      lcio::TrackerHit* lHit = hitsInFit.front().first ;
-      //order of hits in fit is reversed wrt time  (we fit inwards)
-      
-      // ======= get TrackState at first hit  ========================
+      if( ! hitsInFit.empty() ){
 	
-      code = mtrk->getTrackState( fHit, *tsFH, chi2, ndf ) ;
-	
-      if( code != MarlinTrk::IMarlinTrack::success ){
+	// store the delta chi2 for the given hit
+	for(unsigned i=0, N=hitsInFit.size() ; i<N ; ++i){
 	  
-	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
-				<< " error code : " << MarlinTrk::errorCode( code ) 
-				<< std::endl ; 
-      }
-	
-      // ======= get TrackState at last hit  ========================
-      code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
-	
-      if( code != MarlinTrk::IMarlinTrack::success ){
+	  hitsInFit[i].first->ext<DChi2>() = hitsInFit[i].second ;
 	  
-	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
-      }
+	  IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( hitsInFit[i].first ) ;
+	  thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 1 )  ;
+	}
 	
-      // ======= get TrackState at calo face  ========================
-      //
-      encoder.reset() ;
-      encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
-      encoder[ lcio::ILDCellID0::layer  ] =  0  ;
-      encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
-      int layerID  = encoder.lowWord() ;  
-      int sensorID = -1 ;
-
-      code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
+	lcio::TrackStateImpl* tsFH =  new lcio::TrackStateImpl ;
+	lcio::TrackStateImpl* tsLH =  new lcio::TrackStateImpl ;
+	lcio::TrackStateImpl* tsCA =  new lcio::TrackStateImpl ;
 	
-      if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
+	tsIP->setLocation(  lcio::TrackState::AtIP ) ;
+	tsFH->setLocation(  lcio::TrackState::AtFirstHit ) ;
+	tsLH->setLocation(  lcio::TrackState::AtLastHit) ;
+	tsCA->setLocation(  lcio::TrackState::AtCalorimeter ) ;
+	
+	double chi2 ;
+	int ndf  ;
+	int code ;
+	
+	// Hit* hf = c->front() ;
+	// Hit* hb = c->back() ;
+	// bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
+	// lcio::TrackerHit* fHit =  ( reverse_order ?  hb->first->lcioHit  :  hf->first->lcioHit ) ;
+	// lcio::TrackerHit* lHit =  ( reverse_order ?  hf->first->lcioHit  :  hb->first->lcioHit ) ;
+	
+	lcio::TrackerHit* fHit = hitsInFit.back().first ;
+	lcio::TrackerHit* lHit = hitsInFit.front().first ;
+	//order of hits in fit is reversed wrt time  (we fit inwards)
+	
+	// ======= get TrackState at first hit  ========================
+	
+	code = mtrk->getTrackState( fHit, *tsFH, chi2, ndf ) ;
+	
+	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
-	layerID = encoder.lowWord() ;
+	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
+				  << " error code : " << MarlinTrk::errorCode( code ) 
+				  << std::endl ; 
+	}
+	
+	// ======= get TrackState at last hit  ========================
+	code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
+	
+	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
+	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
+	}
+	
+	// ======= get TrackState at calo face  ========================
+	//
+	encoder.reset() ;
+	encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
+	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
+	encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
+	int layerID  = encoder.lowWord() ;  
+	int sensorID = -1 ;
+	
 	code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
-      }
-      if ( code !=MarlinTrk::IMarlinTrack::success ) {
-
-	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
-      }
-
-      // ======= get TrackState at IP ========================
 	
-      const gear::Vector3D ipv( 0.,0.,0. );
-	
-      // fg: propagate is quite slow  and might not really be needed for the TPC
-	
-      code = ( UsePropagate ?   mtrk->propagate( ipv, fHit, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
-	
-      if( code != MarlinTrk::IMarlinTrack::success ){
+	if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
 	  
-	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
+	  layerID = encoder.lowWord() ;
+	  
+	  code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+	}
+	if ( code !=MarlinTrk::IMarlinTrack::success ) {
+	  
+	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
+	}
+	
+	// ======= get TrackState at IP ========================
+	
+	const gear::Vector3D ipv( 0.,0.,0. );
+	
+	// fg: propagate is quite slow  and might not really be needed for the TPC
+	
+	code = ( UsePropagate ?   mtrk->propagate( ipv, fHit, *tsIP, chi2, ndf ) :  mtrk->extrapolate( ipv, *tsIP, chi2, ndf ) ) ;
+	
+	if( code != MarlinTrk::IMarlinTrack::success ){
+	  
+	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+	}
+	
+	trk->addTrackState( tsIP ) ;
+	trk->addTrackState( tsFH ) ;
+	trk->addTrackState( tsLH ) ;
+	trk->addTrackState( tsCA ) ;
+	
+	trk->setChi2( chi2 ) ;
+	trk->setNdf( ndf ) ;
+
       }
-	
-      trk->addTrackState( tsIP ) ;
-      trk->addTrackState( tsFH ) ;
-      trk->addTrackState( tsLH ) ;
-      trk->addTrackState( tsCA ) ;
-	
-      trk->setChi2( chi2 ) ;
-      trk->setNdf( ndf ) ;
-	
 
     } else {
 	  
