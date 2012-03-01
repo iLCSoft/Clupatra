@@ -17,6 +17,8 @@
 #include "UTIL/Operators.h"
 #include "UTIL/LCRelationNavigator.h"
 #include "UTIL/LCTypedVector.h"
+#include "UTIL/LCTypedVector.h"
+#include "UTIL/ILDConf.h"
 
 //---- GEAR ----
 // #include "marlin/Global.h"
@@ -56,35 +58,35 @@ namespace TrackEfficiencyHistos {
   }; 
 
 
-class Histograms{
-public:
-  Histograms(std::vector<TH1*>& v) : _h(&v) {}
+  class Histograms{
+  public:
+    Histograms(std::vector<TH1*>& v) : _h(&v) {}
 
-  void create(int idx, const char* n, int nBin=100, double min=0., double max=0. ){
-    create( idx , n , n , nBin, min , max ) ; 
-  }
+    void create(int idx, const char* n, int nBin=100, double min=0., double max=0. ){
+      create( idx , n , n , nBin, min , max ) ; 
+    }
 
-  void create(int idx, const char* n, const char* t,  int nBin=100, double min=0., double max=0. ){
+    void create(int idx, const char* n, const char* t,  int nBin=100, double min=0., double max=0. ){
 
-    //    _h->resize( idx+1 ) ;
-    _h->at( idx ) = new TH1D( n, t , nBin , min, max ) ;
+      //    _h->resize( idx+1 ) ;
+      _h->at( idx ) = new TH1D( n, t , nBin , min, max ) ;
 
-    streamlog_out( DEBUG ) << " create histo " <<  n << " at index " << idx << std::endl ;
-  }
+      streamlog_out( DEBUG ) << " create histo " <<  n << " at index " << idx << std::endl ;
+    }
 
-  void create(int idx, const char* n, const char* t,  int nBin , double* bins ){
+    void create(int idx, const char* n, const char* t,  int nBin , double* bins ){
 
-    _h->at( idx ) = new TH1D( n, t , nBin , bins ) ;
+      _h->at( idx ) = new TH1D( n, t , nBin , bins ) ;
 
-    streamlog_out( DEBUG ) << " create histo " <<  n << " at index " << idx << std::endl ;
-  }
+      streamlog_out( DEBUG ) << " create histo " <<  n << " at index " << idx << std::endl ;
+    }
 
-  void fill( int idx , double val, double weight=1.0 ){  _h->at( idx )->Fill( val , weight ) ; }
+    void fill( int idx , double val, double weight=1.0 ){  _h->at( idx )->Fill( val , weight ) ; }
 
-protected:
+  protected:
 
-  std::vector<TH1*>* _h;
-};
+    std::vector<TH1*>* _h;
+  };
 
 
 
@@ -95,9 +97,9 @@ using namespace TrackEfficiencyHistos ;
 //======================================================================================================
 
 #define APPLY_CUT( LEVEL, Cut, Exp )  if( (Exp) == false ) { Cut = false ; \
-  streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp	    \
-  <<  " ] in evt: " << evt->getEventNumber()			    \
-  << " run: "  << evt->getRunNumber()   << std::endl ; }
+    streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp	\
+			   <<  " ] in evt: " << evt->getEventNumber()	\
+			   << " run: "  << evt->getRunNumber()   << std::endl ; }
 
 //======================================================================================================
 
@@ -252,8 +254,8 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     //  void create(int idx, const char* n, const char* t,  int nBin=100, double min=0., double max=0. ){
 
     // variable  bin size histogram for pt
-    static const int nBins = 9 ;
-    double bins[nBins+1] = { 0.1, 0.2, 0.5 , 1.0 , 2., 5.0 , 10. , 20. , 50. , 100. } ;
+    static const int nBins = 11 ;
+    double bins[nBins+1] = { 0.1, 0.2, 0.5 , 1.0 , 2., 5.0 , 10. , 20. , 50. , 100. , 300. , 500. } ;
 
     h.create( hpt_t, "hpt_t", "pt - true ", nBins , bins ) ;
     h.create( hpt_f, "hpt_f", "pt - found ", nBins , bins ) ;
@@ -305,15 +307,22 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   
   evt->addCollection( mcpTracks , name  ) ;
 
-  LCCollectionVec* mcpTrksFound = new LCCollectionVec( LCIO::MCPARTICLE )  ;
-  mcpTrksFound->setSubset( true ) ;
-  mcpTrksFound->reserve(  mcpIt.size() ) ;
+  LCCollectionVec* mcpTrksNotFound = new LCCollectionVec( LCIO::MCPARTICLE )  ;
+  mcpTrksNotFound->setSubset( true ) ;
+  mcpTrksNotFound->reserve(  mcpIt.size() ) ;
 
-  name = "MCParticleTracksFound_" ;
+  name = "MCParticleTracksNotFound_" ;
   name += this->name() ;
-  evt->addCollection( mcpTrksFound ,  name  ) ;
+  evt->addCollection( mcpTrksNotFound ,  name  ) ;
 
 
+  LCCollectionVec* splitTracks = new LCCollectionVec( LCIO::TRACK )  ;
+  splitTracks->setSubset( true ) ;
+  splitTracks->reserve(  trkCol->getNumberOfElements() ) ;
+  name = "SplitTracks_" ;
+  name += this->name() ;
+  evt->addCollection( splitTracks ,  name  ) ;
+  
   //------ count sim hits from every MCParticle
   typedef std::map< MCParticle* , int > HITMAP ;
   HITMAP hitMap ;
@@ -330,8 +339,6 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
   //--- check if we hav any tracks in the relation (not always for LEP trk)
 
-
-  //---------------------------
 
   while( MCParticle* mcp = mcpIt.next()  ){
     
@@ -382,7 +389,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     double pymcp =  trm->getMomentum()[1]  ;
     //    double pzmcp =  trm->getMomentum()[2]  ;
     
-   //    double pmcp  = sqrt( pxmcp*pxmcp + pymcp*pymcp + pzmcp*pzmcp ) ;
+    //    double pmcp  = sqrt( pxmcp*pxmcp + pymcp*pymcp + pzmcp*pzmcp ) ;
     double ptmcp = sqrt( pxmcp*pxmcp + pymcp*pymcp ) ;
     
     // double thmcp  = atan2( ptmcp , pzmcp ) ;
@@ -434,7 +441,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     h.fill( hacth_t , std::abs( costhmcp) ) ;
     
     const EVENT::LCObjectVec& trkV = nav.getRelatedFromObjects( trm ) ;
-    
+
     if( trkV.size() >  0 ){
       
       //      LCUTIL::LCTypedVector<Track*> trks( trkV ) ;
@@ -442,16 +449,29 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
       const FloatVec& wV = nav.getRelatedFromWeights( trm ) ;
       double wMax = 0.0 ;
       int iMax = 0 ;
+
+      streamlog_out( DEBUG5 ) <<  " ------   trkV.size()  : " << trkV.size()  << std::endl ;
+
       for(unsigned i=0 ; i<wV.size() ; ++i ) {
-	  
-	  if( wV[i] > wMax ){
-	    wMax =  wV[i] ;
-	    iMax = i ;
-	  }  
-	} 
+	 
+	streamlog_out( DEBUG5 ) <<  "          nhit  : " << ((Track*)trkV[i])->getTrackerHits().size() <<    " ---- weight : " <<   wV[i]   << std::endl ;
+
+	if( wV[i] > wMax ){
+	  wMax =  wV[i] ;
+	  iMax = i ;
+	}  
+      } 
+
+      // store split tracks collection
+      if( trkV.size() >  1 ){
+
+	for(unsigned i=0,N=trkV.size() ; i<N ; ++i ) {
+	  splitTracks->addElement( trkV[i] ) ;
+	}
+      }
+
 
       Track* tr = dynamic_cast<Track*>( trkV.at(iMax)  ) ; 
-
  
       double d0 = tr->getD0() ;
       double ph = tr->getPhi() ;
@@ -482,20 +502,33 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
       bool cut = true ;
       
-      //      APPLY_CUT( DEBUG4, cut,  std::abs( dph )  <  (3.*eph)  ) ;
-      //      APPLY_CUT( DEBUG4, cut,  std::abs( dom )  <  (5.*eom)  ) ;              // require 5 sigma on omega only for now
-      //      APPLY_CUT( DEBUG4, cut,  std::abs( dtL  ) <  (3.*etL)  ) ;
+      //       APPLY_CUT( DEBUG4, cut,  std::abs( dph )  <  (3.*eph)  ) ;
+      //       APPLY_CUT( DEBUG4, cut,  std::abs( dom )  <  (5.*eom)  ) ;              // require 5 sigma on omega only for now
+      //       APPLY_CUT( DEBUG4, cut,  std::abs( dtL  ) <  (3.*etL)  ) ;
 
+
+      // trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
+      // trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
+      int nTPCHit = tr->getSubdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] ;
+      int nMCPTPCHit = hitMap[ trm ] ;
+      //      double goodHitFraction = ( wMax * nTPCHit )  / nMCPTPCHit ;
+
+      double goodHitFraction = wMax ;
+      
+      
+      APPLY_CUT( DEBUG4, cut,  goodHitFraction > 0.96  ) ;
+      
       if( ! cut ) {
-	streamlog_out(DEBUG3) << " phi : " << dph << "  -  " <<  3.*eph << std::endl ;
-	streamlog_out(DEBUG3) << " ome : " << dom << "  -  " <<  3.*eom << std::endl ;
-	streamlog_out(DEBUG3) << " tanL: " << dtL << "  -  " <<  3.*etL << std::endl ;
+	streamlog_out(DEBUG6) << "  goodHitFraction : " << wMax<< "*" << nTPCHit << "/" << nMCPTPCHit 
+			      << "=" << goodHitFraction << std::endl ;
+	
+	streamlog_out(DEBUG3) << " phi : " << dph << "  -  " <<  3.*eph << " - " << dph /ph << std::endl ;
+	streamlog_out(DEBUG3) << " ome : " << dom << "  -  " <<  3.*eom << " - " << dom /om << std::endl ;
+	streamlog_out(DEBUG3) << " tanL: " << dtL << "  -  " <<  3.*etL << " - " << dtL /tL << std::endl ;
 	streamlog_out(DEBUG3) << " pt: " << pt <<  " dpt: " << dpt << " ept : " << ept << " theta " <<  180. * atan( 1. / tL ) / M_PI  << std::endl ;
       }
-
+      
       if( cut == true ){
-	
-	mcpTrksFound->push_back( trm ) ;
 	
 	h.fill( hd0,    d0 ) ;
 	h.fill( hphi,   ph ) ;
@@ -534,12 +567,18 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 	h.fill( hcosth_f , costhmcp ) ;
 	h.fill( hacth_f , std::abs( costhmcp) ) ;
 
+	
+      } else {
+	
+	// debug: for now create a collection of mcparticle tracks  that where not found
+	mcpTrksNotFound->push_back( trm ) ;
+	
       }
+    } 
 
-    }
   }
 
-  streamlog_out( DEBUG4 )  << " ===== found " << mcpTrksFound->size()  <<  " tracks of " << mcpTracks->size()  
+  streamlog_out( DEBUG4 )  << " ===== found " << mcpTrksNotFound->size()  <<  " tracks of " << mcpTracks->size()  
 			   << std::endl ;
 
   //----------------------------------------------------------------------  
@@ -560,7 +599,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 void TrackEfficiency::check( LCEvent * evt ) { 
   /*************************************************************************************************/
 
-  }
+}
 //====================================================================================
 
 
