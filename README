@@ -41,7 +41,44 @@
 
 
  =============================================================================================================
-  -----------
+   --------
+ | v00-05 |
+  --------
+
+      - reduce memory footprint: deal with one KalTest track at a time wherever possible
+        (saves >2MByte/track)
+
+      - properly set the bit UTIL::ILDTrkHitQualityBit::USED_IN_FIT
+        for all trackerhits used in fit
+
+      - set correct subdetectorHitNumbers() for used in fit
+         ( trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  usedInFIt ; 
+           trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  nHit ;  )
+
+      - algorithmic improvements:
+          - introduce a loop over increasing distance cuts for finding the tracks seeds
+             -> fixdes some of the problems seen @ 3 TeV with extremely boosted jets
+
+          - use function split_multiplicity() to split up merged cluster seeds if possible
+             ( improves efficiencies in forward region )
+
+           - added create_n_clusters and use for splitting up 
+            clusters with multiplicities 4 and 5 
+
+      - added gear and steering file for CLIC detector
+
+      - added some debugging functionality
+        - new track debugging processor - under developmet: TrackCheckMCTruth
+        - added debug method printTrackerHit() for picking 
+        - added optional debug collections:
+          ClupatraPoorQualityTracks, ClupatraOuterSegments, ClupatraInnerSegments, ClupatraMiddleSegments
+	  
+       - improved TrackEfficiencyProcessor
+           - extended pt range to 500 GeV 
+           - introduce cut on good hit fraction (96%)
+             (needs MarlinReco v01-01 )
+
+ -----------
  | v00-04-01 |
   -----------
 
