@@ -1058,29 +1058,31 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //  apply some track quality cuts
   //===============================================================================================
   
-  for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
-    
-    // — Function: double gsl_cdf_chisq_P (double x, double nu)
-    // — Function: double gsl_cdf_chisq_Q (double x, double nu)
-    //cumulative distribution functions P(x) - lower , Q(x)  - upper 
-    
-    
-    double prob = ( trk->getNdf() > 0 ? gsl_cdf_chisq_Q(  trk->getChi2() ,  (double) trk->getNdf() )  : 0. ) ;
-    
-    streamlog_out( DEBUG2 ) << " gsl_cdf_chisq_Q( "<< trk->getChi2() << ", " <<  (double) trk->getNdf()  << " ) = " << prob << std::endl ;
-    if( prob < .01 ) // fixme - parameter ??
-      poorCol->addElement( trk ) ;
-
-
-
-
+  if( writeQualityTracks ) {
+    for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
+      
+      // — Function: double gsl_cdf_chisq_P (double x, double nu)
+      // — Function: double gsl_cdf_chisq_Q (double x, double nu)
+      //cumulative distribution functions P(x) - lower , Q(x)  - upper 
+      
+      
+      double prob = ( trk->getNdf() > 0 ? gsl_cdf_chisq_Q(  trk->getChi2() ,  (double) trk->getNdf() )  : 0. ) ;
+      
+      streamlog_out( DEBUG2 ) << " gsl_cdf_chisq_Q( "<< trk->getChi2() << ", " <<  (double) trk->getNdf()  << " ) = " << prob << std::endl ;
+      if( prob < .01 ) // fixme - parameter ??
+	poorCol->addElement( trk ) ;
+      
+      
+      
+      
+    }
   }
-  //---------------------------------------------------------------------------------------------------------
+ //---------------------------------------------------------------------------------------------------------
 
 
 
 
-  streamlog_out( MESSAGE )  <<  timer.toString () << std::endl ;
+  streamlog_out( DEBUG9 )  <<  timer.toString () << std::endl ;
 
   _nEvt ++ ;
 
