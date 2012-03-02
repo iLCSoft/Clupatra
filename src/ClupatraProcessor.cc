@@ -853,10 +853,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       
       TrackImpl* trk = (TrackImpl*) tsCol->getElementAt(i) ;
       
-      
       const TrackState* tsF = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
       const TrackState* tsL = trk->getTrackState( lcio::TrackState::AtLastHit  ) ;
       
+      // protect against bad tracks 
+      if(  tsF == 0 ) continue ;
+      if(  tsL == 0 ) continue ;
+
       gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
       gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
       
