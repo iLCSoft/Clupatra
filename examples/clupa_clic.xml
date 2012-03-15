@@ -193,7 +193,7 @@
     <!--the maximum delta Chi2 for which a hit is added to a track segement-->
     <parameter name="MaxDeltaChi2" type="float">35 </parameter>
     <!--the maximum number of layers without finding a hit before hit search search is stopped -->
-    <parameter name="MaxStepWithoutHit" type="int">3 </parameter>
+    <parameter name="MaxStepWithoutHit" type="int"> 6 </parameter>
     <!--minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
     <parameter name="MinLayerFractionWithMultiplicity" type="float">0.5 </parameter>
     <!--minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
