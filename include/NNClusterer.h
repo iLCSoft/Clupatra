@@ -126,7 +126,8 @@ namespace nnclu {
   
   public :
     typedef Element<T> element_type ; 
-  
+    typedef std::list< Element<T> * > base ;
+
     int ID ; //DEBUG
   
     Cluster()  {}
@@ -142,7 +143,7 @@ namespace nnclu {
     void addElement( Element<T>* element ) {
     
       element->second = this ;
-      push_back( element ) ;
+      base::push_back( element ) ;
     }
 
     // /** Remove all elements from the cluster and reset the cluster association, i.e. elements can be
@@ -162,21 +163,21 @@ namespace nnclu {
     /** Free all elements, ie. reset their cluster association - the elements are still in the list !.
      */
     void freeElements(){
-
+      
       for( typename Cluster<T>::iterator it = this->begin(), end = this->end() ; it != end ; it++ ){
         (*it)->second = 0 ;
       }
-    
+      
       // typename Cluster<T>::iterator it = this->begin() ;
       // while( it !=  this->end() ){
       //   (*it)->second = 0 ;
       //   it = this->erase(it) ;
       // }
     }
-  
+    
     /** Merges all elements from the other cluster cl into this cluster */
     void mergeClusters( Cluster<T>* cl ) {
-    
+      
       for( typename Cluster<T>::iterator it = cl->begin(), end = cl->end() ; it != end ; it++ ){
         (*it)->second = this  ;
       }
