@@ -122,6 +122,31 @@ struct Distance3D2{
 
   }
 };
+
+//----------------------------------------------------------------
+struct StripDistance2{
+  gear::Vector3D _pos ;
+  StripDistance2( const gear::Vector3D& pos) : _pos( pos ) {}
+  
+  double operator()( const TrackerHit* t) { 
+
+    gear::Vector3D p( t->getPosition() ) ;
+
+    const TrackerHitPlane* h = (const TrackerHitPlane*) t ;
+
+    gear::Vector3D v( 1. , h->getU()[1] ,  h->getU()[0] , gear::Vector3D::spherical ) ;
+
+    double d = ( p - _pos ).dot(v)  ;
+
+    streamlog_out( DEBUG3 ) << " h: " << *h << "\n"
+			    << " v: " << v << "\n"
+			    << " d: " << d << std::endl ;
+
+
+    return d*d ;
+  }
+};
+
 //----------------------------------------------------------------
 struct MeanAbsZOfTrack{
   double operator()( const Track* t){
@@ -1135,7 +1160,9 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     
     LCIterator<TrackerHit> it( evt, _sitColName ) ;
     while( TrackerHit* hit = it.next()  ){
-      
+
+      streamlog_out( DEBUG3  ) << "     adding SIT space point hit : " << hit << std::endl ;
+
       hLMap[ hit->getCellID0() ].push_back(  hit ) ;
     }    
   }
@@ -1269,11 +1296,23 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	double min = 1.e99 ;
 	double maxDist = 1. ; //FIXME: make parameter - what is reasonable here ?
 	 
-	std::list<TrackerHit*>::iterator bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2( point ) , min ) ;
-	
+	std::list<TrackerHit*>::iterator bestIt ; 
+
+	if( detID == ILDDetID::SIT ) {
+
+	  bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2( point ) , min ) ;
+
+	} else {
+
+	  bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2( point ) , min ) ;
+	}
+
 	if( bestIt == hL.end() || min  > maxDist ){
 
-	  streamlog_out( DEBUG3 ) << " ######### no close by hit found !! " << std::endl ;
+	  streamlog_out( DEBUG3 ) << " ######### no close by hit found !! " 
+				  << " (bestIt == hL.end())" << (bestIt == hL.end()) 
+				  << " (min  > maxDist)" << (min  > maxDist) 
+				  << std::endl ;
 	  continue ; // FIXME: need to limit the number of layers w/o hits !!!!!!
 	}
 
