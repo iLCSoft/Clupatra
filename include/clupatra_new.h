@@ -304,7 +304,7 @@ namespace clupatra_new{
    *  Hits are added if the resulting delta Chi2 is less than dChiMax - a maxStep is the maximum number of steps (layers) w/o 
    *  successfully merging a hit.
    */
-  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, ZIndex& zIndex,  bool backward=false) ; 
+  int addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, ZIndex& zIndex,  bool backward=false) ; 
   //------------------------------------------------------------------------------------------
   
   /** Try to add a hit from the given HitList in layer of subdetector to the track.
@@ -418,8 +418,8 @@ namespace clupatra_new{
       const TrackInfoStruct* ti1 =  trk1->ext<TrackInfo>() ;
 
 
-      streamlog_out( DEBUG0 ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
-			      << "  (  ti0->zAvg > ti1->zAvg ) " << (  ti0->zAvg > ti1->zAvg )
+      streamlog_out( DEBUG1 ) << "TrackCircleDistance::operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+			      << "  (  ti0->zAvg > ti1->zAvg ) = " << (  ti0->zAvg > ti1->zAvg )
 			      << std::endl ;
 
 
@@ -446,8 +446,9 @@ namespace clupatra_new{
 
       double dtl = 2. * std::abs( tl0 - tl1 ) / ( tl0 + tl1 ) ;
 
-      streamlog_out( DEBUG ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
-			     << "(  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  ) " << (  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  )
+      streamlog_out( DEBUG1 ) << "TrackCircleDistance::operator() : " <<  trk0->id() << " <-> "  << trk1->id()
+			     << " dtl : " << dtl << "   std::abs( tl0 + tl1 ) = " <<  std::abs( tl0 + tl1 ) 
+			     << " (  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  ) = " << (  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  )
 			     << std::endl ;
       
       if(  dtl > 2.  * _dCut  &&  std::abs( tl0 + tl1 ) > 1.e-2  )
@@ -469,12 +470,12 @@ namespace clupatra_new{
 
       double rIP = 20. ; 
 
-      // streamlog_out( DEBUG3 ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
-      // 			      << " (  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  && std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     ) " 
-      // 			      << (  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  && std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     )
-      // 			      << std::endl ;
+      streamlog_out( DEBUG1 ) << "TrackCircleDistance::operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+       			      << " (  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  && std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     ) " 
+       			      << (  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  && std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     )
+       			      << std::endl ;
       
-
+      
       // // don't merge tracks that come from an area of 20 mm around the IP
       if(  std::abs( d0 ) < rIP &&  std::abs( z0 ) < rIP  &&
        	   std::abs( d1 ) < rIP &&  std::abs( z1 ) < rIP     )
@@ -493,14 +494,14 @@ namespace clupatra_new{
 
       double distMS = sqrt ( ( x0 - x1 ) * ( x0 - x1 ) + ( y0 - y1 ) * ( y0 - y1 )  ) ;
     
-      streamlog_out( DEBUG ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
-			     << "( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) " 
-			     << ( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) 
-			     <<  " dr : " << dr 
-			     <<  " _dCut * std::abs( r0 ) " << _dCut * std::abs( r0 )
-			     << " distMS :" << distMS 
-			     << std::endl ;
-      
+      streamlog_out( DEBUG1 ) << "TrackCircleDistance:: operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
+			      << "( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) " 
+			      << ( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) 
+			      <<  " dr : " << dr 
+			      <<  " _dCut * std::abs( r0 ) " << _dCut * std::abs( r0 )
+			      << " distMS :" << distMS 
+			      << std::endl ;
+
       //      return ( dr < DRMAX && distMS < _dCut * std::abs( r0 )  ) ;
       return ( dr < _dCut * std::abs( r0 )  &&  distMS < _dCut * std::abs( r0 )  ) ;
 

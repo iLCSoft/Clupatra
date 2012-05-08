@@ -560,7 +560,7 @@ void TrackCheckMCTruth::processEvent( LCEvent * evt ) {
 	  iMax = i ;
 	}  
 
-	if( wV[i] > 0.25 ) { // if we have a track segment that has a weight >0.5 it could be part of a split track....
+	if( wV[i] > 0.5 ) { // if we have a track segment that has a weight >0.5 it could be part of a split track....
 	  splitTrackIndices.push_back( i ) ;
 	}
       } 

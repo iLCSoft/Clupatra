@@ -521,13 +521,24 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
       for( Clusterer::cluster_list::iterator icv = sclu.begin(), end =sclu.end()  ; icv != end ; ++ icv ) {
       
+	int nHitsAdded = 0 ;
+
 	MarlinTrk::IMarlinTrack* mTrk = fitter( *icv ) ;
 
-	addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex ) ; 
+	nHitsAdded += addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex ) ; 
       
 	static const bool backward = true ;
-	addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	nHitsAdded += addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
 
+	
+	if( nHitsAdded < 1 ){ // poor seed segment -> delete cluster and free hits up again
+	  
+	  for( Clusterer::cluster_type::iterator ci=(*icv)->begin(), end= (*icv)->end() ; ci!=end; ++ci ) {
+	    hitsInLayer[ (*ci)->first->layer ].push_back( *ci )   ; 
+	  }
+	  (*icv)->freeElements() ;
+	  (*icv)->clear() ;
+	}
 	
 	if( writeCluTrackSegments )  //  ---- store track segments from the first main step  ----- 
 	  cluCol->addElement(  converter( *icv ) );
@@ -582,40 +593,35 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     HitVec hits ;
 
-
     int  minRow = ( ( outerRow - padRangeRecluster ) > -1 ?  ( outerRow - padRangeRecluster ) : -1 ) ;
-
-    streamlog_out( DEBUG4 ) << "   recluster in the range : " << outerRow << " - " <<  minRow << std::endl ;
 
     // add all hits in pad row range to hits
     for(int iRow = outerRow ; iRow > minRow ; --iRow ) {
+
+      streamlog_out( DEBUG ) << "      hit candidates in row " << iRow << " : " << hitsInLayer[ iRow ].size() << std::endl ;
       
-      //      std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
-
       for( HitList::iterator hlIt=hitsInLayer[ iRow ].begin() , end = hitsInLayer[ iRow ].end() ; hlIt != end ; ++hlIt ) {
-	if( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits ) 
+	streamlog_out( DEBUG ) << "      hit candidate for reclustering " << (*hlIt)->first 
+			       << " ( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits )  " 
+			       <<   ( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits )
+			       << std::endl ;
+	
+	if( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits ) {
 	  hits.push_back( *hlIt ) ;
+	}
       }
-
     }
     
     
-    
-    //  CluTrack debug ;
-    
-    // int startRowRecluster = 100 ; // FIXME: make parameter 
-    // for(unsigned iRow = startRowRecluster ; iRow <  maxTPCLayers ; ++iRow ) {
-    
-    //   std::copy( hitsInLayer[ iRow ].begin() , hitsInLayer[ iRow ].end() , std::back_inserter( hits )  ) ;
-    // }
-    
-    HitDistance distSmall( _distCut ) ; //   / 2. ) ;
+    HitDistance distSmall( _distCut ) ; 
     nncl.cluster( hits.begin(), hits.end() , std::back_inserter( loclu ),  distSmall , _minCluSize ) ;
     
+    streamlog_out( DEBUG ) << "   reclusterd in the range : " << outerRow << " - " <<  minRow 
+			   << " found " << loclu.size() << " clusters " 
+			   << std::endl ;
     
     if( writeLeftoverClusters )
       std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
-    
     
     
     // timer.time( t_recluster ) ;
@@ -626,7 +632,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     
     //    _dChi2Max = 5. * _dChi2Max ; //FIXME !!!!!!!!!
-
+    
     for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
       
       CluTrack* clu = *it ;
@@ -754,15 +760,24 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   }
   
-  //===============================================================================================
-  //  try again to gobble up hits at the ends ....   - Not needed anymore
-  //===============================================================================================
-  // for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
-  //   addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-  //   static const bool backward = true ;
-  //   addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
-  // }
+  //=======================================================================================================================
+  //  try again to gobble up hits at the ends ....   - does not work right now, as there are no fits  for the clusters....
+  //=======================================================================================================================
+
+  // streamlog_out( DEBUG5 ) << " ===========     gobble up leftover hits at the ends for "  <<  cluList.size() << "  clusters " << std::endl ;
   
+  // for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
+    
+  //   if( (*icv)->empty() ) continue ;
+    
+  //   int nH = 0 ;
+
+  //   nH += addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+  //   static const bool backward = true ;
+  //   nH += addHitsAndFilter( *icv , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+
+  //   streamlog_out( DEBUG3 ) << "     added " << nH << " leftover hits to cluster " << *icv << std::endl ; 
+  // }
   
   timer.time( t_split ) ;
 
@@ -784,6 +799,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   IMarlinTrkFitter fit(_trksystem,  _dChi2Max) ; // fixme: do we need a different chi2 max here ????
 
   for( Clusterer::cluster_list::iterator icv = cluList.begin() , end = cluList.end() ; icv != end ; ++ icv ) {
+
+    if( (*icv)->empty() ) 
+      continue ;
+
     MarlinTrk::IMarlinTrack* trk = fit( *icv ) ;
     trk->smooth() ;
     Track* lcioTrk = converter( *icv ) ; 

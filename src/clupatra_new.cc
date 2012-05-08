@@ -65,8 +65,10 @@ namespace clupatra_new{
   //-------------------------------------------------------------------------------
   
 
-  void addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, ZIndex& zIndex, bool backward) {
+  int addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, ZIndex& zIndex, bool backward) {
     
+    int nHitsAdded = 0 ;
+
     const int maxTPCLayerID  = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
    
     clu->sort( LayerSortIn() ) ;
@@ -74,11 +76,11 @@ namespace clupatra_new{
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
 
     
-    streamlog_out( DEBUG ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
+    streamlog_out( DEBUG3 ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
 
 
    if( layer <= 0  || layer >=  maxTPCLayerID   ) 
-	return  ;
+	return  nHitsAdded ;
 
 
     Chi2_RPhi_Z_Hit ch2rzh ;
@@ -86,8 +88,8 @@ namespace clupatra_new{
     IMarlinTrack* trk =  clu->ext<MarTrk>() ;
 
     if(  trk == 0 ){
-      streamlog_out( DEBUG2 ) <<  "  addHitsAndFilter called with null pointer to MarlinTrk  - won't do anything " << std::endl ;
-      return  ;
+      streamlog_out( DEBUG3 ) <<  "  addHitsAndFilter called with null pointer to MarlinTrk  - won't do anything " << std::endl ;
+      return  nHitsAdded;
     } 
     
     unsigned step = 0 ;
@@ -110,7 +112,7 @@ namespace clupatra_new{
       int smoothed  = trk->smooth( firstHit ) ;
       //int smoothed  = trk->smooth() ;
 
-     streamlog_out( DEBUG ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
+     streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
 
     }
 
@@ -151,7 +153,7 @@ namespace clupatra_new{
 
 
 
-      streamlog_out( DEBUG ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
+      streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
 			     <<  "  Step : " << step 
 			     <<  "  at layer: "   << layer      
 			     <<  "   intersects: " << MarlinTrk::errorCode( intersects )
@@ -166,6 +168,8 @@ namespace clupatra_new{
 	
 	double ch2Min = 1.e99 ;
 	Hit* bestHit = 0 ;
+
+	streamlog_out( DEBUG3 ) <<  "      -- number of hits on layer " << layer << " : " << hLL.size() << std::endl ; 
 
 	for( HitList::const_iterator ih = hLL.begin(), end = hLL.end() ; ih != end ; ++ih ){    
 	  
@@ -183,12 +187,13 @@ namespace clupatra_new{
  	}//-------------------------------------------------------------------
 	
 
-  	streamlog_out( DEBUG ) <<   " ************ bestHit "  << bestHit 
-			       <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
-			       <<   " chi2: " <<  ch2Min 
-			       <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
 	
  	if( bestHit != 0 ){
+	  
+	  streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
+				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
+				  <<   " chi2: " <<  ch2Min 
+				  <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
 	  
 	  const gear::Vector3D&  hPos = bestHit->first->pos  ;
 	  
@@ -200,7 +205,7 @@ namespace clupatra_new{
 	    
 	    
 	    
-	    streamlog_out( DEBUG ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
+	    streamlog_out( DEBUG3 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
 				   <<   " dist: " <<  (  hPos - xv ).r()
 				   <<   " chi2: " <<  ch2Min 
 				   <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
@@ -222,7 +227,8 @@ namespace clupatra_new{
 	      
 	      firstHit = 0 ; // after we added a hit, the next intersection search should use this last hit...
 	      
-	      
+	      ++nHitsAdded ;
+
 	      streamlog_out( DEBUG ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
 	    }
 	  } // chi2Cut 
@@ -240,6 +246,8 @@ namespace clupatra_new{
 
     } // while step < maxStep
   
+
+    return nHitsAdded ;
 
   }
 
