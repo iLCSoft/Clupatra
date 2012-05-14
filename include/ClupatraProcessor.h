@@ -14,6 +14,14 @@ using namespace marlin ;
 namespace MarlinTrk{
   class IMarlinTrkSystem ;
 }
+namespace gear{
+  class TPCParameters ;
+  class PadRowLayout2D ;
+}
+
+namespace EVENT{ 
+  class Track ;
+}
 
 /** Clustering based pattern recognition for a TPC...
  */
@@ -52,6 +60,11 @@ class ClupatraProcessor : public Processor {
   
  protected:
 
+  /** helper method to compute a few track segment parameters (start and end points, z spread,...) 
+   */
+  void computeTrackInfo(  lcio::Track* lTrk  ) ;
+
+
   void pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCEvent* evt) ;
 
   /** Input collection name.
@@ -72,6 +85,11 @@ class ClupatraProcessor : public Processor {
   float _minLayerFractionWithMultiplicity ;
   int   _minLayerNumberWithMultiplicity ;
   
+  float _trackStartsInnerDist ;
+  float _trackEndsOuterCentralDist ;
+  float _trackEndsOuterForwardDist ;
+  float _trackIsCurlerOmega ;
+  
   int   _minCluSize ;
   int   _padRowRange ; 
   int   _nZBins ;
@@ -87,6 +105,9 @@ class ClupatraProcessor : public Processor {
   int _nEvt ;
 
   MarlinTrk::IMarlinTrkSystem* _trksystem ;
+
+  const gear::TPCParameters*  _gearTPC ;
+  const gear::PadRowLayout2D* _padLayout ;
 
 //   NNClusterer* _clusterer ;
 

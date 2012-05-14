@@ -138,10 +138,10 @@ struct StripDistance2{
 
     double d = ( p - _pos ).dot(v)  ;
 
-    streamlog_out( DEBUG3 ) << " h: " << *h << "\n"
-			    << " v: " << v << "\n"
-			    << " d: " << d << std::endl ;
-
+    streamlog_out( DEBUG ) << " h: " << *h << "\n"
+			   << " v: " << v << "\n"
+			   << " d: " << d << std::endl ;
+    
 
     return d*d ;
   }
@@ -264,6 +264,27 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
 			      _minLayerNumberWithMultiplicity,
 			      (int) 3 ) ;
 
+  registerProcessorParameter( "TrackStartsInnerDist" , 
+			      "maximum radial distance [mm] from inner field cage of first hit, such that the track is considered to start at the beginning " ,
+ 			      _trackStartsInnerDist ,
+ 			      (float) 25. ) ;
+  
+  registerProcessorParameter( "TrackEndsOuterCentralDist" , 
+			      "maximum radial distance [mm] from outer field cage of last hit, such that the track is considered to end at the end " ,
+ 			      _trackEndsOuterCentralDist ,
+ 			      (float) 25. ) ;
+  
+  registerProcessorParameter( "TrackEndsOuterForwardDist" , 
+			      "maximum distance in z [mm] from endplate of last hit, such that the track is considered to end at the end " ,
+ 			      _trackEndsOuterForwardDist ,
+ 			      (float) 40. ) ;
+  
+  registerProcessorParameter( "TrackIsCurlerOmega" , 
+			      "minimum curvature omega of a track segment for being considered a curler" ,
+ 			      _trackIsCurlerOmega ,
+ 			      (float) 0.001 ) ;
+
+
   registerProcessorParameter("MultipleScatteringOn",
 			     "Use MultipleScattering in Fit",
 			     _MSOn,
@@ -362,12 +383,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   LCIOTrackConverter converter ;
   
-  const gear::TPCParameters& gearTPC = Global::GEAR->getTPCParameters() ;
-  const gear::PadRowLayout2D& padLayout = gearTPC.getPadLayout() ;
-
-  unsigned maxTPCLayers =  padLayout.getNRows() ;
+  _gearTPC = &Global::GEAR->getTPCParameters() ;
+  _padLayout = &_gearTPC->getPadLayout() ;
   
-  double driftLength = gearTPC.getMaxDriftLength() ;
+  unsigned maxTPCLayers =  _padLayout->getNRows() ;
+  
+  double driftLength = _gearTPC->getMaxDriftLength() ;
   ZIndex zIndex( -driftLength , driftLength , _nZBins  ) ; 
   
 
@@ -585,11 +606,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   //---------------------------------------------------------------------------------------------------------
 
-  //  ---- store track segments from the first main step  -----  
-  // if( writeCluTrackSegments )
-  //   std::transform( cluList.begin(), cluList.end(), std::back_inserter( *cluCol ) , converter ) ;
-
-    
   timer.time( t_seedtracks ) ;
   
   timer.time( t_recluster ) ;
@@ -597,194 +613,197 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //===============================================================================================
   //  do a global reclustering in leftover hits
   //===============================================================================================
-  
-  outerRow = maxTPCLayers - 1 ;
-  
-  int padRangeRecluster = 50 ; // FIXME: make parameter 
-  // define an inner cylinder where we exclude hits from re-clustering:
-  double zMaxInnerHits   = driftLength * .67 ;   // FIXME: make parameter 
-  double rhoMaxInnerHits = padLayout.getPlaneExtent()[0] + (  padLayout.getPlaneExtent()[1] - padLayout.getPlaneExtent()[0] ) * .67 ;// FIXME: make parameter 
-  
-  streamlog_out( DEBUG5 ) << "  ===========================================================================\n"
-			  << "      recluster in leftover hits - outside a clyinder of :  z =" << zMaxInnerHits << " rho = " <<  rhoMaxInnerHits << "\n"
-			  << "  ===========================================================================\n" << std::endl ;
+  static const int do_global_reclustering = true ;
+  if( do_global_reclustering ) {
 
-  
-  while( outerRow > 0 ) {
+    outerRow = maxTPCLayers - 1 ;
     
-
-    Clusterer::cluster_list loclu ; // leftover clusters
-    loclu.setOwner() ;
+    int padRangeRecluster = 50 ; // FIXME: make parameter 
+    // define an inner cylinder where we exclude hits from re-clustering:
+    double zMaxInnerHits   = driftLength * .67 ;   // FIXME: make parameter 
+    double rhoMaxInnerHits = _padLayout->getPlaneExtent()[0] + (  _padLayout->getPlaneExtent()[1] - _padLayout->getPlaneExtent()[0] ) * .67 ;// FIXME: make parameter 
     
-    HitVec hits ;
-
-    int  minRow = ( ( outerRow - padRangeRecluster ) > -1 ?  ( outerRow - padRangeRecluster ) : -1 ) ;
-
-    // add all hits in pad row range to hits
-    for(int iRow = outerRow ; iRow > minRow ; --iRow ) {
-
-      streamlog_out( DEBUG ) << "      hit candidates in row " << iRow << " : " << hitsInLayer[ iRow ].size() << std::endl ;
+    streamlog_out( DEBUG5 ) << "  ===========================================================================\n"
+			    << "      recluster in leftover hits - outside a clyinder of :  z =" << zMaxInnerHits << " rho = " <<  rhoMaxInnerHits << "\n"
+			    << "  ===========================================================================\n" << std::endl ;
+    
+    
+    while( outerRow > 0 ) {
       
-      for( HitList::iterator hlIt=hitsInLayer[ iRow ].begin() , end = hitsInLayer[ iRow ].end() ; hlIt != end ; ++hlIt ) {
-	streamlog_out( DEBUG ) << "      hit candidate for reclustering " << (*hlIt)->first 
-			       << " ( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits )  " 
-			       <<   ( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits )
-			       << std::endl ;
+      
+      Clusterer::cluster_list loclu ; // leftover clusters
+      loclu.setOwner() ;
+      
+      HitVec hits ;
+      
+      int  minRow = ( ( outerRow - padRangeRecluster ) > -1 ?  ( outerRow - padRangeRecluster ) : -1 ) ;
+      
+      // add all hits in pad row range to hits
+      for(int iRow = outerRow ; iRow > minRow ; --iRow ) {
 	
-	if( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits ) {
-	  hits.push_back( *hlIt ) ;
+	streamlog_out( DEBUG ) << "      hit candidates in row " << iRow << " : " << hitsInLayer[ iRow ].size() << std::endl ;
+	
+	for( HitList::iterator hlIt=hitsInLayer[ iRow ].begin() , end = hitsInLayer[ iRow ].end() ; hlIt != end ; ++hlIt ) {
+	  streamlog_out( DEBUG ) << "      hit candidate for reclustering " << (*hlIt)->first 
+				 << " ( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits )  " 
+				 <<   ( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits )
+				 << std::endl ;
+	  
+	  if( std::abs( (*hlIt)->first->pos.z() ) > zMaxInnerHits  ||  (*hlIt)->first->pos.rho() >  rhoMaxInnerHits ) {
+	    hits.push_back( *hlIt ) ;
+	  }
 	}
       }
-    }
-    
-    
-    HitDistance distSmall( _distCut ) ; 
-    nncl.cluster( hits.begin(), hits.end() , std::back_inserter( loclu ),  distSmall , _minCluSize ) ;
-    
-    streamlog_out( DEBUG ) << "   reclusterd in the range : " << outerRow << " - " <<  minRow 
-			   << " found " << loclu.size() << " clusters " 
-			   << std::endl ;
-    
-    if( writeLeftoverClusters )
-      std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
-    
-    
-    // timer.time( t_recluster ) ;
-    
-    //===============================================================================================
-    //  now we split the clusters based on their hit multiplicities
-    //===============================================================================================
-    
-    
-    //    _dChi2Max = 5. * _dChi2Max ; //FIXME !!!!!!!!!
-    
-    for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
-      
-      CluTrack* clu = *it ;
-      
-      streamlog_out(  DEBUG5 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
-      
-      std::vector<int> mult(8) ; 
-      // get hit multiplicities up to 6 ( 7 means 7 or higher ) 
-      getHitMultiplicities( clu , mult ) ;
-      
-      streamlog_out(  DEBUG4 ) << " **** left over cluster with hit multiplicities: \n" ;
-      for( unsigned i=0,n=mult.size() ; i<n ; ++i) {
-	streamlog_out(  DEBUG4 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
-      }
       
       
-      if( float( mult[5]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[5] >  _minLayerNumberWithMultiplicity ) {
+      HitDistance distSmall( _distCut ) ; 
+      nncl.cluster( hits.begin(), hits.end() , std::back_inserter( loclu ),  distSmall , _minCluSize ) ;
+      
+      streamlog_out( DEBUG ) << "   reclusterd in the range : " << outerRow << " - " <<  minRow 
+			     << " found " << loclu.size() << " clusters " 
+			     << std::endl ;
+      
+      if( writeLeftoverClusters )
+	std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
+      
+      
+      // timer.time( t_recluster ) ;
+      
+      //===============================================================================================
+      //  now we split the clusters based on their hit multiplicities
+      //===============================================================================================
+      
+      
+      //    _dChi2Max = 5. * _dChi2Max ; //FIXME !!!!!!!!!
+      
+      for( Clusterer::cluster_list::iterator it= loclu.begin(), end= loclu.end() ; it != end ; ++it ){
 	
-	Clusterer::cluster_list reclu ; // reclustered leftover clusters
-	reclu.setOwner() ;
+	CluTrack* clu = *it ;
 	
-	create_n_clusters( *clu , reclu , 5 ) ;
+	streamlog_out(  DEBUG5 ) << " **** left over cluster with size : " << clu->size() << std::endl ;
 	
-	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	std::vector<int> mult(8) ; 
+	// get hit multiplicities up to 6 ( 7 means 7 or higher ) 
+	getHitMultiplicities( clu , mult ) ;
 	
-	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
-	  
-	  streamlog_out( DEBUG5 ) << " extending mult-5 clustre  of length " << (*ir)->size() << std::endl ;
-	  
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	  static const bool backward = true ;
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	streamlog_out(  DEBUG4 ) << " **** left over cluster with hit multiplicities: \n" ;
+	for( unsigned i=0,n=mult.size() ; i<n ; ++i) {
+	  streamlog_out(  DEBUG4 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
 	}
 	
-	cluList.merge( reclu ) ;
-      } 
-      
-      else if( float( mult[4]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[4] >  _minLayerNumberWithMultiplicity ) {
 	
-	Clusterer::cluster_list reclu ; // reclustered leftover clusters
-	reclu.setOwner() ;
-	
-	create_n_clusters( *clu , reclu , 4 ) ;
-	
-	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
-	
-	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	if( float( mult[5]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[5] >  _minLayerNumberWithMultiplicity ) {
 	  
-	  streamlog_out( DEBUG5 ) << " extending mult-4 clustre  of length " << (*ir)->size() << std::endl ;
+	  Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	  reclu.setOwner() ;
 	  
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	  static const bool backward = true ;
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
-	}
-	
-	cluList.merge( reclu ) ;
-      } 
-      
-      else if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
-	
-	Clusterer::cluster_list reclu ; // reclustered leftover clusters
-	reclu.setOwner() ;
-	
-	create_three_clusters( *clu , reclu ) ;
-	
-	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
-	
-	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  create_n_clusters( *clu , reclu , 5 ) ;
 	  
-	  streamlog_out( DEBUG5 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
 	  
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	  static const bool backward = true ;
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
-	}
-	
-	cluList.merge( reclu ) ;
-      } 
-      
-      else if( float( mult[2]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[2] >  _minLayerNumberWithMultiplicity ) {
-	
-	Clusterer::cluster_list reclu ; // reclustered leftover clusters
-	reclu.setOwner() ;
-	
-	create_two_clusters( *clu , reclu ) ;
-	
-	std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
-	
-	for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	    
+	    streamlog_out( DEBUG5 ) << " extending mult-5 clustre  of length " << (*ir)->size() << std::endl ;
+	    
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	    static const bool backward = true ;
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	  }
 	  
-	  streamlog_out( DEBUG5 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
-	  
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	  static const bool backward = true ;
-	  addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	  cluList.merge( reclu ) ;
 	} 
-	
-	cluList.merge( reclu ) ;
-	
-      }
-      else if( float( mult[1]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[1] >  _minLayerNumberWithMultiplicity ) {    
-	
-	
-	seedTrks.push_back( fitter( *it )  );
-	
-	addHitsAndFilter( *it , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
-	static const bool backward = true ;
-	addHitsAndFilter( *it , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
-	
-	cluList.push_back( *it ) ;
-	
-	it = loclu.erase( it ) ;
-	--it ; // erase returns iterator to next element 
-	
-      } else {
-	
-	//  discard cluster and free hits
-	clu->freeElements() ; 
-      }
       
+	else if( float( mult[4]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[4] >  _minLayerNumberWithMultiplicity ) {
+	
+	  Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	  reclu.setOwner() ;
+	
+	  create_n_clusters( *clu , reclu , 4 ) ;
+	
+	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	    streamlog_out( DEBUG5 ) << " extending mult-4 clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	    static const bool backward = true ;
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	  }
+	
+	  cluList.merge( reclu ) ;
+	} 
+      
+	else if( float( mult[3]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[3] >  _minLayerNumberWithMultiplicity ) {
+	
+	  Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	  reclu.setOwner() ;
+	
+	  create_three_clusters( *clu , reclu ) ;
+	
+	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	    streamlog_out( DEBUG5 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	    static const bool backward = true ;
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	  }
+	
+	  cluList.merge( reclu ) ;
+	} 
+      
+	else if( float( mult[2]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[2] >  _minLayerNumberWithMultiplicity ) {
+	
+	  Clusterer::cluster_list reclu ; // reclustered leftover clusters
+	  reclu.setOwner() ;
+	
+	  create_two_clusters( *clu , reclu ) ;
+	
+	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
+	
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  
+	    streamlog_out( DEBUG5 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
+	  
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	    static const bool backward = true ;
+	    addHitsAndFilter( *ir , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	  } 
+	
+	  cluList.merge( reclu ) ;
+	
+	}
+	else if( float( mult[1]) / mult[0]  >= _minLayerFractionWithMultiplicity &&  mult[1] >  _minLayerNumberWithMultiplicity ) {    
+	
+	
+	  seedTrks.push_back( fitter( *it )  );
+	
+	  addHitsAndFilter( *it , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex) ; 
+	  static const bool backward = true ;
+	  addHitsAndFilter( *it , hitsInLayer , _dChi2Max, _chi2Cut , _maxStep , zIndex, backward ) ; 
+	
+	  cluList.push_back( *it ) ;
+	
+	  it = loclu.erase( it ) ;
+	  --it ; // erase returns iterator to next element 
+	
+	} else {
+	
+	  //  discard cluster and free hits
+	  clu->freeElements() ; 
+	}
+      
+      }
+
+  
+      outerRow -=  padRangeRecluster ; 
+
     }
-
-  
-    outerRow -=  padRangeRecluster ; 
-
   }
-  
+
   //=======================================================================================================================
   //  try again to gobble up hits at the ends ....   - does not work right now, as there are no fits  for the clusters....
   //=======================================================================================================================
@@ -811,13 +830,6 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //===============================================================================================
 
   streamlog_out( DEBUG5 ) << " ===========    refitting final " << cluList.size() << " track segments  "   << std::endl ;
-
-  // nnclu::PtrVector<MarlinTrk::IMarlinTrack> finalTrks ;
-  // finalTrks.setOwner() ;  // memory mgmt - will delete MarlinTrks at the end
-  // finalTrks.reserve( cluList.size() ) ;
-  // std::transform( cluList.begin(), cluList.end(), std::back_inserter( finalTrks) , IMarlinTrkFitter(_trksystem)  ) ;
-  // std::for_each( finalTrks.begin() , finalTrks.end() , std::mem_fun_t< int, MarlinTrk::IMarlinTrack >( &MarlinTrk::IMarlinTrack::smooth )  ) ;
-  // std::transform( cluList.begin(), cluList.end(), std::back_inserter( *tsCol ) , converter ) ;
 
   //---- refit cluster tracks individually to save memory ( KalTest tracks have ~1MByte each)
 
@@ -869,6 +881,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   if( merge_track_segments ) {
 
+
+    streamlog_out( DEBUG5 ) << "===============================================================================================\n"
+			    << "  merge track segements\n"
+			    << "===============================================================================================\n"  ;
     
     typedef nnclu::NNClusterer<Track> TrackClusterer ;
     TrackClusterer nntrkclu ;
@@ -881,38 +897,24 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     trkVec.reserve( tsCol->size()  ) ;
     trkCluVec.reserve(  tsCol->size() ) ;
 
-    std::for_each( tsCol->begin() , tsCol->end() , ComputeTrackerInfo()  ) ;
-    
 
-    // std::transform( tsCol->begin() , tsCol->end() , std::back_inserter( trkVec ) , MakeLCIOElement<Track>() ) ; 
-    //
     // ----  exclude already complete tracks from merging: -------
     MakeLCIOElement<Track> em ;
-    float r_inner = padLayout.getPlaneExtent()[0] ;
-    float r_outer = padLayout.getPlaneExtent()[1] ;
     
     // for( LCCollectionVec::iterator it= tsCol->begin() , end = tsCol->end() ; it!= end ; ++it ){
     //   Track* trk = (Track*)( *it ) ;
+
     for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ){
       
       TrackImpl* trk = (TrackImpl*) tsCol->getElementAt(i) ;
       
-      const TrackState* tsF = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
-      const TrackState* tsL = trk->getTrackState( lcio::TrackState::AtLastHit  ) ;
+      computeTrackInfo( trk ) ;
       
-      // protect against bad tracks 
-      if(  tsF == 0 ) continue ;
-      if(  tsL == 0 ) continue ;
-
-      gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
-      gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
+      const TrackInfoStruct* ti = trk->ext<TrackInfo>() ;
       
-      bool isCentral =  std::abs( lhPos.rho() - r_outer ) < 25. ; // last hit close to outer field cage
-      bool isForward =  ( driftLength - std::abs( lhPos.z() )  ) < 40.  ;	// or close to endcap
-      bool isCurler  =  std::abs( tsF->getOmega() ) > 0.001  ;  
-
-      bool isCompleteTrack =  ( std::abs( fhPos.rho() - r_inner ) <  25. )   // first hit close to inner field cage 
-	&&                    ( ( isCentral && !isCurler )   ||  isForward ) ;  
+            bool isCompleteTrack =   ti->startsInner &&  (  ( ti->isCentral && ! ti->isCurler )  || ti->isForward ) ;  
+      //DEBUG - leave out curlers ...
+      //      bool isCompleteTrack =   ti->startsInner &&  (  ti->isCentral || ti->isForward ) ;  
       
       if( !isCompleteTrack ){
 	
@@ -1038,8 +1040,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //===============================================================================================
   if( _createDebugCollections ) {
 
-    float r_inner = padLayout.getPlaneExtent()[0] ;
-    float r_outer = padLayout.getPlaneExtent()[1] ;
+    float r_inner = _padLayout->getPlaneExtent()[0] ;
+    float r_outer = _padLayout->getPlaneExtent()[1] ;
 
     for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
       
@@ -1051,30 +1053,25 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
       
 
-      bool endsCentral  =  std::abs( lhPos.rho() - r_outer ) < 25. ; // last hit close to outer field cage
-
-      bool endsForward  =  ( driftLength - std::abs( lhPos.z() )  ) < 40.  ;	// or close to endcap
-
-      bool isCurler     =  std::abs( tsF->getOmega() ) > 0.002  ;  
-      
-      bool endsInOuter = ( endsCentral ) || endsForward  ; 
-      
-      bool startsInInner  =  ( std::abs( fhPos.rho() - r_inner ) <  25. )  ;
-
-
+      bool startsInner =  std::abs( fhPos.rho() - r_inner )     <  _trackStartsInnerDist ;        // first hit close to inner field cage 
+      bool isCentral   =  std::abs( lhPos.rho() - r_outer )     <  _trackEndsOuterCentralDist ;   // last hit close to outer field cage
+      bool isForward   =  driftLength - std::abs( lhPos.z() )   <  _trackEndsOuterForwardDist  ;  // last hitclose to endcap
+      bool isCurler    =  std::abs( tsF->getOmega() )           >  _trackIsCurlerOmega  ;         // curler segment ( r <~ 1m )
+      bool endsOuter   = isCentral || isForward ;
+     
 
       if( isCurler )  continue ;
 
 
-      if( !startsInInner && endsInOuter ) {
+      if( !startsInner && endsOuter ) {
 	
 	outerCol->addElement( trk ) ;
       } 
-      if( startsInInner &&  !endsInOuter ) {
+      if( startsInner &&  !endsOuter ) {
 	
 	innerCol->addElement( trk ) ;
       } 
-      if( !startsInInner &&  !endsInOuter ) {    
+      if( !startsInner &&  !endsOuter ) {    
 	
 	middleCol->addElement( trk ) ;
       }
@@ -1209,9 +1206,12 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     {
 	
 
+      double initial_chi2 = 0 ;
+      int    initial_ndf  = 0 ;
+      
       // ------------------------------------------
 #if 1 // this code works for plain lcio tracks, i.e. in the case where the corresponding KalTrack
-      // has laready been deleted 
+      // has already been deleted 
       //===========================================================================================
 
       //--------------------------------------------
@@ -1234,6 +1234,10 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       if( nHit == 0 || ts ==0 )
 	continue ;
       
+
+      initial_chi2 = trk->getChi2() ;
+      initial_ndf  = trk->getNdf() ;
+
       streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
       
       //need to add a dummy hit to the track
@@ -1387,16 +1391,73 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 
 
-      trk->setChi2( chi2 ) ;
-      trk->setNdf( ndf ) ;
+      trk->setChi2( chi2 + initial_chi2 ) ;
+      trk->setNdf(  ndf  + initial_ndf  ) ;
     } 
   }
+}
+
+ /*************************************************************************************************/
+
+void ClupatraProcessor::computeTrackInfo(  lcio::Track* lTrk  ){
+  
+  float r_inner = _padLayout->getPlaneExtent()[0] ;
+  float r_outer = _padLayout->getPlaneExtent()[1] ;
+  float driftLength = _gearTPC->getMaxDriftLength() ;
+
+  // compute z-extend of this track segment
+  const lcio::TrackerHitVec& hv = lTrk->getTrackerHits() ;
+  
+  float zMin =  1e99 ;
+  float zMax = -1e99 ;
+  float zAvg =  0. ;
+  
+  if( hv.size() >  1 ) {
+    zMin = hv[            0  ]->getPosition()[2] ;
+    zMax = hv[ hv.size() -1  ]->getPosition()[2] ;
+    zAvg = ( zMax + zMin ) / 2. ;
+  }
+  
+  if( zMin > zMax ){ // swap 
+    float d = zMax ;
+    zMax = zMin ;
+    zMin = d  ;
+  }
+  
+  const lcio::TrackState* tsF = lTrk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+  const lcio::TrackState* tsL = lTrk->getTrackState( lcio::TrackState::AtLastHit  ) ;
+  
+  // protect against bad tracks 
+  if(  tsF == 0 ) return ;
+  if(  tsL == 0 ) return ;
+  
+  gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
+  gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
+  
+  if( ! lTrk->ext<TrackInfo>() )
+    lTrk->ext<TrackInfo>() =  new TrackInfoStruct ;
+
+  TrackInfoStruct* ti = lTrk->ext<TrackInfo>() ;
+
+  ti->startsInner =  std::abs( fhPos.rho() - r_inner )     <  _trackStartsInnerDist ;        // first hit close to inner field cage 
+  ti->isCentral   =  std::abs( lhPos.rho() - r_outer )     <  _trackEndsOuterCentralDist ;   // last hit close to outer field cage
+  ti->isForward   =  driftLength - std::abs( lhPos.z() )   <  _trackEndsOuterForwardDist  ;  // last hitclose to endcap
+  ti->isCurler    =  std::abs( tsF->getOmega() )           >  _trackIsCurlerOmega  ;         // curler segment ( r <~ 1m )
+  
+  ti->zMin = zMin ;
+  ti->zMax = zMax ;
+  ti->zAvg = zAvg ;
+
 }
 
 
 /*************************************************************************************************/
 void ClupatraProcessor::check( LCEvent * evt ) { 
   
+
+
+
+
   /*************************************************************************************************/
 }
 

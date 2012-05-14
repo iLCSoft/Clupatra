@@ -344,10 +344,15 @@ namespace clupatra_new{
 
   //=======================================================================================
 
-  struct TrackInfoStruct{  TrackInfoStruct() : zMin(0.), zAvg(0.), zMax(0.) {}
+  struct TrackInfoStruct{  
+    TrackInfoStruct() : zMin(0.), zAvg(0.), zMax(0.), startsInner(false), isCentral(false), isForward(false), isCurler(false) {}
     float zMin ;
     float zAvg ;
     float zMax ;
+    bool startsInner ;
+    bool isCentral   ;
+    bool isForward   ;
+    bool isCurler    ;
   } ;
   struct TrackInfo : lcrtrel::LCOwnedExtension<TrackInfo, TrackInfoStruct> {} ;
 
@@ -365,16 +370,6 @@ namespace clupatra_new{
       float zMin =  1e99 ;
       float zMax = -1e99 ;
       float zAvg =  0. ;
-      // for(unsigned i=0; i < hv.size() ; ++i ){
-	
-      // 	float z = hv[i]->getPosition()[2] ;
-	
-      // 	if( z < zMin )   zMin = z ;
-      // 	if( z > zMax )   zMax = z ;
-	
-      // 	zAvg += z ;
-      // }
-      // zAvg /= hv.size() ;
       
       if( hv.size() >  1 ) {
 	zMin = hv[            0  ]->getPosition()[2] ;
@@ -394,6 +389,9 @@ namespace clupatra_new{
       lTrk->ext<TrackInfo>()->zMin = zMin ;
       lTrk->ext<TrackInfo>()->zMax = zMax ;
       lTrk->ext<TrackInfo>()->zAvg = zAvg ;
+
+
+
     }
   } ;
   //=======================================================================================

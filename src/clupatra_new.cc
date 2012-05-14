@@ -76,7 +76,7 @@ namespace clupatra_new{
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
 
     
-    streamlog_out( DEBUG3 ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
+    streamlog_out( DEBUG2 ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
 
 
    if( layer <= 0  || layer >=  maxTPCLayerID   ) 
@@ -112,7 +112,7 @@ namespace clupatra_new{
       int smoothed  = trk->smooth( firstHit ) ;
       //int smoothed  = trk->smooth() ;
 
-     streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
+     streamlog_out( DEBUG2 ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
 
     }
 
@@ -153,7 +153,7 @@ namespace clupatra_new{
 
 
 
-      streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
+      streamlog_out( DEBUG2 ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
 			     <<  "  Step : " << step 
 			     <<  "  at layer: "   << layer      
 			     <<  "   intersects: " << MarlinTrk::errorCode( intersects )
@@ -169,7 +169,7 @@ namespace clupatra_new{
 	double ch2Min = 1.e99 ;
 	Hit* bestHit = 0 ;
 
-	streamlog_out( DEBUG3 ) <<  "      -- number of hits on layer " << layer << " : " << hLL.size() << std::endl ; 
+	streamlog_out( DEBUG2 ) <<  "      -- number of hits on layer " << layer << " : " << hLL.size() << std::endl ; 
 
 	for( HitList::const_iterator ih = hLL.begin(), end = hLL.end() ; ih != end ; ++ih ){    
 	  
@@ -190,7 +190,7 @@ namespace clupatra_new{
 	
  	if( bestHit != 0 ){
 	  
-	  streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
+	  streamlog_out( DEBUG2 ) <<   " ************ bestHit "  << bestHit 
 				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
 				  <<   " chi2: " <<  ch2Min 
 				  <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
@@ -205,7 +205,7 @@ namespace clupatra_new{
 	    
 	    
 	    
-	    streamlog_out( DEBUG3 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
+	    streamlog_out( DEBUG2 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
 				   <<   " dist: " <<  (  hPos - xv ).r()
 				   <<   " chi2: " <<  ch2Min 
 				   <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
@@ -274,7 +274,7 @@ namespace clupatra_new{
     
     //  IMarlinTrack::modeBackward , IMarlinTrack::modeForward 
     
-    streamlog_out( DEBUG4 ) <<  "  ============ addHitAndFilter(): looked for intersection - " 
+    streamlog_out( DEBUG2 ) <<  "  ============ addHitAndFilter(): looked for intersection - " 
 			    <<  "  detector : " <<  detectorID 
 			    <<  "  at layer: "   << layer      
 			    <<  "  intersects: " << MarlinTrk::errorCode( intersects )
@@ -310,7 +310,7 @@ namespace clupatra_new{
       }//-------------------------------------------------------------------
       
       
-      streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
+      streamlog_out( DEBUG2 ) <<   " ************ bestHit "  << bestHit 
 			     <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
 			     <<   " chi2: " <<  ch2Min 
 			     <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
@@ -327,7 +327,7 @@ namespace clupatra_new{
 	  
 	  
 	  
-	  streamlog_out( DEBUG3 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
+	  streamlog_out( DEBUG2 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
 				 <<   " dist: " <<  (  hPos - xv ).r()
 				 <<   " chi2: " <<  ch2Min 
 				 <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
@@ -347,7 +347,7 @@ namespace clupatra_new{
 	    clu->addElement( bestHit ) ;
 	    
 	    
-	    streamlog_out( DEBUG4 ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
+	    streamlog_out( DEBUG2 ) <<   " ---- track state filtered with new hit ! ------- " << std::endl ;
 	  }
 	} // chi2Cut 
       } // bestHit
@@ -403,10 +403,10 @@ namespace clupatra_new{
       getHitMultiplicities( clu , mult ) ;
       
 
-      streamlog_out(  DEBUG4 ) << " **** split_multiplicity -  hit multiplicities: \n" ;
+      streamlog_out(  DEBUG2 ) << " **** split_multiplicity -  hit multiplicities: \n" ;
       
       for( unsigned i=0,n=mult.size() ; i<n ; ++i) {
-      	streamlog_out(  DEBUG4 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
+      	streamlog_out(  DEBUG2 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
       }
       
       
@@ -419,7 +419,7 @@ namespace clupatra_new{
 	
 	if( m == 2 && mult[m] >= layerWithMultiplicity ){
 	  
-	  streamlog_out(  DEBUG5 ) << " **** split_multiplicity - create_two_clusters \n" ;
+	  streamlog_out(  DEBUG3 ) << " **** split_multiplicity - create_two_clusters \n" ;
 	  
  	  create_two_clusters( *clu , cluList  ) ;
 	  
@@ -427,7 +427,7 @@ namespace clupatra_new{
 	}
 	else if( m == 3 && mult[m] >= layerWithMultiplicity ){
 	  
-	  streamlog_out(  DEBUG5 ) << " **** split_multiplicity - create_three_clusters \n" ;
+	  streamlog_out(  DEBUG3 ) << " **** split_multiplicity - create_three_clusters \n" ;
 	  
 	  create_three_clusters( *clu , cluList  ) ;
 	  
@@ -435,7 +435,7 @@ namespace clupatra_new{
 	}
 	else if(  mult[m] >= layerWithMultiplicity ){
 	  
-	  streamlog_out(  DEBUG5 ) << " **** split_multiplicity - create_n_clusters \n" ;
+	  streamlog_out(  DEBUG3 ) << " **** split_multiplicity - create_n_clusters \n" ;
 	  
 	  create_n_clusters( *clu ,cluList , m  ) ;
 	  
@@ -502,7 +502,7 @@ namespace clupatra_new{
       std::vector< gear::Vector3D>  p(n) ;
       
 
-      streamlog_out(  DEBUG4 ) << " create_n_clusters  ---  layer " << l << std::endl ;
+      streamlog_out(  DEBUG2 ) << " create_n_clusters  ---  layer " << l << std::endl ;
       
       for(unsigned i=0; i<n; ++i){
       
@@ -510,10 +510,10 @@ namespace clupatra_new{
 	
 	p[i] = h[i]->first->pos ;
 
-	streamlog_out(  DEBUG4 ) << "              h"<< i << ": " << p[i] << std::endl ; 
+	streamlog_out(  DEBUG2 ) << "              h"<< i << ": " << p[i] << std::endl ; 
       }
       
-      streamlog_out(  DEBUG4 ) << " ---------------------------- " << std::endl ;
+      streamlog_out(  DEBUG2 ) << " ---------------------------- " << std::endl ;
 
       
       if( clu[0]->empty() ){ // first hit tuple
@@ -560,7 +560,7 @@ namespace clupatra_new{
       
       for( std::list<CDot>::iterator it = cDot.begin() ; it != cDot.end() ; ++ it ) {
 	
-  	streamlog_out(  DEBUG4 ) << " I : " << it->I  
+  	streamlog_out(  DEBUG2 ) << " I : " << it->I  
 				 << " J : " << it->J 
 				 << " d : " << it->Dot 
 				 << std::endl ;
@@ -580,7 +580,7 @@ namespace clupatra_new{
 	  
   	  lastp[i] =  p[j] ;
 	  
-  	  streamlog_out(  DEBUG4 ) << " **** adding to cluster : " << it->I  
+  	  streamlog_out(  DEBUG2 ) << " **** adding to cluster : " << it->I  
 				   << " hit  : " << it->J 
 				   << " d : " << it->Dot 
 				   << std::endl ;
@@ -842,7 +842,7 @@ namespace clupatra_new{
 	
       } else{                // oposite orientation, i.e. h1 in this layer belongs to h0 in first layer
 
-  	streamlog_out(  DEBUG3 ) << " create_two_clusters  ---  oposite orientation " << std::endl ;
+  	streamlog_out(  DEBUG2 ) << " create_two_clusters  ---  oposite orientation " << std::endl ;
   	clu0->addElement( h1 ) ;
   	clu1->addElement( h0 ) ;
       }
@@ -1017,7 +1017,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
+	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
 				  << " error code : " << MarlinTrk::errorCode( code ) 
 				  << std::endl ; 
 	}
@@ -1027,7 +1027,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
+	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
 	}
 	
 	// ======= get TrackState at calo face  ========================
@@ -1050,7 +1050,7 @@ namespace clupatra_new{
 	}
 	if ( code !=MarlinTrk::IMarlinTrack::success ) {
 	  
-	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
+	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
 	}
 	
 	// ======= get TrackState at IP ========================
@@ -1063,7 +1063,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  streamlog_out( DEBUG5 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
 	}
 	
 	trk->addTrackState( tsIP ) ;
