@@ -201,10 +201,15 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
   
   registerOutputCollection( LCIO::TRACK,
 			    "OutputCollection" , 
-			    "Name of the output collection"  ,
+			    "Name of the output collection with final TPC tracks"  ,
 			    _outColName ,
 			    std::string("ClupatraTracks" ) ) ;
   
+  registerOutputCollection( LCIO::TRACK,
+			    "SegmentCollectionName" , 
+			    "Name of the output collection that has the individual track segments"  ,
+			    _segmentsOutColName ,
+			    std::string("ClupatraTrackSegments" ) ) ;
   
   registerProcessorParameter( "DistanceCut" , 
 			      "Cut for distance between hits in mm"  ,
@@ -478,7 +483,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCCollectionVec* middleCol = ( _createDebugCollections ?  newTrkCol( "ClupatraMiddleSegments" , evt ,true )  :   0   )  ; 
 
   
-  LCCollectionVec* tsCol  =  newTrkCol( "ClupatraTrackSegments" , evt ) ;
+  LCCollectionVec* tsCol  =  newTrkCol( _segmentsOutColName , evt ) ;
   
   LCCollectionVec* outCol =  newTrkCol( _outColName  , evt )  ; 
 
@@ -952,7 +957,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	mergedTrk.push_back( (*itC)->first ) ; 
       }
       
-      //      std::sort(  mergedTrk.begin() , mergedTrk.end() , TrackZSort() ) ;
+
       mergedTrk.sort( TrackZSort() ) ;
       
       // ====== create a new LCIO track for the merged cluster ...
@@ -968,6 +973,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       	  trk->addHit( hV[i] ) ;
       	}
 	hitCount  += hV.size()  ;
+
+	// add a pointer to the original track segment 
+	trk->addTrack( *itML ) ;
       }
       
       // take track states from first and last track :

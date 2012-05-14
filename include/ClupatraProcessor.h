@@ -73,6 +73,7 @@ class ClupatraProcessor : public Processor {
   std::string _vxdColName ;
   std::string _sitColName ;
   std::string _outColName ;
+  std::string  _segmentsOutColName ;
 
   float _distCut ;
   //  float _rCut ;
