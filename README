@@ -41,6 +41,28 @@
 
 
  =============================================================================================================
+  --------
+ | v00-06 |
+  --------
+
+    - added new TrackSegmentMerger for merging split tracks
+
+    - add ppointer to original track segments for
+      merged curling tracks 
+
+    - added parameter SegmentCollectionName
+
+    - added steering parameters TrackStartsInnerDist, TrackEndsOuterCentralDist,
+      TrackEndsOuterForwardDist, TrackIsCurlerOmega  to define "incomplete" track segments
+
+    - adapted pickupSiTracks to use strip hits for the SIT
+
+    - fixed issue w/ split seed tracks (occured, e.g. if hit distance is larger than current
+      cut in the loop for one hit pair ...)
+
+    - made compatible with llvmgcc4.2 and clang 
+
+
   -----------
  | v00-05-01 |
   -----------
