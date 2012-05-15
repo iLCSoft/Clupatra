@@ -78,6 +78,7 @@ class ClupatraProcessor : public Processor {
   float _distCut ;
   //  float _rCut ;
   float _duplicatePadRowFraction ;
+  float _bfield ;
   
   float  _dChi2Max ;
   float  _chi2Cut ;

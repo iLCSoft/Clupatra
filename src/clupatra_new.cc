@@ -19,6 +19,12 @@
 
 using namespace MarlinTrk ;
 
+namespace lcio{
+  // bits 0-15 are reserved !?
+  const int  ILDTrackTypeBit::SEGMENT   = 16  ;
+  const int  ILDTrackTypeBit::COMPOSITE = 17  ;
+} 
+
 namespace clupatra_new{
   
   

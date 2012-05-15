@@ -44,6 +44,7 @@
 #include "MarlinTrk/Factory.h"
 #include "MarlinTrk/IMarlinTrack.h"
 #include "MarlinTrk/IMarlinTrkSystem.h"
+#include "MarlinTrk/MarlinTrkUtils.h"
 
 
 using namespace lcio ;
@@ -390,7 +391,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
   _gearTPC = &Global::GEAR->getTPCParameters() ;
   _padLayout = &_gearTPC->getPadLayout() ;
-  
+
+  _bfield = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
+
   unsigned maxTPCLayers =  _padLayout->getNRows() ;
   
   double driftLength = _gearTPC->getMaxDriftLength() ;
@@ -433,7 +436,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     nncluHits.push_back( gh ) ;
     
     //-------
-    // th->ext<HitInfo>() = ch ;  // assign the clupa hit to the LCIO hit for memory mgmt
+    th->ext<GHit>() = gh ;  // assign the clupa hit to the LCIO hit for memory mgmt
     
     ch->lcioHit = th ; 
     
@@ -472,7 +475,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCCollectionVec* seedCol =  ( writeSeedCluster        ?  newTrkCol( "ClupatraSeedCluster"          , evt )  :   0   )  ; 
   LCCollectionVec* cluCol  =  ( writeCluTrackSegments   ?  newTrkCol( "ClupatraInitialTrackSegments" , evt )  :   0   )  ; 
   LCCollectionVec* locCol  =  ( writeCluTrackSegments   ?  newTrkCol( "ClupatraLeftoverClusters"     , evt )  :   0   )  ; 
-  LCCollectionVec* fsegCol  = ( writeCluTrackSegments   ?  newTrkCol( "ClupatraFinalTrackSegments"   , evt , true )  :   0   )  ; 
+
+  LCCollectionVec* incSegCol  = ( writeCluTrackSegments   ?  newTrkCol( "ClupatraIncompleteSegments"   , evt , true )  :   0   )  ; 
+  LCCollectionVec* curSegCol  = ( writeCluTrackSegments   ?  newTrkCol( "ClupatraCurlerSegments"       , evt , true )  :   0   )  ; 
+  LCCollectionVec* finSegCol  = ( writeCluTrackSegments   ?  newTrkCol( "ClupatraFinalTrackSegments"   , evt , true )  :   0   )  ; 
 
   //LCCollectionVec* goodCol  = ( writeQualityTracks ?  newTrkCol( "ClupatraGoodQualityTracks" , evt ,true )  :   0   )  ; 
   //LCCollectionVec* fairCol  = ( writeQualityTracks ?  newTrkCol( "ClupatraFairQualityTracks" , evt ,true )  :   0   )  ; 
@@ -691,9 +697,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	// get hit multiplicities up to 6 ( 7 means 7 or higher ) 
 	getHitMultiplicities( clu , mult ) ;
 	
-	streamlog_out(  DEBUG4 ) << " **** left over cluster with hit multiplicities: \n" ;
+	streamlog_out(  DEBUG3 ) << " **** left over cluster with hit multiplicities: \n" ;
 	for( unsigned i=0,n=mult.size() ; i<n ; ++i) {
-	  streamlog_out(  DEBUG4 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
+	  streamlog_out(  DEBUG3 ) << "     m["<<i<<"] = " <<  mult[i] << "\n"  ;
 	}
 	
 	
@@ -877,80 +883,202 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     }
   }
 
-  //===============================================================================================
-  //  merge track segements 
-  //===============================================================================================
-  
-  
-  static const int merge_track_segments = true ;
 
-  if( merge_track_segments ) {
+
+  //===============================================================================================
+  //  compute some track parameters for possible merging
+  //===============================================================================================
+  
+  typedef nnclu::NNClusterer<Track> TrackClusterer ;
+  TrackClusterer nntrkclu ;
+  MakeLCIOElement<Track> trkMakeElement ;
+  
+  for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ) {
+    
+    computeTrackInfo( (Track*) tsCol->getElementAt(i) ) ;
+  }
+  
+  //===============================================================================================
+  //  merge split segements 
+  //===============================================================================================
+  
+  
+  static const int merge_split_segments = true ;
+
+  if( merge_split_segments ) {
+
+    streamlog_out( DEBUG5 ) << "===============================================================================================\n"
+			    << "  merge split segments\n"
+			    << "===============================================================================================\n"  ;
+
+    int nMax  =  tsCol->size()   ;
+
+    TrackClusterer::element_vector incSegVec ;
+    incSegVec.setOwner() ;
+    incSegVec.reserve( nMax  ) ;
+    TrackClusterer::cluster_vector incSegCluVec ;
+    incSegCluVec.setOwner() ;
+    
+    for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ){
+      
+      TrackImpl* trk = (TrackImpl*) tsCol->getElementAt(i) ;
+      
+      const TrackInfoStruct* ti = trk->ext<TrackInfo>() ;
+      
+      bool isIncompleteSegment =   !ti->isCurler  && ( !ti->startsInner || ( !ti->isCentral && !ti->isForward )  ) ;  
+      
+      if( isIncompleteSegment ){ 
+	
+	incSegVec.push_back(  trkMakeElement( trk )  ) ; 
+	
+	if( writeCluTrackSegments )  incSegCol->addElement( trk ) ;
+      }
+
+    }
+    
+ 
+    TrackSegmentMerger trkMerge( _dChi2Max , _trksystem ,  _bfield  ) ; 
+
+ 
+    nntrkclu.cluster( incSegVec.begin() , incSegVec.end() , std::back_inserter( incSegCluVec ), trkMerge , 2  ) ;
+
+
+    streamlog_out( DEBUG4 ) << " ===== merged track segments - # cluster: " << incSegCluVec.size()   
+			    << " from " << incSegVec.size() << " incomplete track segments "    << "  ============================== " << std::endl ;
+    
+    for(  TrackClusterer::cluster_vector::iterator it= incSegCluVec.begin() ; it != incSegCluVec.end() ; ++it) {
+      
+      streamlog_out( DEBUG4 ) <<  lcio::header<Track>() << std::endl ;
+      
+      TrackClusterer::cluster_type*  incSegClu = *it ;
+
+      std::vector<Track*> mergedTrk ;
+      
+      // vector to collect hits from segments
+      //      std::vector< TrackerHit* >  hits ;
+      // hits.reserve( 1024 ) ;
+      // IMPL::TrackImpl* track = new  IMPL::TrackImpl ;
+      // tsCol->addElement( track ) ;
+      
+      CluTrack hits ; 
+      
+      for( TrackClusterer::cluster_type::iterator itC = incSegClu->begin() ; itC != incSegClu->end() ; ++ itC ){
+	
+	streamlog_out( DEBUG3 ) << lcshort(  (*itC)->first ) << std::endl ; 
+	
+	TrackImpl* trk = (TrackImpl*) (*itC)->first ;
+
+	mergedTrk.push_back( trk ) ;
+
+	//	std::copy( trk->getTrackerHits().begin() , trk->getTrackerHits().end() , std::back_inserter( hits ) ) ;
+
+	for( lcio::TrackerHitVec::const_iterator it = trk->getTrackerHits().begin() , END =  trk->getTrackerHits().end() ; it != END ; ++ it ){
+	  hits.addElement( (*it)->ext<GHit>() )  ;
+	}
+
+	// flag the segments so they can be ignored for final list 
+	trk->setTypeBit( ILDTrackTypeBit::SEGMENT ) ;
+
+	// add old segments to new track
+	//	track->addTrack( trk ) ;
+      }
+
+      // MarlinTrk::IMarlinTrack* mTrk = _trksystem->createTrack();
+      // EVENT::FloatVec icov( 15 ) ;
+      // icov[ 0] = 1e2 ;
+      // icov[ 2] = 1e2 ;
+      // icov[ 5] = 1e2 ;
+      // icov[ 9] = 1e2 ;
+      // icov[14] = 1e2 ;
+      // int result = createFinalisedLCIOTrack( mTrk, hits, track, !MarlinTrk::IMarlinTrack::backward, icov, _bfield,  _dChi2Max ) ;
+      // //int result = createFinalisedLCIOTrack( mTrk, hits, track, ! MarlinTrk::IMarlinTrack::backward, icov, _bfield,  _dChi2Max ) ; 
+      // // ??? 
+      
+      MarlinTrk::IMarlinTrack* mTrk = fit( &hits ) ;
+      mTrk->smooth() ;
+      Track* track = converter( &hits ) ; 
+      tsCol->push_back(  track ) ;
+      track->ext<MarTrk>() = 0 ;
+      delete mTrk ;
+      
+      computeTrackInfo( track ) ;    
+
+      streamlog_out( DEBUG4 ) << "   ******  created new track : " << " : " << lcshort( (Track*) track )  << std::endl ;
+
+    }
+
+  }
+  //===============================================================================================
+  //  merge curler segments 
+  //===============================================================================================
+  
+  
+  static const int merge_curler_segments = true ;
+  
+  if( merge_curler_segments ) {
 
 
     streamlog_out( DEBUG5 ) << "===============================================================================================\n"
-			    << "  merge track segements\n"
+			    << "  merge curler segments\n"
 			    << "===============================================================================================\n"  ;
     
-    typedef nnclu::NNClusterer<Track> TrackClusterer ;
-    TrackClusterer nntrkclu ;
+    int nMax  =  tsCol->size()   ;
 
-    TrackClusterer::element_vector trkVec ;
-    trkVec.setOwner() ;
-    TrackClusterer::cluster_vector trkCluVec ;
-    trkCluVec.setOwner() ;
+    TrackClusterer::element_vector curSegVec ;
+    curSegVec.setOwner() ;
+    curSegVec.reserve( nMax  ) ;
+    TrackClusterer::cluster_vector curSegCluVec ;
+    curSegCluVec.setOwner() ;
 
-    trkVec.reserve( tsCol->size()  ) ;
-    trkCluVec.reserve(  tsCol->size() ) ;
-
-
-    // ----  exclude already complete tracks from merging: -------
-    MakeLCIOElement<Track> em ;
-    
-    // for( LCCollectionVec::iterator it= tsCol->begin() , end = tsCol->end() ; it!= end ; ++it ){
-    //   Track* trk = (Track*)( *it ) ;
 
     for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ){
       
       TrackImpl* trk = (TrackImpl*) tsCol->getElementAt(i) ;
       
-      computeTrackInfo( trk ) ;
-      
+
+      std::bitset<32> type = trk->getType() ;
+
+      if( type[ ILDTrackTypeBit::SEGMENT ] ) 
+	continue ;   // ignore previously merged track segments
+
       const TrackInfoStruct* ti = trk->ext<TrackInfo>() ;
       
-            bool isCompleteTrack =   ti->startsInner &&  (  ( ti->isCentral && ! ti->isCurler )  || ti->isForward ) ;  
-      //DEBUG - leave out curlers ...
-      //      bool isCompleteTrack =   ti->startsInner &&  (  ti->isCentral || ti->isForward ) ;  
+      bool isCompleteTrack =   ti && !ti->isCurler  && ( ti->startsInner &&  (  ti->isCentral || ti->isForward ) );  
       
-      if( !isCompleteTrack ){
+      if( !isCompleteTrack ){ 
 	
-	trkVec.push_back(  em( trk )  ) ; 
-
-      } else { // add a copy to the final tracks collection 
-
-	if( writeCluTrackSegments ) 
-	  fsegCol->addElement( trk ) ;
-
+	curSegVec.push_back(  trkMakeElement( trk )  ) ; 
+	
+	if( writeCluTrackSegments )  curSegCol->addElement( trk ) ;
+	  
+      } else {   // ... is not a curler ->  add a copy to the final tracks collection 
+	  
 	outCol->addElement( new TrackImpl( *trk )  ) ;
+	
+	if( writeCluTrackSegments )  finSegCol->addElement( trk ) ;
       }
     }
     
+    //======================================================================================================
+
+
     TrackCircleDistance trkMerge( 0.1 ) ; 
 
-    nntrkclu.cluster( trkVec.begin() , trkVec.end() , std::back_inserter( trkCluVec ), trkMerge , 2  ) ;
+    nntrkclu.cluster( curSegVec.begin() , curSegVec.end() , std::back_inserter( curSegCluVec ), trkMerge , 2  ) ;
 
 
-    streamlog_out( DEBUG4 ) << " ===== merged tracks - # cluster: " << trkCluVec.size()   
+    streamlog_out( DEBUG4 ) << " ===== merged tracks - # cluster: " << curSegCluVec.size()   
 			    << " from " << tsCol->size() << " track segments "    << "  ============================== " << std::endl ;
     
-    for(  TrackClusterer::cluster_vector::iterator it= trkCluVec.begin() ; it != trkCluVec.end() ; ++it) {
+    for(  TrackClusterer::cluster_vector::iterator it= curSegCluVec.begin() ; it != curSegCluVec.end() ; ++it) {
       
       streamlog_out( DEBUG4 ) <<  lcio::header<Track>() << std::endl ;
       
-      TrackClusterer::cluster_type*  trkClu = *it ;
+      TrackClusterer::cluster_type*  curSegClu = *it ;
 
       std::list<Track*> mergedTrk ;
 
-      for( TrackClusterer::cluster_type::iterator itC = trkClu->begin() ; itC != trkClu->end() ; ++ itC ){
+      for( TrackClusterer::cluster_type::iterator itC = curSegClu->begin() ; itC != curSegClu->end() ; ++ itC ){
 	
 	streamlog_out( DEBUG4 ) << lcshort(  (*itC)->first ) << std::endl ; 
 	
@@ -1020,7 +1148,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     //---------------------------------------------------------------------------------------------
     // // add all tracks that have not been merged :
     
-    for( TrackClusterer::element_vector::iterator it = trkVec.begin(); it != trkVec.end() ;++it){
+    for( TrackClusterer::element_vector::iterator it = curSegVec.begin(); it != curSegVec.end() ;++it){
       
       if( (*it)->second == 0 ){
 	
@@ -1228,7 +1356,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       
       std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
 
-      double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
+      //      double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
       
       const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
       
@@ -1252,7 +1380,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
       
       
-      mTrk->initialise( *ts ,  b ,  MarlinTrk::IMarlinTrack::backward ) ;
+      mTrk->initialise( *ts ,  _bfield ,  MarlinTrk::IMarlinTrack::backward ) ;
     
 #else  //===========================================================================================
       // use the MarlinTrk allready stored with the TPC track

@@ -14,6 +14,7 @@
 #include "EVENT/TrackerHit.h"
 #include "IMPL/TrackImpl.h"
 #include "UTIL/Operators.h"
+#include "UTIL/CellIDDecoder.h"
 #include "UTIL/ILDConf.h"
 
 #include "GEAR.h"
@@ -24,6 +25,20 @@
 // ----- include for verbosity dependend logging ---------
 #include "marlin/VerbosityLevels.h"
 
+
+/** Helper structs that should go to LCIo to make extraction of layer (and subdetector etc easier )
+ */
+namespace lcio{
+  struct ILDDecoder : public CellIDDecoder<TrackerHit>{
+    ILDDecoder() :  lcio::CellIDDecoder<TrackerHit>( ILDCellID0::encoder_string ) {} 
+  } ;
+  static ILDDecoder ILD_cellID ;
+
+  struct ILDTrackTypeBit{
+    static const int SEGMENT ;
+    static const int COMPOSITE ;
+  } ;
+} 
 
 namespace clupatra_new{
   
@@ -63,6 +78,10 @@ namespace clupatra_new{
 
   // typedef GenericHitVec<ClupaHit>      GHitVec ;
   // typedef GenericClusterVec<ClupaHit>  GClusterVec ;
+  
+  //------------------------------------------------------------------------------------------
+ 
+  struct GHit : lcrtrel::LCExtension<GHit, Hit > {} ;
   
   //------------------------------------------------------------------------------------------
 
@@ -395,8 +414,138 @@ namespace clupatra_new{
     }
   } ;
   //=======================================================================================
+
+  /** helper class for merging split track segments */
   
-  /** helper class for merging track segments, based on circle (and tan lambda) */
+  class TrackSegmentMerger{
+    
+  public:
+    /** C'tor takes merge distance */
+    TrackSegmentMerger(float chi2Max,  MarlinTrk::IMarlinTrkSystem* trksystem, float b) : _chi2Max( chi2Max ) , _trksystem( trksystem), _b(b) {}
+    
+    float _chi2Max ;
+    MarlinTrk::IMarlinTrkSystem* _trksystem ;
+    float _b ;
+    
+    /** Merge condition: ... */
+    inline bool operator()( nnclu::Element<lcio::Track>* h0, nnclu::Element<lcio::Track>* h1){
+      
+      lcio::Track* trk0 = h0->first ;
+      lcio::Track* trk1 = h1->first ;
+
+      // const TrackInfoStruct* ti0 =  trk0->ext<TrackInfo>() ;
+      // const TrackInfoStruct* ti1 =  trk1->ext<TrackInfo>() ;
+
+      // const lcio::TrackState* tsF0 = trk0->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+      // const lcio::TrackState* tsL0 = trk0->getTrackState( lcio::TrackState::AtLastHit  ) ;
+
+      // const lcio::TrackState* tsF1 = trk1->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+      // const lcio::TrackState* tsL1 = trk1->getTrackState( lcio::TrackState::AtLastHit  ) ;
+
+      // --- get three hits per track : first last midddle
+
+      unsigned nhit0 = trk0->getTrackerHits().size() ;
+      unsigned nhit1 = trk1->getTrackerHits().size() ;
+
+      lcio::TrackerHit* thf0 = trk0->getTrackerHits()[ 0 ] ;
+      lcio::TrackerHit* thf1 = trk1->getTrackerHits()[ 0 ] ;
+
+      lcio::TrackerHit* thl0 = trk0->getTrackerHits()[ nhit0 - 1 ] ;
+      lcio::TrackerHit* thl1 = trk1->getTrackerHits()[ nhit1 - 1 ] ;
+
+      // lcio::TrackerHit* thm1 = trk1->getTrackerHits()[ nhit1 / 2 ] ;
+      // lcio::TrackerHit* thm0 = trk0->getTrackerHits()[ nhit0 / 2 ] ;
+
+      int lthf0 = ILD_cellID(  thf0 )[ ILDCellID0::layer ] ;
+      int lthf1 = ILD_cellID(  thf1 )[ ILDCellID0::layer ] ;
+
+      int lthl0 = ILD_cellID(  thl0 )[ ILDCellID0::layer ] ;
+      int lthl1 = ILD_cellID(  thl1 )[ ILDCellID0::layer ] ;
+      
+      //      if( lthf0 <= lthl1 && lthf1 <= lthl0 )   return false ; 
+
+      // allow the track segements to overlap slightly  - FIXME: make a parameter ...
+      const int overlapRows = 4 ;
+      if( lthf0 + overlapRows <= lthl1 && lthf1  + overlapRows  <= lthl0 )   return false ; 
+
+      // now we take the larger segment and see if we can add the three hits from the other segment...
+
+      lcio::Track* trk = ( nhit0 > nhit1  ?  trk0           :  trk1           ) ; 
+      bool     outward = ( nhit0 > nhit1  ?  lthl0 < lthf1  :  lthl1 < lthf0  ) ;
+      lcio::Track* oth = ( nhit0 > nhit1  ?  trk1           :  trk0           ) ;
+      
+      unsigned n = oth->getTrackerHits().size() ;
+      
+      lcio::TrackerHit* th0 =  ( outward ? oth->getTrackerHits()[ 0 ]     :  oth->getTrackerHits()[ n / 2 ] ) ;
+      lcio::TrackerHit* th1 =              oth->getTrackerHits()[ n - 1 ] ;
+      lcio::TrackerHit* th2 =  ( outward ? oth->getTrackerHits()[ n / 2 ] :  oth->getTrackerHits()[ 0 ]     );
+      
+      const lcio::TrackState* ts = ( outward ? trk->getTrackState( lcio::TrackState::AtLastHit  ) : trk->getTrackState( lcio::TrackState::AtFirstHit  ) ) ;
+      
+      streamlog_out( DEBUG3 ) << " *******  TrackSegmentMerger : will extrapolate track " << ( outward ? " outwards\t" : " inwards\t" ) 
+			      <<  lcio::lcshort( trk  ) << std::endl ;  
+
+      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
+
+      int nHit = trk->getTrackerHits().size() ;
+      
+      if( nHit == 0 || ts ==0 )
+	return false ;
+      
+      // float initial_chi2 = trk->getChi2() ;
+      // float initial_ndf  = trk->getNdf() ;
+      
+      streamlog_out( DEBUG3  )  << "               -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+      
+      //need to add a dummy hit to the track
+      mTrk->addHit(  trk->getTrackerHits()[0] ) ;  // is this the right hit ??????????
+      
+      mTrk->initialise( *ts ,  _b ,  MarlinTrk::IMarlinTrack::backward ) ;
+      
+      double deltaChi ;
+      int addHit = 0 ;
+
+      //-----   now try to add the three hits : ----------------
+      addHit = mTrk->addAndFit(  th0 , deltaChi, _chi2Max ) ;
+      
+      streamlog_out( DEBUG3 ) << "    ****  adding first hit : " <<  gear::Vector3D( th0->getPosition() )  
+			      << "         added : " << MarlinTrk::errorCode( addHit )
+			      << "         deltaChi2: " << deltaChi 
+			      << std::endl ;
+      
+      if( addHit !=  MarlinTrk::IMarlinTrack::success ) return false ;
+
+      //---------------------
+      addHit = mTrk->addAndFit(  th1 , deltaChi, _chi2Max ) ;
+      
+      streamlog_out( DEBUG3 ) << "    ****  adding second hit : " <<  gear::Vector3D( th1->getPosition() )  
+			      << "         added : " << MarlinTrk::errorCode( addHit )
+			      << "         deltaChi2: " << deltaChi 
+			      << std::endl ;
+      
+      if( addHit !=  MarlinTrk::IMarlinTrack::success ) return false ;
+
+      //--------------------
+      addHit = mTrk->addAndFit(  th2 , deltaChi, _chi2Max ) ;
+      
+      streamlog_out( DEBUG3 ) << "    ****  adding third hit : " <<  gear::Vector3D( th2->getPosition() )  
+			      << "         added : " << MarlinTrk::errorCode( addHit )
+			      << "         deltaChi2: " << deltaChi 
+			      << std::endl ;
+      
+      if( addHit !=  MarlinTrk::IMarlinTrack::success ) return false ;
+
+
+
+      ////////////
+      return true ;
+      /////////// 
+    }
+
+  };
+  //=======================================================================================
+  
+/** helper class for merging track segments, based on circle (and tan lambda) */
   
   class TrackCircleDistance{
     

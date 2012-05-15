@@ -79,27 +79,29 @@
     <parameter name="Verbosity" value="WARNING" />
   </processor>
 
-  <processor name="VXDSimplePlanarDigiProcessor" type="SimplePlanarDigiProcessor">
-    <!--SimplePlanarDigiProcessor creates TrackerHits from SimTrackerHits, smearing them according to the input parameters. The plannar geometry should be either VXD, SIT or 
-	SET described using ZPlannarLayout-->
-    <!--Mokka has encoded the ladder number in the cellID-->
-    <parameter name="Ladder_Number_encoded_in_cellID" type="bool">false </parameter>
-    <!--R-Phi Resolution-->
-    <parameter name="PointResolutionRPhi" type="float">0.003 </parameter>
-    <!--Z Resolution-->
-    <parameter name="PointResolutionZ" type="float">0.003 </parameter>
-    <!--Name of the Input SimTrackerHit collection-->
-    <parameter name="SimTrackHitCollectionName" type="string" lcioInType="SimTrackerHit">VXDCollection </parameter>
-    <!--ID of Sub-Detector using UTIL/ILDConf.h from lcio. Either VXD, SIT or SET-->
-    <parameter name="Sub_Detector_ID" type="int">1 </parameter>
-    <!--Name of the TrackerHit output collection-->
-    <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHit">VXDTrackerHitsPlanar </parameter>
-    <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
-    <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">VXDTrackerHitRelations </parameter>
-    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-    <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
-  </processor>
-  
+<processor name="VXDSimplePlanarDigiProcessor" type="SimplePlanarDigiProcessor">                                   
+  <!--SimplePlanarDigiProcessor creates TrackerHits from SimTrackerHits, smearing them according to the input parameters. The plannar geometry should be either VXD, SIT or SET described using ZPlannarLayout-->
+  <!--whether hits are 1D strip hits-->
+  <parameter name="IsStrip" type="bool">false </parameter>
+  <!--Mokka has encoded the ladder number in the cellID-->
+  <parameter name="Ladder_Number_encoded_in_cellID" type="bool">true </parameter>
+  <!--U Resolution-->
+  <parameter name="PointResolutionU" type="float">0.003 </parameter>
+  <!--V Resolution-->
+  <parameter name="PointResolutionV" type="float">0.003 </parameter>
+  <!--Name of the Input SimTrackerHit collection-->
+  <parameter name="SimTrackHitCollectionName" type="string" lcioInType="SimTrackerHit">VXDCollection </parameter>
+  <!--Name of TrackerHit SimTrackHit relation collection-->
+  <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">VXDTrackerHitRelations </parameter>
+  <!--ID of Sub-Detector from UTIL/ILDConf.h from lcio. Either for VXD, SIT or SET. Only used if Ladder_Number_encoded_in_cellID == false-->
+  <parameter name="Sub_Detector_ID" type="int">1 </parameter>
+  <!--Name of the TrackerHit output collection-->
+  <parameter name="TrackerHitCollectionName" type="string" lcioOutType="TrackerHitPlane"> VXDTrackerHits</parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
+</processor>    
+
+ 
   <processor name="SITSimplePlanarDigiProcessor" type="SimplePlanarDigiProcessor">
     <!--SimplePlanarDigiProcessor creates TrackerHits from SimTrackerHits, smearing them according to the input parameters. The plannar geometry should be either VXD, SIT or 
 	SET described using ZPlannarLayout-->
@@ -191,9 +193,9 @@
     <!--Use Energy Loss in Fit-->
     <parameter name="EnergyLossOn" type="bool">false true </parameter>
     <!--the maximum delta Chi2 for which a hit is added to a track segement-->
-    <parameter name="MaxDeltaChi2" type="float">35 </parameter>
+    <parameter name="MaxDeltaChi2" type="float">20 </parameter>
     <!--the maximum number of layers without finding a hit before hit search search is stopped -->
-    <parameter name="MaxStepWithoutHit" type="int"> 6 </parameter>
+    <parameter name="MaxStepWithoutHit" type="int">6 </parameter>
     <!--minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
     <parameter name="MinLayerFractionWithMultiplicity" type="float">0.5 </parameter>
     <!--minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
@@ -214,7 +216,7 @@
     <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
     <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter>
     <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
-    <parameter name="VXDHitCollection" type="string">VXDTrackerHitsPlanar </parameter>
+    <parameter name="VXDHitCollection" type="string">VXDTrackerHits </parameter>
     
     <!--Smooth All Mesurement Sites in Fit-->
     <parameter name="SmoothOn" type="bool">false </parameter>
@@ -236,7 +238,7 @@
   <!--Name of the input tracker hit collection-->
   <parameter name="InputTPCTrackerHitCollectionName" type="string" lcioInType="TrackerHit">TPCTrackerHits </parameter>
   <!--Name of the input tracker hit collection-->
-  <parameter name="InputVXDTrackerHitCollectionName" type="string" lcioInType="TrackerHitPlane">VXDTrackerHitsPlanar  </parameter>
+  <parameter name="InputVXDTrackerHitCollectionName" type="string" lcioInType="TrackerHitPlane">VXDTrackerHits  </parameter>
   <!--Name of the output track collection-->
   <parameter name="OutputTrackCollectionName" type="string" lcioOutType="Track">FTFTracks </parameter>
   <!--Use Parameter-->
@@ -365,7 +367,7 @@
     <!--Use SIT-->
     <parameter name="UseSIT" type="int">1 </parameter>
     <!--VTX Hit Collection Name-->
-    <parameter name="VTXHitCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHitsPlanar </parameter>
+    <parameter name="VTXHitCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHits </parameter>
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
     <!--parameter name="Verbosity" type="string">DEBUG </parameter-->
   </processor>
@@ -489,7 +491,7 @@
     <!--Use Extra Point in Fit-->
     <parameter name="UseExtraPoint" type="int">0 </parameter>
     <!--VTX Hit Collection Name-->
-    <parameter name="VTXHitCollection" type="string" lcioInType="TrackerHit">VXDTrackerHitsPlanar </parameter>
+    <parameter name="VTXHitCollection" type="string" lcioInType="TrackerHit">VXDTrackerHits </parameter>
     <!--Cut on distance between track and VTX hits-->
     <parameter name="VTXHitToTrackDistance" type="float">1.5 </parameter>
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
@@ -551,7 +553,7 @@
     <!--Name of the TPC sim trk hit collection-->
     <parameter name="TPCSimTrkhitCollectionName" type="string" lcioInType="SimTrackerHit">TPCCollection </parameter>
     <!--Name of the collection of VTX tracker hits-->
-    <parameter name="VTXCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHitsPlanar </parameter>
+    <parameter name="VTXCollectionName" type="string" lcioInType="TrackerHit">VXDTrackerHits </parameter>
     <!--Name of the VTX sim trk hit collection-->
     <parameter name="VTXSimTrkhitCollectionName" type="string" lcioInType="SimTrackerHit">VXDCollection </parameter>
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
@@ -576,7 +578,7 @@
 
     <!--collection to be displayed ( ColName, marker type[0-2], size, layer)
       PandoraPFOs 0 2 3
-      VXDTrackerHitsPlanar  0 6 4
+      VXDTrackerHits  0 6 4
       SITTrackerHits  0 6 4
 
       OddMCPTracks 0 3 14
