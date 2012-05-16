@@ -6,6 +6,7 @@
 #include <time.h>
 #include <math.h>
 #include <sstream>
+#include <memory>
 #include "assert.h"
 
 #include "NNClusterer.h"
