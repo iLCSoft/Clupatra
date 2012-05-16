@@ -471,23 +471,30 @@ namespace clupatra_new{
 
       // now we take the larger segment and see if we can add the three hits from the other segment...
 
-      lcio::Track* trk = ( nhit0 > nhit1  ?  trk0           :  trk1           ) ; 
-      bool     outward = ( nhit0 > nhit1  ?  lthl0 < lthf1  :  lthl1 < lthf0  ) ;
-      lcio::Track* oth = ( nhit0 > nhit1  ?  trk1           :  trk0           ) ;
+      lcio::Track* trk = ( nhit0 > nhit1 ? trk0 :  trk1 ) ; 
+      lcio::Track* oth = ( nhit0 > nhit1 ? trk1 :  trk0 ) ;
+
+      bool  outward = ( nhit0 > nhit1  ?  lthl0 <= lthf1 + overlapRows :  lthl1 <= lthf0 + overlapRows ) ;
       
       unsigned n = oth->getTrackerHits().size() ;
       
-      lcio::TrackerHit* th0 =  ( outward ? oth->getTrackerHits()[ 0 ]     :  oth->getTrackerHits()[ n / 2 ] ) ;
-      lcio::TrackerHit* th1 =              oth->getTrackerHits()[ n - 1 ] ;
-      lcio::TrackerHit* th2 =  ( outward ? oth->getTrackerHits()[ n / 2 ] :  oth->getTrackerHits()[ 0 ]     );
+      lcio::TrackerHit* th0 =  ( outward ? oth->getTrackerHits()[ 0 ]     :  oth->getTrackerHits()[ n - 1 ] ) ;
+      lcio::TrackerHit* th1 =              oth->getTrackerHits()[ n / 2 ] ;
+      lcio::TrackerHit* th2 =  ( outward ? oth->getTrackerHits()[ n -1 ] :  oth->getTrackerHits()[ 0 ]     );
       
       const lcio::TrackState* ts = ( outward ? trk->getTrackState( lcio::TrackState::AtLastHit  ) : trk->getTrackState( lcio::TrackState::AtFirstHit  ) ) ;
       
       streamlog_out( DEBUG3 ) << " *******  TrackSegmentMerger : will extrapolate track " << ( outward ? " outwards\t" : " inwards\t" ) 
-			      <<  lcio::lcshort( trk  ) << std::endl ;  
+			      <<  lcio::lcshort( trk  ) << "     vs:  [" <<   std::hex << oth->id() << std::dec << "]"  << std::endl ;  
+      
+      // if( trk->id() == 0x0004534d &&  oth->id() == 0x000454a6 ){
+      // 	streamlog_out( DEBUG3 )  << " &&&&&&&&&&&&&& Track 1 : \n" << *trk 
+      // 				 << " &&&&&&&&&&&&&& Track 2 : \n" << *oth 
+      // 				 <<  std::endl ;
+      // }
 
       std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
-
+      
       int nHit = trk->getTrackerHits().size() ;
       
       if( nHit == 0 || ts ==0 )
