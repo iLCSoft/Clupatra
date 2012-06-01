@@ -1,13 +1,15 @@
 
 void trkeff(const char* FILEN ) {
-  
-  // const char* title = "TPC track finding efficiency - tau pairs @ 500 GeV" ;
+
+   const char* title = "TPC track finding efficiency - WW @ 1000 GeV" ;
+
+  //   const char* title = "TPC track finding efficiency - tau pairs @ 500 GeV" ;
   //const char* title = "TPC track finding efficiency - ttbar @ 500 GeV" ;
   //const char* title = "TPC track finding efficiency - tracks from v-zeros (in ttbar @ 500 GeV)" ;
 
-  char* dirClupa = "clupa_ttbar" ;
-  char* dirTPC   = "tpc_ttbar" ;
-  char* dirLDC   = "ldc_ttbar" ;
+  char* dirClupa = "clupaeff" ;
+  //  char* dirTPC   = "marlintrkeff" ;
+  char* dirLDC   = "marlintrkeff" ;
 
   
   gROOT->Reset();
@@ -53,16 +55,16 @@ void trkeff(const char* FILEN ) {
   gacth_clupa->SetName("gacth_clupa" ) ;
 
 
-  f->cd( dirTPC ) ; 
-  TGraphAsymmErrors* gpt_tpc = new TGraphAsymmErrors ;
-  gpt_tpc->Divide( hpt_f , hpt_t , "v" ) ;
+//   f->cd( dirTPC ) ; 
+//   TGraphAsymmErrors* gpt_tpc = new TGraphAsymmErrors ;
+//   gpt_tpc->Divide( hpt_f , hpt_t , "v" ) ;
 
-  // TGraphAsymmErrors* gcosth_tpc = new TGraphAsymmErrors ;
-  // gcosth_tpc->Divide( hcosth_f , hcosth_t , "v" ) ;
+//   // TGraphAsymmErrors* gcosth_tpc = new TGraphAsymmErrors ;
+//   // gcosth_tpc->Divide( hcosth_f , hcosth_t , "v" ) ;
 
-  TGraphAsymmErrors* gacth_tpc = new TGraphAsymmErrors ;
-  gacth_tpc->Divide( hacth_f , hacth_t , "v" ) ;
-  gacth_tpc->SetName("gacth_tpc" ) ;
+//   TGraphAsymmErrors* gacth_tpc = new TGraphAsymmErrors ;
+//   gacth_tpc->Divide( hacth_f , hacth_t , "v" ) ;
+//   gacth_tpc->SetName("gacth_tpc" ) ;
 
 
 
@@ -80,11 +82,11 @@ void trkeff(const char* FILEN ) {
 
 
   // ----------- create histograms that defnie the axis ranges of the plot ----
-  float minEff = 0.9 ;
+  float minEff = 0.5 ;
   float maxEff = 1.01 ;
 
   float minpt = 0.2 ;
-  float maxpt = 100. ;
+  float maxpt = 500. ;
 
   float minct = 0.0 ;
   float maxct = 1. ;
@@ -134,32 +136,15 @@ void trkeff(const char* FILEN ) {
   gpt_clupa->SetLineColor( kRed ) ;
   gpt_clupa->Draw("P") ;
 
-  gpt_tpc->SetMarkerStyle( kOpenTriangleUp ) ;
-  gpt_tpc->SetMarkerColor( kBlue) ;
-  gpt_tpc->SetLineColor( kBlue ) ;
-  gpt_tpc->Draw("P") ;
+//   gpt_tpc->SetMarkerStyle( kOpenTriangleUp ) ;
+//   gpt_tpc->SetMarkerColor( kBlue) ;
+//   gpt_tpc->SetLineColor( kBlue ) ;
+//   gpt_tpc->Draw("P") ;
 
   gpt_ldc->SetMarkerStyle( kDot) ;
   gpt_ldc->SetMarkerColor( kBlack) ;
   gpt_ldc->SetLineColor( kBlack ) ;
-  gpt_ldc->Draw("P") ;
-
-  // //-----  draw a box with legend -------------------------------
-  // TPaveText* tp = new TPaveText(1., 0.91, 8. ,.94 ) ;
-
-  // // TPolyMarker pm = new TPolyMarker( 1. , 0.91 ) ;
-  // // pm->
-
-  // tp->SetTextAlign( 12 ) ;
-  // tp->SetBorderSize(0) ;
-  // tp->AddText("- Clupatra (TPC only)") ;
-  // tp->AddText("- LEPTracking (TPC only)") ;
-  // tp->AddText("- FullLDCTracking (incl VTX/SIT)") ;
-  // tp->GetLine(0)->SetTextColor( kRed ) ;
-  // tp->GetLine(1)->SetTextColor( kBlue ) ;
-  // tp->GetLine(2)->SetTextColor( kBlack ) ;
-  // tp->Draw();
-  // //-----------------------------------------------
+//****  gpt_ldc->Draw("P") ;
 
 
   //========================================================================================
@@ -173,24 +158,24 @@ void trkeff(const char* FILEN ) {
   gacth_clupa->SetLineColor( kRed ) ;
   gacth_clupa->Draw("P") ;
 
-  gacth_tpc->SetMarkerStyle( kOpenTriangleUp ) ;
-  gacth_tpc->SetMarkerColor( kBlue) ;
-  gacth_tpc->SetLineColor( kBlue ) ;
-  gacth_tpc->Draw("P") ;
+//   gacth_tpc->SetMarkerStyle( kOpenTriangleUp ) ;
+//   gacth_tpc->SetMarkerColor( kBlue) ;
+//   gacth_tpc->SetLineColor( kBlue ) ;
+//   gacth_tpc->Draw("P") ;
 
   gacth_ldc->SetMarkerStyle( kDot) ;
   gacth_ldc->SetMarkerColor( kBlack) ;
   gacth_ldc->SetLineColor( kBlack ) ;
-  gacth_ldc->Draw("P") ;
+//***  gacth_ldc->Draw("P") ;
 
 
   // TLegend* tl = ((TPad*)c1->GetPad(2))->BuildLegend() ;
   //  tl->Draw()
 
-  TLegend* leg = new TLegend(0.2, 0.2, .5, .5);
+  TLegend* leg = new TLegend(0.5, 0.2, .8, .5);
   leg->AddEntry( "gacth_clupa" ,  "Clupatra (TPC only)" , "lep") ;
-  leg->AddEntry( "gacth_tpc"   ,  "LEPTracking (TPC only)", "lep") ;
-  leg->AddEntry( "gacth_ldc"   ,  "FullLDCTracking (incl VTX/SIT,FTD)", "lep") ;
+//   leg->AddEntry( "gacth_tpc"   ,  "LEPTracking (TPC only)", "lep") ;
+//  leg->AddEntry( "gacth_ldc"   ,  "MarlinTrk (incl VTX/SIT,FTD)", "lep") ;
   leg->Draw();
 
 

@@ -95,11 +95,16 @@ using namespace TrackEfficiencyHistos ;
 
 
 //======================================================================================================
-
-#define APPLY_CUT( LEVEL, Cut, Exp )  if( (Exp) == false ) { Cut = false ; \
-    streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp	\
+// 
+#define APPLY_CUT( LEVEL, Cut, Exp )  if( (Exp) == false ) {  if ( Cut ) \
+    streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp \
 			   <<  " ] in evt: " << evt->getEventNumber()	\
-			   << " run: "  << evt->getRunNumber()   << std::endl ; }
+			   << " run: "  << evt->getRunNumber()   << std::endl ; \
+    Cut = false ; }
+// #define APPLY_CUT( LEVEL, Cut, Exp )  if( (Exp) == false ) { Cut = false ; \
+//            streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp	\
+// 			   <<  " ] in evt: " << evt->getEventNumber()	\
+// 			   << " run: "  << evt->getRunNumber()   << std::endl ; }
 
 //======================================================================================================
 
@@ -271,6 +276,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   }
   catch( lcio::DataNotAvailableException& e){
 
+    streamlog_out( DEBUG ) << " *** collection not ine event : " << _relColName << std::endl ;
     return ; // nothing to do in this event (no tracks)
     
   }
@@ -282,6 +288,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   }
   catch( lcio::DataNotAvailableException& e){
 
+    streamlog_out( DEBUG ) << " *** collection not ine event : " << _trkColName << std::endl ;
     return ; // nothing to do in this event (no tracks)
     
   }
@@ -302,7 +309,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   mcpTracks->setSubset( true ) ;
   mcpTracks->reserve(  mcpIt.size() ) ;
   
-  std::string name = "MCParticleTracks_" ;
+  std::string name = "MCParticleTracksFound_" ;
   name += this->name() ;
   
   evt->addCollection( mcpTracks , name  ) ;
@@ -342,10 +349,14 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
   while( MCParticle* mcp = mcpIt.next()  ){
     
+ 
     bool cut = true ;
-    APPLY_CUT( DEBUG, cut,  std::abs( mcp->getCharge() )  > 0.5  ) ;
-    
-    APPLY_CUT( DEBUG, cut,  mcp->getGeneratorStatus() != 2   ) ;   // no documentation lines
+    //    APPLY_CUT( DEBUG, cut,  std::abs( mcp->getCharge() )  > 0.5  ) ;
+    if(  std::abs( mcp->getCharge() ) < 0.5 ) cut = false ; // silent cut
+    if( cut )
+      streamlog_out( DEBUG ) <<  lcshort( mcp ) << std::endl ;
+
+    //    APPLY_CUT( DEBUG, cut,  mcp->getGeneratorStatus() == 1   ) ;   // no documentation lines
 
     gear::Vector3D v( mcp->getVertex()[0], mcp->getVertex()[1], mcp->getVertex()[2] );
     gear::Vector3D e( mcp->getEndpoint()[0], mcp->getEndpoint()[1], mcp->getEndpoint()[2] );
@@ -366,9 +377,9 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
     APPLY_CUT( DEBUG, cut, p.rho() > 0.1  ) ; // pt> 100 MeV
 
-    APPLY_CUT( DEBUG, cut, std::abs( cos( p.theta() ) )  < 0.99  ) ; //  | cos( theta ) | > 0.99
+    APPLY_CUT( DEBUG, cut, std::abs( cos( p.theta() ) )  < 0.99  ) ; //FIXME 0.9 <=> .99  //  | cos( theta ) | > 0.99
 
-    APPLY_CUT( DEBUG, cut, hitMap[ mcp ]  > 5 ) ; //  require at least 10 TPC hits (particle actually made it to the TPC)
+    APPLY_CUT( DEBUG, cut, hitMap[ mcp ]  > 10 ) ; //  require at least 10 TPC hits (particle actually made it to the TPC)
 
     //....
 
@@ -383,8 +394,13 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
   LCIterator<MCParticle> trmIt( evt, name ) ;
 
-  while( MCParticle* trm = trmIt.next()  ){
+  //  while( MCParticle* trm = trmIt.next()  ){
+  for(int ii=0,nn=mcpTracks->getNumberOfElements() ; ii<nn ; ++ii) {
+
+    MCParticle* trm = (MCParticle*) mcpTracks->getElementAt(ii) ; 
     
+    //    std::cout << "    ----- searching particle track : " << lcshort( trm ) << std::endl;
+
     double pxmcp =  trm->getMomentum()[0]  ;
     double pymcp =  trm->getMomentum()[1]  ;
     //    double pzmcp =  trm->getMomentum()[2]  ;
@@ -441,6 +457,10 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     h.fill( hacth_t , std::abs( costhmcp) ) ;
     
     const EVENT::LCObjectVec& trkV = nav.getRelatedFromObjects( trm ) ;
+    
+    //    std::cout <<  " ------   trkV.size()  : " << trkV.size()  << std::endl ;
+
+    bool foundTrack = false ;
 
     if( trkV.size() >  0 ){
       
@@ -450,11 +470,11 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
       double wMax = 0.0 ;
       int iMax = 0 ;
 
-      streamlog_out( DEBUG5 ) <<  " ------   trkV.size()  : " << trkV.size()  << std::endl ;
+      streamlog_out( DEBUG2 ) <<  " ------   trkV.size()  : " << trkV.size()  << std::endl ;
 
       for(unsigned i=0 ; i<wV.size() ; ++i ) {
 	 
-	streamlog_out( DEBUG5 ) <<  "          nhit  : " << ((Track*)trkV[i])->getTrackerHits().size() <<    " ---- weight : " <<   wV[i]   << std::endl ;
+	streamlog_out( DEBUG2 ) <<  "          nhit  : " << ((Track*)trkV[i])->getTrackerHits().size() <<    " ---- weight : " <<   wV[i]   << std::endl ;
 
 	if( wV[i] > wMax ){
 	  wMax =  wV[i] ;
@@ -462,11 +482,21 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 	}  
       } 
 
+      double minGoodHitFraction = 0.75 ;
+
+      int nSplitSegments = 0 ;
+      
       // store split tracks collection
       if( trkV.size() >  1 ){
-
+	
 	for(unsigned i=0,N=trkV.size() ; i<N ; ++i ) {
-	  splitTracks->addElement( trkV[i] ) ;
+	  
+	  if(  wV[i] > minGoodHitFraction ) {
+
+	    ++nSplitSegments ;
+
+	    splitTracks->addElement( trkV[i] ) ;
+	  }
 	}
       }
 
@@ -515,11 +545,13 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
       double goodHitFraction = wMax ;
       
+      APPLY_CUT( DEBUG4, cut,  goodHitFraction > minGoodHitFraction  ) ;
+      APPLY_CUT( DEBUG4, cut,  nSplitSegments < 2 ) ;  // don't count split tracks as found....
       
-      APPLY_CUT( DEBUG4, cut,  goodHitFraction > 0.96  ) ;
-      
-      if( ! cut ) {
-	streamlog_out(DEBUG6) << "  goodHitFraction : " << wMax<< "*" << nTPCHit << "/" << nMCPTPCHit 
+      //      std::cout   << " ========= track  found ?  -> " << cut << lcshort( trm ) << std::endl ;
+
+     if( ! cut ) {
+	streamlog_out(DEBUG3) << "  goodHitFraction : " << wMax<< "*" << nTPCHit << "/" << nMCPTPCHit 
 			      << "=" << goodHitFraction << std::endl ;
 	
 	streamlog_out(DEBUG3) << " phi : " << dph << "  -  " <<  3.*eph << " - " << dph /ph << std::endl ;
@@ -528,8 +560,11 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 	streamlog_out(DEBUG3) << " pt: " << pt <<  " dpt: " << dpt << " ept : " << ept << " theta " <<  180. * atan( 1. / tL ) / M_PI  << std::endl ;
       }
       
+
       if( cut == true ){
 	
+	foundTrack = true ;
+
 	h.fill( hd0,    d0 ) ;
 	h.fill( hphi,   ph ) ;
 	h.fill( homega, om ) ;
@@ -568,17 +603,17 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 	h.fill( hacth_f , std::abs( costhmcp) ) ;
 
 	
-      } else {
-	
-	// debug: for now create a collection of mcparticle tracks  that where not found
-	mcpTrksNotFound->push_back( trm ) ;
-	
       }
-    } 
+    }
+    
+    if( ! foundTrack )  {
+      mcpTrksNotFound->push_back( trm ) ;
 
+      streamlog_out( DEBUG3 )  << " ========= track not found " << lcshort( trm ) << std::endl ;
+    }
   }
 
-  streamlog_out( DEBUG4 )  << " ===== found " << mcpTrksNotFound->size()  <<  " tracks of " << mcpTracks->size()  
+  streamlog_out( DEBUG4 )  << " ===== could not find " << mcpTrksNotFound->size()  <<  " tracks of " << mcpTracks->size()  
 			   << std::endl ;
 
   //----------------------------------------------------------------------  

@@ -13,7 +13,7 @@
 ------------------------------------------------------------
  
 
-- current version of algorithm ( Dec, 2011)
+- current version of algorithm ( May, 2012)
 
    ClupatraProcessor.cc
 
@@ -25,7 +25,7 @@
 
   steering files in ./examples
  
-   clupa.xml
+   clupa.xml, clupa_ild01.xml
       - do patrec and display result in CED
 
    clupa_ana.xml 
@@ -36,11 +36,33 @@
    trkeff.xml
      - create root file with histos for track finding efficiencies
    
-     trkeff.C
+    trkeff.C
      - make nice plots for Clupatra, LEPTracking and FullLDCTracking
 
 
  =============================================================================================================
+  --------
+ | v00-07 |
+  --------
+
+    - added code to merge split tracks seeds - this happens sometimes if one link of a track seed
+      is just a bit further than the current distance cut ( artefact of loops with increasing 
+      distance cuts )
+
+    - introduced parameter CosAlphaCut and merge hits from consecutive rows if
+      their angle is smaller than acos(CosAlphaCut)
+      -> helps to recover some stiff tracks in forward region   
+
+    - added parameter NLoopForSeeding (default 4 )
+      defining the number of loops for seeding with different distance cuts 
+
+    - restrict segment merging to two segments at a time in order to
+      prevent falsly merging almost complete tracks (through a small 'common' stub)
+      - repeat this procedure once in order to get also tracks split into three 
+
+    - use track state at first hit also for outward extrapolation as this is more 
+      accurate when merging segments
+
   --------
  | v00-06 |
   --------

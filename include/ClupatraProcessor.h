@@ -76,7 +76,8 @@ class ClupatraProcessor : public Processor {
   std::string  _segmentsOutColName ;
 
   float _distCut ;
-  //  float _rCut ;
+  float _cosAlphaCut ;
+
   float _duplicatePadRowFraction ;
   float _bfield ;
   
@@ -86,6 +87,7 @@ class ClupatraProcessor : public Processor {
 
   float _minLayerFractionWithMultiplicity ;
   int   _minLayerNumberWithMultiplicity ;
+  int   _nLoop ;
   
   float _trackStartsInnerDist ;
   float _trackEndsOuterCentralDist ;

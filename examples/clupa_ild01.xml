@@ -13,28 +13,30 @@
     <processor name="MyAIDAProcessor" />
 
     <!-- ========== track digitization and tracking  =======================================  -->
-     <XXXXprocessor name="VXDSimplePlanarDigiProcessor"/> <!-- Use SimplePlanarTestDigiProcessor until functionality is ported over -->
+    <!--
+     <XXXXprocessor name="VXDSimplePlanarDigiProcessor"/>
      <processor name="VXDSimplePlanarTestDigiProcessor"/>
-     <XXXXprocessor name="SITSimplePlanarDigiProcessor"/> <!-- Use SimplePlanarTestDigiProcessor until functionality is ported over -->
-
+     <XXXXprocessor name="SITSimplePlanarDigiProcessor"/>
      <processor name="SITSimplePlanarTestDigiProcessor"/>
      <processor name="SITSpacePointBuilder" />
-
-     <XXXXprocessor name="FTDSimpleDiscDigiProcessor"/> <!-- Use SimplePlanarTestDigiProcessor until functionality is ported over -->
+     <XXXXprocessor name="FTDSimpleDiscDigiProcessor"/>
      <processor name="FTDPixelSimplePlanarTestDigiProcessor"/>
      <processor name="FTDStripSimplePlanarTestDigiProcessor"/>
      <processor name="FTDSpacePointBuilder"/>
+     -->
 
     <processor name="MyTPCDigiProcessor"/>
 
     <processor name="MyClupatraProcessor" />
 
     <processor name="ClupatraMCTruthLinker" />
-    <processor name="TruthCheck" />
+    <processor name="clupaeff" type="TrackEfficiency"/>
+    <!--processor name="TruthCheck" /-->
 
+<!--
     <XXXprocessor name="MySiliconTracking_MarlinTrk"/>
     <XXXprocessor name="MyFullLDCTracking_MarlinTrk"/>
-
+-->
     <XXXprocessor name="MyTruthTracker" />
 
     <processor name="MyCEDViewer" />
@@ -45,7 +47,7 @@
     <parameter name="LCIOInputFiles"> recfile_ild01.slcio </parameter>
     <parameter name="GearXMLFile" value="gear_ILD_O1_v02.xml" />
     <parameter name="MaxRecordNumber" value="0" />
-    <parameter name="SkipNEvents" value="2 0 39 31" /> 
+    <parameter name="SkipNEvents" value="19" /> 
     <parameter name="SupressCheck" value="false true false" />
     <parameter name="Verbosity" value="MESSAGE" />
   </global>
@@ -282,6 +284,10 @@
     <parameter name="CreateDebugCollections" type="bool">true  </parameter>
     <!--Cut for distance between hits in mm-->
     <parameter name="DistanceCut" type="float">40 </parameter>
+    <!--Cut for max.angle between hits in consecutive layers for seed finding - NB value should be smaller than 1 - default is 0.9999999 !!!-->
+    <parameter name="CosAlphaCut" type="float"> 0.9999999 </parameter>
+    <!--number of seed finding loops - every loop increased the cut by DistanceCut/NLoopForSeeding-->
+    <parameter name="NLoopForSeeding" type="int">4 </parameter>
     <!--allowed fraction of hits in same pad row per track-->
     <parameter name="DuplicatePadRowFraction" type="float">0.1 </parameter>
     <!--Use Energy Loss in Fit-->
@@ -304,7 +310,13 @@
     <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
     <!--number of pad rows used in initial seed clustering-->
     <parameter name="PadRowRange" type="int">15 </parameter>
-    
+    <parameter name="TrackEndsOuterCentralDist" type="float">25 </parameter>
+    <!--maximum distance in z [mm] from endplate of last hit, such that the track is considered to end at the end -->
+    <parameter name="TrackEndsOuterForwardDist" type="float">40 </parameter>
+    <!--minimum curvature omega of a track segment for being considered a curler-->
+    <parameter name="TrackIsCurlerOmega" type="float">0.002 </parameter>
+    <!--maximum radial distance [mm] from inner field cage of first hit, such that the track is considered to start at the beginning -->
+    <parameter name="TrackStartsInnerDist" type="float">25 </parameter>
     <!--try to pick up hits from Si-trackers-->
     <parameter name="pickUpSiHits" type="bool"> false </parameter>
     <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
@@ -337,7 +349,17 @@
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
     <parameter name="Verbosity" type="string"> MESSAGE DEBUG3 </parameter>
  </processor>
-
+  
+ <processor name="clupaeff" type="TrackEfficiency">
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string"> DEBUG3 MESSAGE DEBUG3 </parameter>
+   <parameter name="MCParticlesCollection" type="string" lcioInType="MCParticle">MCParticle</parameter>
+   <parameter name="TrackMCPRelation" type="string" lcioInType="LCRelation"> ClupatraMCTruthLink </parameter>
+   <parameter name="PtRange" type="FloatVec">0. 100.</parameter>
+   <parameter name="TrackCollection" type="string" lcioInType="Track">ClupatraTracks</parameter>
+   <parameter name="SimTrackerHitCollection" type="string" lcioInType="SimTrackerHit">TPCCollection </parameter>
+ </processor>
+ 
   <processor name="TruthCheck" type="TrackCheckMCTruth">
     <!--TrackCheckMCTruth: analysis plots for Tracks-->
     <!--maximal fractions of hits that are allowed to be missing for a merged track-->
@@ -635,7 +657,7 @@
     <!--draw a helix for Track objects:0 none, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
     <parameter name="DrawHelixForTrack" type="int"> 1 </parameter>
 
-    <parameter name="MCParticleEnergyCut" type="float"> 2.0 </parameter> 
+    <parameter name="MCParticleEnergyCut" type="float"> .1 </parameter> 
    <!--color scheme to be used for drawing - see MESSAGE for options-->
     <parameter name="ColorScheme" type="int">12</parameter>
 
@@ -653,6 +675,13 @@
 
       ClupatraTrackSegments 0 4 6
       ClupatraInitialTrackSegments 0 3 7 
+
+      ClupatraOuterSegments   0 3 3
+      ClupatraInnerSegments   0 3 4
+      ClupatraMiddleSegments  0 3 5
+
+      VXDTrackerHits  0 6 4
+      SITTrackerHits  0 6 4
     -->
     <parameter name="DrawInLayer"> 
       TPCCollection 0 1 0
@@ -660,10 +689,8 @@
       ClupatraSeedCluster 0 4 1 
       ClupatraLeftoverClusters 0 3 2
 
-
-      ClupatraOuterSegments   0 3 3
-      ClupatraInnerSegments   0 3 4
-      ClupatraMiddleSegments  0 3 5
+      MCParticleTracksFound_clupaeff 0 3 3
+      MCParticleTracksNotFound_clupaeff 0 3 4 
 
       ClupatraIncompleteSegments 0 4 6
       ClupatraCurlerSegments  0 3 7 
@@ -675,7 +702,9 @@
       ClupatraMergedTracks 0 3 12
 
       MCParticle  0 3 15
-
+ 
+      ClupatraTrackSegments 0 4 16
+ 
       MarlinTrkTracks 2 20 18
       ClupatraTracks 0 6 19
 

@@ -155,7 +155,7 @@ namespace clupatra_new{
   class HitDistance{
   public:
 
-    HitDistance(float dCut) : _dCutSquared( dCut*dCut ) {} 
+    HitDistance(float dCut, float caCut = -1.0 ) : _dCutSquared( dCut*dCut ) , _caCut( caCut ) {} 
 
     /** Merge condition: true if distance  is less than dCut */ 
     inline bool operator()( Hit* h0, Hit* h1){
@@ -165,11 +165,23 @@ namespace clupatra_new{
       if( h0->first->layer == h1->first->layer )
 	return false ;
 
+      if(  _caCut > 0.  && std::abs( h0->first->layer - h1->first->layer ) == 1 ){
+
+	gear::Vector3D& p0 =  h0->first->pos   ;
+	gear::Vector3D& p1 =  h1->first->pos   ;
+	
+	double cosAlpha = p0.dot( p1 ) / p0.r() / p1.r()  ;
+
+	// merge hits that seem to come from stiff track from the IP
+	//fixme: make parameter
+	if( cosAlpha > _caCut ) return true ;
+      }
+
       return ( h0->first->pos - h1->first->pos).r2()  < _dCutSquared ;
     }
   protected:
     HitDistance() ;
-    float _dCutSquared ;
+    float _dCutSquared, _caCut  ;
   } ;
   
   
@@ -202,8 +214,14 @@ namespace clupatra_new{
   } ;
 
   //------------------------------------------------------------------------------------------
+  /** Predicate class for identifying small clusters. */
+  struct ClusterSize { 
+    ClusterSize( unsigned n) : _n(n) {} 
+    bool operator()(const CluTrack* cl) const {   return cl->size() < _n ;  } 
+    unsigned _n ;
+  };
   
-  
+  //------------------------------------------------------------------------------------------
   /** Predicate class for identifying clusters with duplicate pad rows - returns true
    *  if the fraction of duplicate hits is larger than 'fraction'.
    */
@@ -434,6 +452,11 @@ namespace clupatra_new{
       lcio::Track* trk0 = h0->first ;
       lcio::Track* trk1 = h1->first ;
 
+
+      // protect against merging multiple segments (and thus complete tracks) 
+      if(  h0->second || h1->second ) 
+	return false ;
+
       // const TrackInfoStruct* ti0 =  trk0->ext<TrackInfo>() ;
       // const TrackInfoStruct* ti1 =  trk1->ext<TrackInfo>() ;
 
@@ -482,8 +505,13 @@ namespace clupatra_new{
       lcio::TrackerHit* th1 =              oth->getTrackerHits()[ n / 2 ] ;
       lcio::TrackerHit* th2 =  ( outward ? oth->getTrackerHits()[ n -1 ] :  oth->getTrackerHits()[ 0 ]     );
       
-      const lcio::TrackState* ts = ( outward ? trk->getTrackState( lcio::TrackState::AtLastHit  ) : trk->getTrackState( lcio::TrackState::AtFirstHit  ) ) ;
+
+      // track state at last hit migyt be rubish....
+      //      const lcio::TrackState* ts = ( outward ? trk->getTrackState( lcio::TrackState::AtLastHit  ) : trk->getTrackState( lcio::TrackState::AtFirstHit  ) ) ;
+      const lcio::TrackState* ts = trk->getTrackState( lcio::TrackState::AtFirstHit  )  ;
       
+
+
       streamlog_out( DEBUG3 ) << " *******  TrackSegmentMerger : will extrapolate track " << ( outward ? " outwards\t" : " inwards\t" ) 
 			      <<  lcio::lcshort( trk  ) << "     vs:  [" <<   std::hex << oth->id() << std::dec << "]"  << std::endl ;  
       
