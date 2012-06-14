@@ -1170,7 +1170,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
 
       ts = firstTrk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
-      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+      if( ts ) 	trk->addTrackState( new TrackStateImpl( ts )  ) ;
 
       ts = lastTrk->getTrackState( lcio::TrackState::AtLastHit  ) ;
       if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
@@ -1191,6 +1191,12 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
       trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
       
+      ts = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+      double RMin = ( ts ?
+		      sqrt( ts->getReferencePoint()[0] * ts->getReferencePoint()[0]
+			    + ts->getReferencePoint()[1] * ts->getReferencePoint()[1] )
+		      :  0.0 ) ;
+      trk->setRadiusOfInnermostHit( RMin  ) ; 
 
       streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
 			      << "   with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 

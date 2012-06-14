@@ -1077,6 +1077,11 @@ namespace clupatra_new{
 	trk->addTrackState( tsLH ) ;
 	trk->addTrackState( tsCA ) ;
 	
+	double RMin = sqrt( tsFH->getReferencePoint()[0] * tsFH->getReferencePoint()[0]
+			    + tsFH->getReferencePoint()[1] * tsFH->getReferencePoint()[1] ) ;
+	
+	trk->setRadiusOfInnermostHit( RMin  ) ; 
+	
 	trk->setChi2( chi2 ) ;
 	trk->setNdf( ndf ) ;
 
