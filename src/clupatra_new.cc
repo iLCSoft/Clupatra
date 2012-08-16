@@ -972,15 +972,15 @@ namespace clupatra_new{
     trk->setdEdx( e/nHit ) ;
     trk->subdetectorHitNumbers().resize( 2 * lcio::ILDDetID::ETD ) ;
 
-    trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  0 ; 
-    trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  nHit ;  
+    trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  0 ; 
+    trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  nHit ;  
       
     if( mtrk != 0 && ! c->empty() ){
       
 
       std::vector<std::pair<EVENT::TrackerHit*, double> > hitsInFit ;
       mtrk->getHitsInFit( hitsInFit ) ;
-      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 1 ] =  hitsInFit.size() ;  
+      trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  hitsInFit.size() ;  
       
       if( ! hitsInFit.empty() ){
 	

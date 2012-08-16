@@ -1,6 +1,15 @@
 
 void trkeff(const char* FILEN ) {
 
+  float minEff = 0.8 ;
+  float maxEff = 1.01 ;
+
+  float minpt = 0.2 ;
+  float maxpt = 500. ;
+
+  float minct = 0.0 ;
+  float maxct = 1. ;
+
    const char* title = "TPC track finding efficiency - WW @ 1000 GeV" ;
 
   //   const char* title = "TPC track finding efficiency - tau pairs @ 500 GeV" ;
@@ -82,14 +91,6 @@ void trkeff(const char* FILEN ) {
 
 
   // ----------- create histograms that defnie the axis ranges of the plot ----
-  float minEff = 0.5 ;
-  float maxEff = 1.01 ;
-
-  float minpt = 0.2 ;
-  float maxpt = 500. ;
-
-  float minct = 0.0 ;
-  float maxct = 1. ;
 
   hpt_clupa = new TH2F( "hpt_clupa", title ,10, minpt, maxpt, 10, minEff , maxEff  ) ;
 
@@ -144,7 +145,7 @@ void trkeff(const char* FILEN ) {
   gpt_ldc->SetMarkerStyle( kDot) ;
   gpt_ldc->SetMarkerColor( kBlack) ;
   gpt_ldc->SetLineColor( kBlack ) ;
-//****  gpt_ldc->Draw("P") ;
+  gpt_ldc->Draw("P") ;
 
 
   //========================================================================================
@@ -166,7 +167,7 @@ void trkeff(const char* FILEN ) {
   gacth_ldc->SetMarkerStyle( kDot) ;
   gacth_ldc->SetMarkerColor( kBlack) ;
   gacth_ldc->SetLineColor( kBlack ) ;
-//***  gacth_ldc->Draw("P") ;
+  gacth_ldc->Draw("P") ;
 
 
   // TLegend* tl = ((TPad*)c1->GetPad(2))->BuildLegend() ;

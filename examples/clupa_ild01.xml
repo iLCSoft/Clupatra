@@ -655,7 +655,7 @@
   <processor name="MyCEDViewer" type="CEDViewer">
 
     <!--draw a helix for Track objects:0 none, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
-    <parameter name="DrawHelixForTrack" type="int"> 1 </parameter>
+    <parameter name="DrawHelixForTrack" type="int"> 0 </parameter>
 
     <parameter name="MCParticleEnergyCut" type="float"> .1 </parameter> 
    <!--color scheme to be used for drawing - see MESSAGE for options-->

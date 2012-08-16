@@ -41,6 +41,22 @@
 
 
  =============================================================================================================
+  --------
+ | v00-08 |
+  --------
+    - changed order of hits in track and hits in fit
+      in subdetector hit numbers
+
+    - changed way how curler tracks are written out:
+       - store only complete track segments - as used in the fit
+       - for merged curlers only the primary segment (closest to IP)
+         is stored in track output collection where
+         the other segments are referenced through the track pointers
+         (sorted in z) 
+
+    - no change in algorithm 
+
+
   -----------
  | v00-07-01 |
   -----------

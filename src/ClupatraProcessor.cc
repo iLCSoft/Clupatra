@@ -500,6 +500,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   const bool writeLeftoverClusters   = _createDebugCollections ;
   const bool writeQualityTracks      = _createDebugCollections ;
   
+  static const bool copyTrackSegments = false ;
+  
   LCCollectionVec* seedCol =  ( writeSeedCluster        ?  newTrkCol( "ClupatraSeedCluster"          , evt )  :   0   )  ; 
   LCCollectionVec* cluCol  =  ( writeCluTrackSegments   ?  newTrkCol( "ClupatraInitialTrackSegments" , evt )  :   0   )  ; 
   LCCollectionVec* locCol  =  ( writeCluTrackSegments   ?  newTrkCol( "ClupatraLeftoverClusters"     , evt )  :   0   )  ; 
@@ -586,7 +588,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	HitVec seedhits ;
 	Clusterer::cluster_list smallclu ; 
 	smallclu.setOwner() ;      
-	split_list( sclu, std::back_inserter(smallclu),  ClusterSize(  _padRowRange * _smallClusterPadRowFraction ) ) ; 
+	split_list( sclu, std::back_inserter(smallclu),  ClusterSize(  int( _padRowRange * _smallClusterPadRowFraction) ) ) ; 
 	for( Clusterer::cluster_list::iterator sci=smallclu.begin(), end= smallclu.end() ; sci!=end; ++sci ){
 	  for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
 	    seedhits.push_back( *ci ) ; 
@@ -1086,7 +1088,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     curSegCluVec.setOwner() ;
 
 
-    for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ){
+    //    for( int i=0,N=tsCol->getNumberOfElements() ;  i<N ; ++i ){
+    for( int i=tsCol->getNumberOfElements()-1 ;  i>=0 ; --i ){
       
       TrackImpl* trk = (TrackImpl*) tsCol->getElementAt(i) ;
       
@@ -1108,8 +1111,18 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  
       } else {   // ... is not a curler ->  add a copy to the final tracks collection 
 	  
-	outCol->addElement( new TrackImpl( *trk )  ) ;
-	
+
+	if( copyTrackSegments) {
+
+	  outCol->addElement( new TrackImpl( *trk )  ) ;
+
+	}else{
+
+	  outCol->addElement( trk ) ;
+
+	  tsCol->removeElementAt( i ) ;
+	}
+
 	if( writeCluTrackSegments )  finSegCol->addElement( trk ) ;
       }
     }
@@ -1143,69 +1156,102 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
       mergedTrk.sort( TrackZSort() ) ;
       
-      // ====== create a new LCIO track for the merged cluster ...
-      TrackImpl* trk = new TrackImpl ;
-      
-      // == and copy all the hits 
-      unsigned hitCount = 0 ;
-      for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
+      //================================================================================
+
+ 
+      if( copyTrackSegments) {
+
+	// ====== create a new LCIO track for the merged cluster ...
+	TrackImpl* trk = new TrackImpl ;
 	
-      	const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
-	for(unsigned i=0, n=hV.size() ; i<n ; ++i){
+	// == and copy all the hits 
+	unsigned hitCount = 0 ;
+	for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
 	  
-      	  trk->addHit( hV[i] ) ;
-      	}
-	hitCount  += hV.size()  ;
+	  const TrackerHitVec& hV = (*itML)->getTrackerHits() ;
+	  for(unsigned i=0, n=hV.size() ; i<n ; ++i){
+	    
+	    trk->addHit( hV[i] ) ;
+	  }
+	  hitCount  += hV.size()  ;
+	  
+	  // add a pointer to the original track segment 
+	  trk->addTrack( *itML ) ;
+	}
+	
+	// take track states from first and last track :
+	Track* firstTrk = mergedTrk.front() ;
+	Track* lastTrk  = mergedTrk.back() ;
+	
+	const TrackState* ts = 0 ; 
+	ts = firstTrk->getTrackState( lcio::TrackState::AtIP  ) ;
+	if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	
+	ts = firstTrk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+	if( ts ) 	trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	
+	ts = lastTrk->getTrackState( lcio::TrackState::AtLastHit  ) ;
+	if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	
+	ts = lastTrk->getTrackState( lcio::TrackState::AtCalorimeter  ) ;
+	if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	
+	
+	trk->ext<MarTrk>() = firstTrk->ext<MarTrk>() ;
+	
+	int hitsInFit  =  firstTrk->getSubdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] ;
+	trk->setChi2(     firstTrk->getChi2()     ) ;
+	trk->setNdf(      firstTrk->getNdf()      ) ;
+	trk->setdEdx(     firstTrk->getdEdx()     ) ;
+	trk->setdEdxError(firstTrk->getdEdxError()) ;
+	
+	trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
+	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitsInFit ;  
+	trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitCount ;  
+	
+	ts = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
+	double RMin = ( ts ?
+			sqrt( ts->getReferencePoint()[0] * ts->getReferencePoint()[0]
+			      + ts->getReferencePoint()[1] * ts->getReferencePoint()[1] )
+			:  0.0 ) ;
+	trk->setRadiusOfInnermostHit( RMin  ) ; 
 
-	// add a pointer to the original track segment 
-	trk->addTrack( *itML ) ;
-      }
-      
-      // take track states from first and last track :
-      Track* firstTrk = mergedTrk.front() ;
-      Track* lastTrk  = mergedTrk.back() ;
-      
-      const TrackState* ts = 0 ; 
-      ts = firstTrk->getTrackState( lcio::TrackState::AtIP  ) ;
-      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+    
 
-      ts = firstTrk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
-      if( ts ) 	trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
+				<< "   with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
+				<< std::endl ;
+	
+	
+	outCol->addElement( trk )  ;
 
-      ts = lastTrk->getTrackState( lcio::TrackState::AtLastHit  ) ;
-      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+      } else { //==========================
+	
+	// we move the first segment to the final list and keep pointers to the other segments
 
-      ts = lastTrk->getTrackState( lcio::TrackState::AtCalorimeter  ) ;
-      if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	std::list<Track*>::iterator itML = mergedTrk.begin() ;
 
+	TrackImpl* trk = (TrackImpl*) *itML++ ;
 
-      trk->ext<MarTrk>() = firstTrk->ext<MarTrk>() ;
-      
-      int hitsInFit  =  firstTrk->getSubdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] ;
-      trk->setChi2(     firstTrk->getChi2()     ) ;
-      trk->setNdf(      firstTrk->getNdf()      ) ;
-      trk->setdEdx(     firstTrk->getdEdx()     ) ;
-      trk->setdEdxError(firstTrk->getdEdxError()) ;
-      
-      trk->subdetectorHitNumbers().resize( 2 * ILDDetID::ETD ) ;
-      trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 1 ] =  hitsInFit ;  
-      trk->subdetectorHitNumbers()[ 2 * ILDDetID::TPC - 2 ] =  hitCount ;  
-      
-      ts = trk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
-      double RMin = ( ts ?
-		      sqrt( ts->getReferencePoint()[0] * ts->getReferencePoint()[0]
-			    + ts->getReferencePoint()[1] * ts->getReferencePoint()[1] )
-		      :  0.0 ) ;
-      trk->setRadiusOfInnermostHit( RMin  ) ; 
+	for(  ; itML != mergedTrk.end() ; ++itML ){
+	  
+	  // add a pointer to the original track segment 
+	  trk->addTrack( *itML ) ;
+	}
 
-      streamlog_out( DEBUG2 ) << "   create new merged track from bestTrack parameters - ptr to MarlinTrk : " << trk->ext<MarTrk>()  
-			      << "   with subdetector hit numbers  : " <<  trk->subdetectorHitNumbers()[0 ] << " , " <<  trk->subdetectorHitNumbers()[1] 
-			      << std::endl ;
-      
+	outCol->addElement( trk ) ;
 
-      outCol->addElement( trk )  ;
+	//remove from segment collection:
+	for( int i=0,N=tsCol->size() ; i<N ; ++i) {
+	  if( ((Track*) tsCol->getElementAt(i) ) == trk ){ 
+	    tsCol->removeElementAt( i ) ;
+	    break ;
+	  }
+	}
+
+      }//================================================================================
+
     }
-
     //---------------------------------------------------------------------------------------------
     // // add all tracks that have not been merged :
     
@@ -1215,15 +1261,31 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
     	TrackImpl* trk = dynamic_cast<TrackImpl*>( (*it)->first ) ;
 	
-    	TrackImpl* t =   new TrackImpl( *trk ) ;
+	if( copyTrackSegments) {
+
+	  TrackImpl* t =   new TrackImpl( *trk ) ;
 	
-    	t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
+	  t->ext<TrackInfo>() = 0 ; // set extension to 0 to prevent double free ... 
 	
-    	t->ext<MarTrk>() = 0 ; // dynamic_cast<TrackImpl*>( (*it)->first )->ext<MarTrk>() ;
+	  t->ext<MarTrk>() = 0 ; // dynamic_cast<TrackImpl*>( (*it)->first )->ext<MarTrk>() ;
 	
-    	streamlog_out( DEBUG2 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
+	  streamlog_out( DEBUG2 ) << "   create new track from existing LCIO track  - ptr to MarlinTrk : " << t->ext<MarTrk>()  << std::endl ;
 	
-    	outCol->addElement( t ) ;
+	  outCol->addElement( t ) ;
+
+	} else { 
+	  outCol->addElement( trk ) ;
+	  
+	  //remove from segment collection:
+	  for( int i=0,N=tsCol->size() ; i<N ; ++i) {
+	    if( ((Track*) tsCol->getElementAt(i) ) == trk ){ 
+	      tsCol->removeElementAt( i ) ;
+	      break ;
+	    }
+	  }
+	}
+
+
       }
     }
     
