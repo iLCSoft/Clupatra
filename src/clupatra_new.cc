@@ -950,7 +950,8 @@ namespace clupatra_new{
     static lcio::BitField64 encoder( lcio::ILDCellID0::encoder_string ) ; 
 
     lcio::TrackImpl* trk = new lcio::TrackImpl ;
- 
+
+    trk->setTypeBit( lcio::ILDDetID::TPC ) ; 
    
     double e = 0.0 ;
     int nHit = 0 ;
