@@ -1163,7 +1163,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 	// ====== create a new LCIO track for the merged cluster ...
 	TrackImpl* trk = new TrackImpl ;
-	
+
+	trk->setTypeBit( lcio::ILDDetID::TPC ) ; 
+
 	// == and copy all the hits 
 	unsigned hitCount = 0 ;
 	for( std::list<Track*>::iterator itML = mergedTrk.begin() ; itML != mergedTrk.end() ; ++ itML ){
