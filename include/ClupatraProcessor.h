@@ -23,7 +23,46 @@ namespace EVENT{
   class Track ;
 }
 
-/** Clustering based pattern recognition for a TPC...
+/** ClupatraProcessor : nearest neighbour clustering seeded pattern recognition using Kalman-Filter for extrapolation and 
+ *  hit search.
+ * 
+ *   @parameter TPCHitCollection         Name of the tpc hit input collections
+ *   @parameter OutputCollection         Name of the output collection with final TPC tracks
+ *   @parameter SegmentCollectionName    Name of the output collection that has the individual track segments
+ *   @parameter CreateDebugCollections   optionally create some debug collection with intermediate track segments and used and unused hits
+ * 
+ *   @parameter DistanceCut              Cut for distance between hits in mm for the seed finding
+ *   @parameter Chi2Cut                  the maximum chi2-distance for which a hit is considered for merging
+ *   @parameter CosAlphaCut              Cut for max.angle between hits in consecutive layers for seed finding - NB value should be smaller than 1 - default is 0.9999999 
+ *   @parameter MaxDeltaChi2             the maximum delta Chi2 after filtering for which a hit is added to a track segement
+ * 
+ *   @parameter DuplicatePadRowFraction  allowed fraction of hits in same pad row per track
+ *   @parameter NLoopForSeeding          number of seed finding loops - every loop increases the distance cut by DistanceCut/NLoopForSeeding
+ *   @parameter NumberOfZBins            number of bins in z over total length of TPC - hits from different z bins are nver merged
+ *   @parameter PadRowRange              number of pad rows used in initial seed clustering
+ * 
+ *   @parameter MaxStepWithoutHit                 the maximum number of layers without finding a hit before hit search search is stopped 
+ *   @parameter MinLayerFractionWithMultiplicity  minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters
+ *   @parameter MinLayerNumberWithMultiplicity    minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters
+ *   @parameter MinimumClusterSize                minimum number of hits per cluster
+ * 
+ *   @parameter TrackEndsOuterCentralDist maximum radial distance [mm] from outer field cage of last hit, such that the track is considered to end at the end 
+ *   @parameter TrackEndsOuterForwardDist maximum distance in z [mm] from endplate of last hit, such that the track is considered to end at the end 
+ *   @parameter TrackIsCurlerOmega        minimum curvature omega of a track segment for being considered a curler
+ *   @parameter TrackStartsInnerDist      maximum radial distance [mm] from inner field cage of first hit, such that the track is considered to start at the beginning 
+ * 
+ *   @parameter EnergyLossOn             Use Energy Loss in Fit
+ *   @parameter MultipleScatteringOn     Use MultipleScattering in Fit
+ *   @parameter SmoothOn                 Smooth All Mesurement Sites in Fit
+ * 
+ *   @parameter pickUpSiHits             try to pick up hits from Si-trackers
+ *   @parameter SITHitCollection         name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)
+ *   @parameter VXDHitCollection         name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)
+ * 
+ *   @parameter Verbosity               verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")
+ * 
+ * @author F.Gaede, DESY, 2011/2012
+ * @version $Id$ 
  */
 class ClupatraProcessor : public Processor {
   

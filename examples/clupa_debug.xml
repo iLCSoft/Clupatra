@@ -25,26 +25,28 @@
      <processor name="FTDSpacePointBuilder"/>
      -->
 
-    <processor name="MyTPCDigiProcessor"/>
+    <processor name="MyDebugDigiProcessor"/>
 
     <processor name="MyClupatraProcessor" />
 
+    <processor name="MyRefitProcessor" />
+
+    <processor name="MyCEDViewer" />
+<!--
+
+
     <processor name="ClupatraMCTruthLinker" />
     <processor name="clupaeff" type="TrackEfficiency"/>
-    <!--processor name="TruthCheck" /-->
 
-<!--
     <XXXprocessor name="MySiliconTracking_MarlinTrk"/>
     <XXXprocessor name="MyFullLDCTracking_MarlinTrk"/>
--->
     <XXXprocessor name="MyTruthTracker" />
 
     <processor name="MyCEDViewer" />
+    <XXXprocessor name="MyLCIOOutputProcessor" />
 
-    <XXXprocessor name="MyRefitProcessor"  />
+-->
 
-    <processor name="MyLCIOOutputProcessor" />
-    <XXXprocessor name="DebugOutput"/>
   </execute>
 
   <global>
@@ -78,6 +80,20 @@
     <!-- type of output file xml (default) or root ( only OpenScientist)-->
     <parameter name="FileType" type="string" value="root" />
   </processor>
+
+ <processor name="MyDebugDigiProcessor" type="DebugDigiProcessor">
+ <!--DebugDigiProcessor: analysis plots for Tracks-->
+  <!--The IDs of the subdetectors corresponding to the hit collections in TrackerHitCollectionNames-->
+  <parameter name="SubDetectorIDs" type="IntVec">4  </parameter>
+  <!--Name of the input collections with  Tracks-->
+  <parameter name="TrackCollection" type="string" lcioInType="Track">ClupatraDebugTracks </parameter>
+  <!--The tracker hit collection names - needs to run parallel to SubDetectorIDs-->
+  <parameter name="TrackerHitCollections" type="StringVec">TPCTrackerHits  </parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">DEBUG2 </parameter>
+</processor>
+
+
 
 <processor name="VXDSimplePlanarDigiProcessor" type="SimplePlanarDigiProcessor">                                   
   <!--SimplePlanarDigiProcessor creates TrackerHits from SimTrackerHits, smearing them according to the input parameters. The plannar geometry should be either VXD, SIT or SET described using ZPlannarLayout-->
@@ -240,50 +256,88 @@
  </processor>
 
 
+  <processor name="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXMyTPCDigiProcessor" type="TPCDigiProcessor">
+    <!--Produces TPC TrackerHit collection from SimTrackerHit collection, smeared in RPhi and Z. A search is made for adjacent hits on a pad row, if they are closer in z and r-phi than the steering parameters _doubleHitResRPhi (default value 2.0 mm) and _doubleHitResZ (default value 5.0 mm) they are considered to overlap. Clusters of hits smaller than _maxMerge (default value 3) are merged into a single tracker hit, with the position given as the average poision of the hits in phi and in z. Clusters which have _maxMerge hits or more are determined to be identifiable as multiple hits, and are not added to the tracker hit collection. This of course means that good hits caught up in a cluster of background hits will be lossed.-->
+    <!--R-Phi Diffusion Coefficent in TPC-->
+    <parameter name="DiffusionCoeffRPhi" type="float">0.025 </parameter>
+    <!--Z Diffusion Coefficent in TPC-->
+    <parameter name="DiffusionCoeffZ" type="float">0.08 </parameter>
+    <!--Defines the minimum distance for two seperable hits in RPhi-->
+    <parameter name="DoubleHitResolutionRPhi" type="float">2 </parameter>
+    <!--Defines the minimum distance for two seperable hits in Z-->
+    <parameter name="DoubleHitResolutionZ" type="float">5 </parameter>
+    <!--Defines spatial slice in RP-->
+    <parameter name="HitSortingBinningRPhi" type="float">2 </parameter>
+    <!--Defines spatial slice in Z-->
+    <parameter name="HitSortingBinningZ" type="float">5 </parameter>
+    <!--Defines the maximum number of adjacent hits which can be merged-->
+    <parameter name="MaxClusterSizeForMerge" type="int">3 </parameter>
+    <!--Number of Effective electrons per pad in TPC-->
+    <parameter name="N_eff" type="int">22 </parameter>
+    <!--Pad Phi Resolution constant in TPC-->
+    <parameter name="PointResolutionPadPhi" type="float">0.9 </parameter>
+    <!--R-Phi Resolution constant in TPC-->
+    <parameter name="PointResolutionRPhi" type="float">0.05 </parameter>
+    <!--TPC Z Resolution Coefficent independent of diffusion-->
+    <parameter name="PointResolutionZ" type="float">0.4 </parameter>
+    <!--whether or not to use hits without proper cell ID (pad row)-->
+    <parameter name="RejectCellID0" type="int">1 </parameter>
+    <!--Name of the LowPt SimTrackerHit collection Produced by Mokka TPC Driver TPC0X-->
+    <parameter name="TPCLowPtCollectionName" type="string" lcioInType="SimTrackerHit">TPCLowPtCollection </parameter>
+    <!--Name of the default pad-row based SimTrackerHit collection-->
+    <parameter name="TPCPadRowHitCollectionName" type="string" lcioInType="SimTrackerHit">TPCCollection </parameter>
+    <!--Name of the additional space point collection which provides additional guide hits between pad row centers.-->
+    <parameter name="TPCSpacePointCollectionName" type="string" lcioInType="SimTrackerHit">TPCSpacePointCollection </parameter>
+    <!--Name of the Output TrackerHit collection-->
+    <parameter name="TPCTrackerHitsCol" type="string" lcioOutType="TrackerHit"> TPCTrackerHits </parameter>
+    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+    <parameter name="Verbosity" type="string"> MESSAGE </parameter>
+  </processor>
  <processor name="MyTPCDigiProcessor" type="TPCDigiProcessor">
-   <!--Produces TPC TrackerHit collection from SimTrackerHit collection, smeared in RPhi and Z. A search is made for adjacent hits on a pad row, if they are closer in z and r-phi than the steering parameters _doubleHitResRPhi (default value 2.0 mm) and _doubleHitResZ (default value 5.0 mm) they are considered to overlap. Clusters of hits smaller than _maxMerge (default value 3) are merged into a single tracker hit, with the position given as the average poision of the hits in phi and in z. Clusters which have _maxMerge hits or more are determined to be identifiable as multiple hits, and are not added to the tracker hit collection. This of course means that good hits caught up in a cluster of background hits will be lossed.-->
-   <!--R-Phi Diffusion Coefficent in TPC-->
-   <parameter name="DiffusionCoeffRPhi" type="float">0.025 </parameter>
-   <!--Z Diffusion Coefficent in TPC-->
-   <parameter name="DiffusionCoeffZ" type="float">0.08 </parameter>
-   <!--Defines the minimum distance for two seperable hits in RPhi-->
-   <parameter name="DoubleHitResolutionRPhi" type="float">2 </parameter>
-   <!--Defines the minimum distance for two seperable hits in Z-->
-   <parameter name="DoubleHitResolutionZ" type="float">5 </parameter>
-   <!--Defines spatial slice in RP-->
-   <parameter name="HitSortingBinningRPhi" type="float">2 </parameter>
-   <!--Defines spatial slice in Z-->
-   <parameter name="HitSortingBinningZ" type="float">5 </parameter>
-   <!--Defines the maximum number of adjacent hits which can be merged-->
-   <parameter name="MaxClusterSizeForMerge" type="int">3 </parameter>
-   <!--Number of Effective electrons per pad in TPC-->
-   <parameter name="N_eff" type="int">22 </parameter>
-   <!--Pad Phi Resolution constant in TPC-->
-   <parameter name="PointResolutionPadPhi" type="float">0.9 </parameter>
-   <!--R-Phi Resolution constant in TPC-->
-   <parameter name="PointResolutionRPhi" type="float">0.05 </parameter>
-   <!--TPC Z Resolution Coefficent independent of diffusion-->
-   <parameter name="PointResolutionZ" type="float">0.4 </parameter>
-   <!--whether or not to use hits without proper cell ID (pad row)-->
-   <parameter name="RejectCellID0" type="int">1 </parameter>
-   <!--Name of the LowPt SimTrackerHit collection Produced by Mokka TPC Driver TPC0X-->
-   <parameter name="TPCLowPtCollectionName" type="string" lcioInType="SimTrackerHit">TPCLowPtCollection </parameter>
-   <!--Name of the default pad-row based SimTrackerHit collection-->
-   <parameter name="TPCPadRowHitCollectionName" type="string" lcioInType="SimTrackerHit">TPCCollection </parameter>
-   <!--Name of the additional space point collection which provides additional guide hits between pad row centers.-->
-   <parameter name="TPCSpacePointCollectionName" type="string" lcioInType="SimTrackerHit">TPCSpacePointCollection </parameter>
-   <!--Name of the Output TrackerHit collection-->
-   <parameter name="TPCTrackerHitsCol" type="string" lcioOutType="TrackerHit"> TPCTrackerHits </parameter>
-   <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
-   <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">TPCTrackerHitRelations </parameter>
-   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-   <!--parameter name="Verbosity" type="string"> MESSAGE </parameter-->
- </processor>
+ <!--Produces TPC TrackerHit collection from SimTrackerHit collection, smeared in RPhi and Z. A search is made for adjacent hits on a pad row, if they are closer in z and r-phi than the steering parameters _doubleHitResRPhi (default value 2.0 mm) and _doubleHitResZ (default value 5.0 mm) they are considered to overlap. Clusters of hits smaller than _maxMerge (default value 3) are merged into a single tracker hit, with the position given as the average poision of the hits in phi and in z. Clusters which have _maxMerge hits or more are determined to be identifiable as multiple hits, and are not added to the tracker hit collection. This of course means that good hits caught up in a cluster of background hits will be lossed.-->
+  <!--R-Phi Diffusion Coefficent in TPC-->
+  <parameter name="DiffusionCoeffRPhi" type="float">0.025 </parameter>
+  <!--Z Diffusion Coefficent in TPC-->
+  <parameter name="DiffusionCoeffZ" type="float">0.08 </parameter>
+  <!--Defines the minimum distance for two seperable hits in RPhi-->
+  <parameter name="DoubleHitResolutionRPhi" type="float">2 </parameter>
+  <!--Defines the minimum distance for two seperable hits in Z-->
+  <parameter name="DoubleHitResolutionZ" type="float">5 </parameter>
+  <!--Defines spatial slice in RP-->
+  <parameter name="HitSortingBinningRPhi" type="float">2 </parameter>
+  <!--Defines spatial slice in Z-->
+  <parameter name="HitSortingBinningZ" type="float">5 </parameter>
+  <!--Defines the maximum number of adjacent hits which can be merged-->
+  <parameter name="MaxClusterSizeForMerge" type="int">3 </parameter>
+  <!--Number of Effective electrons per pad in TPC-->
+  <parameter name="N_eff" type="int">22 </parameter>
+  <!--Pad Phi Resolution constant in TPC-->
+  <parameter name="PointResolutionPadPhi" type="float">0.9 </parameter>
+  <!--R-Phi Resolution constant in TPC-->
+  <parameter name="PointResolutionRPhi" type="float">0.05 </parameter>
+  <!--TPC Z Resolution Coefficent independent of diffusion-->
+  <parameter name="PointResolutionZ" type="float">0.4 </parameter>
+  <!--whether or not to use hits without proper cell ID (pad row)-->
+  <parameter name="RejectCellID0" type="int">1 </parameter>
+  <!--Name of the LowPt SimTrackerHit collection Produced by Mokka TPC Driver TPC0X-->
+  <parameter name="TPCLowPtCollectionName" type="string" lcioInType="SimTrackerHit">TPCLowPtCollection </parameter>
+  <!--Name of the default pad-row based SimTrackerHit collection-->
+  <parameter name="TPCPadRowHitCollectionName" type="string" lcioInType="SimTrackerHit">TPCCollection </parameter>
+  <!--Name of the additional space point collection which provides additional guide hits between pad row centers.-->
+  <parameter name="TPCSpacePointCollectionName" type="string" lcioInType="SimTrackerHit">TPCSpacePointCollection </parameter>
+  <!--Name of the Output TrackerHit collection-->
+  <parameter name="TPCTrackerHitsCol" type="string" lcioOutType="TrackerHit"> TPCTrackerHits </parameter>
+  <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
+  <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">TPCTrackerHitRelations </parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <!--parameter name="Verbosity" type="string"> MESSAGE </parameter-->
+</processor>
+  
+  
   
   <processor name="MyClupatraProcessor" type="ClupatraProcessor">
     <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
     <parameter name="Verbosity" type="string">DEBUG5 </parameter>
-    
     <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
     <!--the maximum chi2-distance for which a hit is considered for merging -->
     <parameter name="Chi2Cut" type="float">100 </parameter>
@@ -710,7 +764,7 @@
  
       ClupatraTrackSegments 0 4 16
 
-      ClupatraPoorQualityTracks 0 4 17
+      RefittedClupatraTracks 0 4 17
 
       MarlinTrkTracks 2 20 18
       ClupatraTracks 0 6 19
@@ -761,39 +815,25 @@
     <!--parameter name="SplitFileSizekB" type="int" value="1992294"/-->
   </processor>
 
-  <processor name="MyRefitProcessor" type="RefitProcessor">
-    <!--RefitProcessor refits an input track collection, producing a new collection of tracks.-->
-    <!--Use Energy Loss in Fit-->
-    <parameter name="EnergyLossOn" type="bool">false true </parameter>
-    <!--Name of the input track collection-->
-    <parameter name="InputTrackCollectionName" type="string" lcioInType="Track">ClupatraDebugTracks</parameter>
-    
-    <!--Name of the MCParticle-Track Relations collection for input tracks-->
-    <parameter name="InputTrackRelCollection" type="string" lcioInType="LCRelation">TruthTracksMCP </parameter>
-    <!--Use MultipleScattering in Fit-->
-    <parameter name="MultipleScatteringOn" type="bool">false true </parameter>
-    <!--Name of the output track collection-->
-    <parameter name="OutputTrackCollectionName" type="string" lcioOutType="Track">RefittedTracks </parameter>
-    <!--Name of the MCParticle-Track Relations collection for output tracks-->
-    <parameter name="OutputTrackRelCollection" type="string" lcioOutType="LCRelation">RefittedTracksMCP </parameter>
-    <!--Smooth All Mesurement Sites in Fit-->
-    <parameter name="SmoothOn" type="bool">false </parameter>
-    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
-    <parameter name="Verbosity" type="string">DEBUG </parameter>
-  </processor>
-  
+<processor name="MyRefitProcessor" type="RefitProcessor">
+ <!--RefitProcessor refits an input track collection, producing a new collection of tracks.-->
+  <!--Use Energy Loss in Fit-->
+  <parameter name="EnergyLossOn" type="bool"> true </parameter>
+  <!--Name of the input track collection-->
+  <parameter name="InputTrackCollectionName" type="string" lcioInType="Track">ClupatraTracks</parameter>
 
- <processor name="DebugOutput" type="LCIOOutputProcessor">
-    <parameter name="DropCollectionNames" type="StringVec">
-      ClupatraUnUsedTPCHits ClupatraUsedTPCHits
-   </parameter>
-
-    <parameter name="DropCollectionTypes" type="StringVec">  Track                </parameter>
-    <parameter name="KeepCollectionNames" type="StringVec">  ClupatraDebugTracks  </parameter>
-
-    <parameter name="LCIOOutputFile" type="string" value="debug.slcio" />
-    <!--write mode for output file:  WRITE_APPEND or WRITE_NEW-->
-    <parameter name="LCIOWriteMode" type="string" value="WRITE_NEW" />
+  <!--Name of the MCParticle-Track Relations collection for input tracks-->
+  <parameter name="InputTrackRelCollection" type="string" lcioInType="LCRelation">TruthTracksMCP </parameter>
+  <!--Use MultipleScattering in Fit-->
+  <parameter name="MultipleScatteringOn" type="bool"> true </parameter>
+  <!--Name of the output track collection-->
+  <parameter name="OutputTrackCollectionName" type="string" lcioOutType="Track">RefittedClupatraTracks </parameter>
+  <!--Name of the MCParticle-Track Relations collection for output tracks-->
+  <parameter name="OutputTrackRelCollection" type="string" lcioOutType="LCRelation">RefittedTracksMCPXX </parameter>
+  <!--Smooth All Mesurement Sites in Fit-->
+  <parameter name="SmoothOn" type="bool">false </parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">MESSAGE DEBUG </parameter>
 </processor>
 
 

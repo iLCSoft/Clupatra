@@ -144,6 +144,9 @@ namespace clupatra_new{
   void addToHitListVector( First first, Last last, HitListVector& hLV ){
     
     while( first != last ){
+
+      streamlog_out( DEBUG ) << "  add hit << "  <<   *first << " to layer " <<  (*first)->first->layer  << std::endl ;
+
       hLV[ (*first)->first->layer ].push_back( *first )  ;
       ++first ;
     }
@@ -275,65 +278,8 @@ namespace clupatra_new{
       _ts( ts ) , 
       _maxChi2Increment(maxChi2Increment) {}
     
-    MarlinTrk::IMarlinTrack* operator() (CluTrack* clu) {  
-      
-      MarlinTrk::IMarlinTrack* trk = _ts->createTrack();
-      
-      if( clu->empty()  ){
 
-	streamlog_out( ERROR ) << " IMarlinTrkFitter::operator() : cannot fit empty cluster track ! " << std::endl ;
-
-	return trk ;
-      }
-
-      clu->ext<MarTrk>() = trk ;
-      
-      clu->sort( LayerSortOut() ) ;
-            
-      // need to reverse the order for incomming track segments (curlers)
-      // assume particle comes from IP
-      Hit* hf = clu->front() ;
-      Hit* hb = clu->back() ;
-      
-      bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
-      
-      if( reverse_order ){
-	
-	for( CluTrack::reverse_iterator it=clu->rbegin() ; it != clu->rend() ; ++it){   
-	  
-	  trk->addHit( (*it)->first->lcioHit  ) ; 
-	  
-	  //	  streamlog_out( DEBUG ) <<  "   hit  added  " <<  *(*it)->first->lcioHit   << std::endl ;
-	}
-	
-	trk->initialise( MarlinTrk::IMarlinTrack::forward ) ;
-
-      } else {
-	
-	for( CluTrack::iterator it=clu->begin() ; it != clu->end() ; ++it){   
-	  
-	  trk->addHit( (*it)->first->lcioHit   ) ; 
-	  
-	  //streamlog_out( DEBUG ) <<  "   hit  added  "<<  *(*it)->first->lcioHit   << std::endl ;
-	}
-
-	trk->initialise( MarlinTrk::IMarlinTrack::backward ) ;
-      }
-
-
-      int code = trk->fit(_maxChi2Increment) ;
-
-      if( code != MarlinTrk::IMarlinTrack::success ){
-	
-	streamlog_out( DEBUG5 ) << "  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMarlinTrkFitter :  problem fitting track "
-				<< " error code : " << MarlinTrk::errorCode( code ) 
-				<< std::endl ; 
-
-      }
-      
-
-      return trk;
-    }
+    MarlinTrk::IMarlinTrack* operator() (CluTrack* clu) ;
   };
 
   //-------------------------------------------------------------------------------------
@@ -342,7 +288,8 @@ namespace clupatra_new{
    *  Hits are added if the resulting delta Chi2 is less than dChiMax - a maxStep is the maximum number of steps (layers) w/o 
    *  successfully merging a hit.
    */
-  int addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, ZIndex& zIndex,  bool backward=false) ; 
+  int addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChiMax, double chi2Cut, unsigned maxStep, ZIndex& zIndex,  bool backward=false, 
+			MarlinTrk::IMarlinTrkSystem* trkSys=0) ; 
   //------------------------------------------------------------------------------------------
   
   /** Try to add a hit from the given HitList in layer of subdetector to the track.

@@ -42,6 +42,35 @@
 
  =============================================================================================================
   --------
+ | v00-09 |
+  --------
+
+     - apply a refit with larger maximum chi2 increment to tracks that have only
+       a small number of hits used (IMarlinTrkFitter::operator())
+
+     - drop poor seed clusters with no hits added except in the very forward (inner) region
+
+     - clupatra_new: added optional  argument TrkSystem* to addHitsAndFilter();
+       if given, the smoothed TrackState is used for backward extrapolation;
+       => not currently used, i.e. the last filtered  TrackStae is used
+       ( this should give better results than the previous version that
+         used the filtered TrackState at the 4th hit )    
+
+     - don't set quality bit on tracker hit: ILDTrkHitQualityBit::USED_IN_FIT anymore,
+       as this won't work on pre-digitized files (and is not unique wrt other pat rec code)
+
+     - added DebugDigiProcessor :
+       takes TrackerHits from a collection of Tracks (e.g. previously written 
+       as ClupatraPoorTrackCollection ) and writes them into new Collections
+       ( according to subdetID )
+       -> see ./example/clupa_debug.xml
+
+    -  added debug method printAndSaveTrack() to Clupatra:
+       allows to store a collection of Tracks selected through picking in CED
+ 
+    -  added doxygen documentation of parameters in ClupatraProcessor.h
+
+  --------
  | v00-08 |
   --------
     - changed order of hits in track and hits in fit

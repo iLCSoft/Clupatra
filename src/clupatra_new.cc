@@ -1,6 +1,4 @@
 #include "clupatra_new.h"
-#include "gear/GEAR.h"
-
 #include <set>
 #include <vector>
 
@@ -13,9 +11,11 @@
 #include "marlin/Global.h"
 #include "gear/TPCParameters.h"
 #include "gear/PadRowLayout2D.h"
-//#include "gear/BField.h"
+
+#include "gear/BField.h"
 
 #include "IMPL/TrackerHitImpl.h"
+#include "IMPL/TrackStateImpl.h"
 
 using namespace MarlinTrk ;
 
@@ -71,9 +71,13 @@ namespace clupatra_new{
   //-------------------------------------------------------------------------------
   
 
-  int addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, ZIndex& zIndex, bool backward) {
+  int addHitsAndFilter( CluTrack* clu, HitListVector& hLV , double dChi2Max, double chi2Cut, unsigned maxStep, ZIndex& zIndex, bool backward, 
+			MarlinTrk::IMarlinTrkSystem* trkSys ) {
     
+
     int nHitsAdded = 0 ;
+
+    const double bfield = marlin::Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
 
     const int maxTPCLayerID  = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
    
@@ -103,26 +107,60 @@ namespace clupatra_new{
     UTIL::BitField64 encoder( UTIL::ILDCellID0::encoder_string ) ; 
     encoder[UTIL::ILDCellID0::subdet] = UTIL::ILDDetID::TPC ;
     
-
-    
     EVENT::TrackerHit* firstHit =  0 ; 
 
-    if( backward ) {
+    IMarlinTrack* bwTrk = 0 ;
+
+    if( trkSys && backward  ) { //==================== only active if called with _trkSystem pointer ============================
 
       // need to go back in cluster until 4th hit from the start 
       CluTrack::iterator it =  clu->begin() , end = clu->end() ;
-      for( int i=0 ; it != end && i<3 ;  ++it , ++i  ) ;
+      int i=0 ;
+      for(     ; it++ != end && i< 3 ;  ++i  ) ;
+
+      if( it == end ) --it ;
+
+      streamlog_out( DEBUG2  ) <<  " ---- addHitsAndFilter : will smooth back to " << i <<"th  hit - size of clu " << clu->size() << std::endl ;
+
+      if( !  (*it)->first ){
+
+	streamlog_out( ERROR ) << " ---- addHitsAndFilter : null pointer at i-th hit : i = " << i << std::endl ;
+	return nHitsAdded ;
+      }
+
 
       firstHit = (*it)->first->lcioHit ;
 
       int smoothed  = trk->smooth( firstHit ) ;
-      //int smoothed  = trk->smooth() ;
 
-     streamlog_out( DEBUG2 ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) << std::endl ;
+      double chi2 ;
+      int ndf  ;
+      IMPL::TrackStateImpl ts ; 
+      trk->getTrackState( firstHit , ts, chi2,  ndf ) ;
+      
+      streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): smoothed track segment : " <<  MarlinTrk::errorCode( smoothed ) 
+			      <<  " using track state : " <<   ts 
+			      <<  " ---- chi2: " << chi2 
+			      <<  "  ndf " << ndf 
+			      << std::endl ;
+
+ 
+
+      //      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
+      bwTrk = trkSys->createTrack()  ;
+
+      //need to add a dummy hit to the track
+      bwTrk->addHit(  firstHit  ) ; // use the hit we smoothed back to
+      
+      // note: backward here is forward in the MarlinTrk sense, ie. in direction of energy loss
+      bwTrk->initialise( ts ,  bfield ,  MarlinTrk::IMarlinTrack::forward ) ;
 
     }
 
-    
+
+    IMarlinTrack* theTrk  = ( bwTrk ? bwTrk : trk )  ;
+
+
     while( step < maxStep + 1 ) {
       
       layer += ( backward ?  +1 : -1 )  ;
@@ -145,16 +183,15 @@ namespace clupatra_new{
       int mode =  IMarlinTrack::modeClosest ;
 
 
-
       int intersects = -1  ;
       
       if( firstHit )  {
 
-	intersects  = trk->intersectionWithLayer( layerID, firstHit, xv, elementID , mode ) ; 
-
+	intersects  = theTrk->intersectionWithLayer( layerID, firstHit, xv, elementID , mode )   ; 
+	
       } else {
-
-	intersects  = trk->intersectionWithLayer( layerID, xv, elementID , mode ) ; 
+	
+	intersects  = theTrk->intersectionWithLayer( layerID, xv, elementID , mode )  ; 
       }
 
 
@@ -175,7 +212,7 @@ namespace clupatra_new{
 	double ch2Min = 1.e99 ;
 	Hit* bestHit = 0 ;
 
-	streamlog_out( DEBUG2 ) <<  "      -- number of hits on layer " << layer << " : " << hLL.size() << std::endl ; 
+	streamlog_out( DEBUG3 ) <<  "      -- number of hits on layer " << layer << " : " << hLL.size() << std::endl ; 
 
 	for( HitList::const_iterator ih = hLL.begin(), end = hLL.end() ; ih != end ; ++ih ){    
 	  
@@ -192,11 +229,9 @@ namespace clupatra_new{
  	  }
  	}//-------------------------------------------------------------------
 	
-
-	
  	if( bestHit != 0 ){
 	  
-	  streamlog_out( DEBUG2 ) <<   " ************ bestHit "  << bestHit 
+	  streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
 				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
 				  <<   " chi2: " <<  ch2Min 
 				  <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
@@ -207,29 +242,26 @@ namespace clupatra_new{
 	    
 	    double deltaChi = 0. ;  
 	    
-	    int addHit = trk->addAndFit( bestHit->first->lcioHit, deltaChi, dChi2Max ) ;
+	    int addHit =  theTrk->addAndFit( bestHit->first->lcioHit, deltaChi, dChi2Max )  ;
 	    
 	    
 	    
-	    streamlog_out( DEBUG2 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
-				   <<   " dist: " <<  (  hPos - xv ).r()
-				   <<   " chi2: " <<  ch2Min 
-				   <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
-									  + bestHit->first->lcioHit->getCovMatrix()[2] ) 
-				   <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
-				   << std::endl ;
+	    streamlog_out( DEBUG3 ) <<   " *****       assigning left over hit : " << errorCode( addHit )  //<< hPos << " <-> " << xv
+				    <<   " dist: " <<  (  hPos - xv ).r()
+				    <<   " chi2: " <<  ch2Min 
+				    <<   "  hit errors :  rphi=" <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[0] 
+									   + bestHit->first->lcioHit->getCovMatrix()[2] ) 
+				    <<	 "  z= " <<  sqrt( bestHit->first->lcioHit->getCovMatrix()[5] )
+				    <<   "  ----- deltaChi = " << deltaChi
+				    << std::endl ;
 	    
 	    
-
-
-
 	    if( addHit  == IMarlinTrack::success ) {
-
+	      
 	      hitAdded = true ;
 	      
 	      hLL.remove(  bestHit ) ;
 	      clu->addElement( bestHit ) ;
-	      
 	      
 	      firstHit = 0 ; // after we added a hit, the next intersection search should use this last hit...
 	      
@@ -252,6 +284,8 @@ namespace clupatra_new{
 
     } // while step < maxStep
   
+
+    if( bwTrk ) delete bwTrk ;
 
     return nHitsAdded ;
 
@@ -939,7 +973,101 @@ namespace clupatra_new{
   // }
 
 
-  // //------------------------------------------------------------------------------------------------------------------------- 
+  //------------------------------------------------------------------------------------------------------------------------- 
+
+  MarlinTrk::IMarlinTrack* IMarlinTrkFitter::operator() (CluTrack* clu) {  
+    
+    bool isFirstFit = true ;
+    double maxChi2  =  _maxChi2Increment   ;
+    
+  start:
+    
+    MarlinTrk::IMarlinTrack* trk = _ts->createTrack();
+    
+    //if( clu->empty()  ){
+    if( clu->size() < 3  ){
+      
+      streamlog_out( ERROR ) << " IMarlinTrkFitter::operator() : cannot fit cluster track with less than 3 hits ! " << std::endl ;
+      
+      return trk ;
+    }
+    
+    clu->ext<MarTrk>() = trk ;
+    
+    clu->sort( LayerSortOut() ) ;
+    
+    // need to reverse the order for incomming track segments (curlers)
+    // assume particle comes from IP
+    Hit* hf = clu->front() ;
+    Hit* hb = clu->back() ;
+    
+    bool reverse_order =   ( std::abs( hf->first->pos.z() ) > std::abs( hb->first->pos.z()) + 3. ) ;
+    
+    unsigned nHit = 0 ;
+
+    if( reverse_order ){
+      
+      for( CluTrack::reverse_iterator it=clu->rbegin() ; it != clu->rend() ; ++it){   
+	
+	trk->addHit( (*it)->first->lcioHit  ) ; 
+	++nHit ;
+
+	streamlog_out( DEBUG1 ) <<  "   hit  added  " <<  *(*it)->first->lcioHit   << std::endl ;
+      }
+      
+      trk->initialise( MarlinTrk::IMarlinTrack::forward ) ;
+      
+    } else {
+      
+      for( CluTrack::iterator it=clu->begin() ; it != clu->end() ; ++it){   
+	
+	trk->addHit( (*it)->first->lcioHit   ) ; 
+	++nHit ;
+	
+	streamlog_out( DEBUG1 ) <<  "   hit  added  "<<  *(*it)->first->lcioHit   << std::endl ;
+      }
+      
+      trk->initialise( MarlinTrk::IMarlinTrack::backward ) ;
+    }
+    
+    
+    int code = trk->fit(  maxChi2  ) ;
+    
+    if( code != MarlinTrk::IMarlinTrack::success ){
+      
+      streamlog_out( ERROR ) << "  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMarlinTrkFitter :  problem fitting track "
+			     << " error code : " << MarlinTrk::errorCode( code ) 
+			     << std::endl ; 
+      
+    }
+    
+
+    //----- if the fit did not fail but has a small number of hits used,
+    //      we try again one more time with a larger max-chi2-increment
+    
+    std::vector<std::pair<EVENT::TrackerHit*, double> > hitsInFit ;
+    trk->getHitsInFit( hitsInFit ) ;
+
+    if( isFirstFit  && ( 1.*hitsInFit.size()) / (1.*nHit )  <  0.2  ) {  // fixme: parameter  
+      
+      isFirstFit = false ;
+      
+      maxChi2 =  2. * _maxChi2Increment  ;
+      
+      streamlog_out( DEBUG4 ) << "  >>>>>>  IMarlinTrkFitter :  small number of hits used in fit " << hitsInFit.size() << "/" << nHit << " = " 
+			      << ( 1.*hitsInFit.size()) / (1.*nHit )  << " refit with larger max chi2 increment:  " << maxChi2 <<  std::endl ;
+      delete trk ;
+
+      goto start ;   // ;-)
+    }
+    //----------------------------------------------------------------------
+
+    return trk;
+  }
+  
+  
+  //---------------------------------------------------------------------------------------------------------------------------
+
   // //std::pair<CluTrack*, CluTrack* > create_two_clusters( CluTrack& clu,  HitVec& hV,  int maxLayerID){
   // void create_two_clusters( const HitVec& hV, CluTrackVec& cluVec,  int maxLayerID) {
 
@@ -958,8 +1086,8 @@ namespace clupatra_new{
     for( CluTrack::iterator hi = c->begin(); hi != c->end() ; hi++) {
       
       // reset outliers (not used in fit)  bit
-      IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> (  (*hi)->first->lcioHit )  ;
-      thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 0 )  ;
+      //      IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> (  (*hi)->first->lcioHit )  ;
+      //      thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 0 )  ;
 
       trk->addHit(  (*hi)->first->lcioHit ) ;
       e += (*hi)->first->lcioHit->getEDep() ;
@@ -990,8 +1118,8 @@ namespace clupatra_new{
 	  
 	  hitsInFit[i].first->ext<DChi2>() = hitsInFit[i].second ;
 	  
-	  IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( hitsInFit[i].first ) ;
-	  thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 1 )  ;
+	  //IMPL::TrackerHitImpl* thi = dynamic_cast<IMPL::TrackerHitImpl*> ( hitsInFit[i].first ) ;
+	  //thi->setQualityBit( UTIL::ILDTrkHitQualityBit::USED_IN_FIT , 1 )  ;
 	}
 	
 	lcio::TrackStateImpl* tsIP =  new lcio::TrackStateImpl ;
@@ -1086,13 +1214,18 @@ namespace clupatra_new{
 	trk->setChi2( chi2 ) ;
 	trk->setNdf( ndf ) ;
 
+      } else {
+
+	streamlog_out( WARNING ) << "  >>>>>>>>>>> LCIOTrackConverter::operator()  -  hitsInFitEmpty ! - nHits " << nHit << std::endl ;
       }
-
+      
     } else {
-	  
-      //	streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter::operator() (CluTrack* c)  :  no MarlinTrk::IMarlinTrack* found for cluster !!?? " << std::endl ; 
+      
+      // this is not an error  for debug collections that just consist of track hits (no fit ) 
+      // streamlog_out( ERROR ) << "  >>>>>>>>>>> LCIOTrackConverter::operator() (CluTrack* c)  :  "
+      // 			     << " no MarlinTrk::IMarlinTrack* found for cluster !!?? " << std::endl ; 
     }
-
+    
 
     return trk ;
   }
