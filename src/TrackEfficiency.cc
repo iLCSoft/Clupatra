@@ -287,17 +287,23 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   //=========================================================================================================================
 
 
-  LCCollection* relCol = 0 ;
+  LCCollection* m2tCol = 0 ;
   try{
-    
-    relCol = evt->getCollection( _m2tColName ) ;
+    m2tCol = evt->getCollection( _m2tColName ) ;
   }
   catch( lcio::DataNotAvailableException& e){
-
-    streamlog_out( DEBUG ) << " *** collection not ine event : " << _m2tColName << std::endl ;
+    streamlog_out( DEBUG ) << " *** collection not in event : " << _m2tColName << std::endl ;
     return ; // nothing to do in this event (no tracks)
-    
   }
+  LCCollection* t2mCol = 0 ;
+  try{
+    t2mCol = evt->getCollection( _t2mColName ) ;
+  }
+  catch( lcio::DataNotAvailableException& e){
+    streamlog_out( DEBUG ) << " *** collection not in event : " << _t2mColName << std::endl ;
+    return ; // nothing to do in this event (no tracks)
+  }
+
 
   LCCollection* trkCol = 0 ;
   try{
@@ -318,8 +324,9 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   }
 
 
-  LCRelationNavigator nav( relCol  ) ;
-  
+  LCRelationNavigator navm2t( m2tCol  ) ;
+  LCRelationNavigator navt2m( t2mCol  ) ;
+
 
   LCIterator<MCParticle> mcpIt( evt, _mcpColName ) ;
   
@@ -396,7 +403,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     // APPLY_CUT( DEBUG, cut,  isVzero    ) ;   // start at IP+/-10cm
     // ==== vzeros =========
 
-    APPLY_CUT( DEBUG, cut, e.rho()==0.0  || e.rho() > 10.   ) ; // end at rho > 40 cm
+    APPLY_CUT( DEBUG, cut, e.rho()==0.0  || e.rho() > 40.   ) ; // end at rho > 40 cm
 
     APPLY_CUT( DEBUG, cut, p.rho() > .1 ) ; //FIXME 1. Gev <->  pt> 100 MeV
 
@@ -479,8 +486,11 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     h.fill( hcosth_t , costhmcp ) ;
     h.fill( hacth_t , std::abs( costhmcp) ) ;
     
-    //    const EVENT::LCObjectVec& trkV = nav.getRelatedFromObjects( trm ) ;
-    const EVENT::LCObjectVec& trkV = nav.getRelatedToObjects( trm ) ;
+
+  
+    bool useT2M = true ;
+
+    const EVENT::LCObjectVec& trkV = ( useT2M ?   navt2m.getRelatedFromObjects( trm ) :   navm2t.getRelatedToObjects( trm )  ); 
     
     //    std::cout <<  " ------   trkV.size()  : " << trkV.size()  << std::endl ;
 
@@ -488,10 +498,9 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
     if( trkV.size() >  0 ){
       
-      //      LCUTIL::LCTypedVector<Track*> trks( trkV ) ;
-      
-      //      const FloatVec& wV = nav.getRelatedFromWeights( trm ) ;
-      const FloatVec& wV = nav.getRelatedToWeights( trm ) ;
+
+      const FloatVec& wV =  ( useT2M ?  navt2m.getRelatedFromWeights( trm ) :  navm2t.getRelatedToWeights( trm ) ) ;
+
       double wMax = 0.0 ;
       int iMax = 0 ;
 
@@ -570,7 +579,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
       double goodHitFraction = wMax ;
       
-      //        APPLY_CUT( DEBUG4, cut,  goodHitFraction > minGoodHitFraction  ) ;
+      APPLY_CUT( DEBUG4, cut,  goodHitFraction > minGoodHitFraction  ) ;
       //	APPLY_CUT( DEBUG4, cut,  nSplitSegments < 2 ) ;  // don't count split tracks as found....
       
       //      std::cout   << " ========= track  found ?  -> " << cut << lcshort( trm ) << std::endl ;
