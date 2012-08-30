@@ -12,7 +12,10 @@ using namespace marlin ;
 
 class TH1 ;
 
-/** Analysis plots for Tracks.
+/** Analysis plots for tracking efficiency.
+ * 
+ *  @author F.Gaede, DESY
+ *  @version $Id$ 
  */
 class TrackEfficiency : public Processor {
   

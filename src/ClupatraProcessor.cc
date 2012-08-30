@@ -1395,6 +1395,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     float r_inner = _padLayout->getPlaneExtent()[0] ;
     float r_outer = _padLayout->getPlaneExtent()[1] ;
 
+
     for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
       
 
@@ -1536,9 +1537,12 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   if(  parameterSet( "SITHitCollection" ) ) {
     
     LCIterator<TrackerHit> it( evt, _sitColName ) ;
+    
+    streamlog_out( DEBUG2  ) << " --  pickUpSiTrackerHits - read SIT hits from collection " <<  _sitColName << "  with size = " << it->getNumberOfElements() << "\n" ;
+
     while( TrackerHit* hit = it.next()  ){
 
-      streamlog_out( DEBUG3  ) << "     adding SIT space point hit : " << hit << std::endl ;
+      streamlog_out( DEBUG0  ) << "     adding SIT space point hit to map : " << hit << std::endl ;
 
       hLMap[ hit->getCellID0() ].push_back(  hit ) ;
     }    
@@ -1548,6 +1552,8 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     LCIterator<TrackerHit> it( evt, _vxdColName ) ;
     while( TrackerHit* hit = it.next()  ){
       
+      streamlog_out( DEBUG0  ) << "     adding VXD point hit to map : " << hit << std::endl ;
+
       hLMap[ hit->getCellID0() ].push_back(  hit ) ;
     }    
   }

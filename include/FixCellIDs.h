@@ -17,7 +17,7 @@ using namespace marlin ;
  * @param CollectionName Name of the TrackerHit collection
  * 
  * @author F. Gaede, DESY
- * @version $Id:$
+ * @version $Id$
  */
 
 class FixCellIDs : public Processor, public EventModifier {

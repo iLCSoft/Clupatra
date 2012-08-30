@@ -10,7 +10,7 @@
 /** Nearest neighbour type clusering for arbitrary types.
  *
  *  @author F.Gaede (DESY)
- *  @version $Id: NNClusterer.h 2468 2011-09-06 07:55:04Z gaede $
+ *  @version $Id$
  */
 namespace nnclu {
   
@@ -33,7 +33,7 @@ namespace nnclu {
    *  
    *  @see Cluster
    *  @author F.Gaede (DESY)
-   *  @version $Id:$
+   *  @version $Id$
    */
   template <class T>
   class Element : public  std::pair< T*, Cluster<T>* >{
@@ -119,7 +119,7 @@ namespace nnclu {
    * 
    *  @see Element
    *  @author F.Gaede (DESY)
-   *  @version $Id:$
+   *  @version $Id$
    */
   template <class T >
   class Cluster : public std::list< Element<T> * >, public lcrtrel::LCRTRelations {
@@ -206,7 +206,7 @@ namespace nnclu {
   /** Main class for a nearest neighbour type clustering. 
    * 
    *  @author F.Gaede (DESY)
-   *  @version $Id:$
+   *  @version $Id$
    */
   class NNClusterer{
 

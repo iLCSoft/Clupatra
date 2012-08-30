@@ -21,7 +21,7 @@ using namespace marlin ;
  * @parameter SubDetectorIDs                            The IDs of the subdetectors corresponding to the hit collections in TrackerHitCollectionNames
  * 
  * @author F.Gaede, DESY
- * @version $Id:$ 
+ * @version $Id$ 
  */
 class DebugDigiProcessor : public Processor, public EventModifier {
   
