@@ -1278,16 +1278,16 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	const TrackState* ts = 0 ; 
 	ts = firstTrk->getTrackState( lcio::TrackState::AtIP  ) ;
-	if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	if( ts ) trk->addTrackState( new TrackStateImpl( *ts )  ) ;
 	
 	ts = firstTrk->getTrackState( lcio::TrackState::AtFirstHit  ) ;
-	if( ts ) 	trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	if( ts ) 	trk->addTrackState( new TrackStateImpl( *ts )  ) ;
 	
 	ts = lastTrk->getTrackState( lcio::TrackState::AtLastHit  ) ;
-	if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	if( ts ) trk->addTrackState( new TrackStateImpl( *ts )  ) ;
 	
 	ts = lastTrk->getTrackState( lcio::TrackState::AtCalorimeter  ) ;
-	if( ts ) trk->addTrackState( new TrackStateImpl( ts )  ) ;
+	if( ts ) trk->addTrackState( new TrackStateImpl( *ts )  ) ;
 	
 	
 	trk->ext<MarTrk>() = firstTrk->ext<MarTrk>() ;
