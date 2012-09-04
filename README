@@ -70,6 +70,8 @@
  
     -  added doxygen documentation of parameters in ClupatraProcessor.h
 
+    -  Updated for new lcio TrackState copy constructor taking const reference.
+
   --------
  | v00-08 |
   --------
