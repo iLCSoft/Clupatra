@@ -1068,12 +1068,7 @@ namespace clupatra_new{
   
   //---------------------------------------------------------------------------------------------------------------------------
 
-  // //std::pair<CluTrack*, CluTrack* > create_two_clusters( CluTrack& clu,  HitVec& hV,  int maxLayerID){
-  // void create_two_clusters( const HitVec& hV, CluTrackVec& cluVec,  int maxLayerID) {
-
- 
-  
-  lcio::Track* LCIOTrackConverter::operator() (CluTrack* c) {  
+   lcio::Track* LCIOTrackConverter::operator() (CluTrack* c) {  
     
     static lcio::BitField64 encoder( lcio::ILDCellID0::encoder_string ) ; 
 
@@ -1152,17 +1147,29 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
-				  << " error code : " << MarlinTrk::errorCode( code ) 
-				  << std::endl ; 
+	  streamlog_out( DEBUG6 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at first Hit !!?? " 
+				 << " error code : " << MarlinTrk::errorCode( code ) 
+				 << std::endl ; 
 	}
 	
 	// ======= get TrackState at last hit  ========================
-	code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
+
+#define use_fit_at_last_hit 0
+
+#if use_fit_at_last_hit
+	  code = mtrk->getTrackState( lHit, *tsLH, chi2, ndf ) ;
+#else     // get the track state at the last hit by propagating from the last(first) constrained fit position (a la MarlinTrkUtils)
+	  EVENT::TrackerHit* last_constrained_hit = 0 ;     
+	  mtrk->getTrackerHitAtPositiveNDF( last_constrained_hit );
+	  code = mtrk->smooth() ;
+	  gear::Vector3D last_hit_pos( lHit->getPosition() );
+	  code = mtrk->propagate( last_hit_pos, last_constrained_hit, *tsLH, chi2, ndf);
+
+#endif
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
+	  streamlog_out( DEBUG6 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at last Hit !!?? " << std::endl ; 
 	}
 	
 	// ======= get TrackState at calo face  ========================
@@ -1174,18 +1181,27 @@ namespace clupatra_new{
 	int layerID  = encoder.lowWord() ;  
 	int sensorID = -1 ;
 	
-	code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+#if use_fit_at_last_hit
+       	code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+#else     // get the track state at the calorimter from a propagating from the last(first) constrained fit position
+	code = mtrk->propagateToLayer( layerID , last_constrained_hit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+#endif
 	
 	if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
 	  
 	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
 	  layerID = encoder.lowWord() ;
 	  
+#if use_fit_at_last_hit
 	  code = mtrk->propagateToLayer( layerID , lHit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+#else     // get the track state at the calorimter from a propagating from the last(first) constrained fit position
+	  code = mtrk->propagateToLayer( layerID , last_constrained_hit, *tsCA, chi2, ndf, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
+#endif
+
 	}
 	if ( code !=MarlinTrk::IMarlinTrack::success ) {
 	  
-	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
+	  streamlog_out( DEBUG6 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
 	}
 	
 	// ======= get TrackState at IP ========================
@@ -1198,7 +1214,7 @@ namespace clupatra_new{
 	
 	if( code != MarlinTrk::IMarlinTrack::success ){
 	  
-	  streamlog_out( DEBUG3 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
+	  streamlog_out( DEBUG6 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not extrapolate TrackState to IP !!?? " << std::endl ; 
 	}
 	
 	trk->addTrackState( tsIP ) ;
