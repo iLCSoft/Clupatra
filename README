@@ -41,6 +41,15 @@
 
 
  =============================================================================================================
+
+  -----------
+ | v00-09-01 |
+  -----------
+
+    - changed  LCIOTrackConverter::operator() to use the
+      first constrained fit ( ~= 3rd hit) smoothed to extrapolate
+      back to the calorimeter
+
   --------
  | v00-09 |
   --------
