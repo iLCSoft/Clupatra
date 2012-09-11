@@ -210,7 +210,7 @@
    <!--Name of the additional space point collection which provides additional guide hits between pad row centers.-->
    <parameter name="TPCSpacePointCollectionName" type="string" lcioInType="SimTrackerHit">TPCSpacePointCollection </parameter>
    <!--Name of the Output TrackerHit collection-->
-   <parameter name="TPCTrackerHitsCol" type="string" lcioOutType="TrackerHit"> TPCTrackerHitsXXX </parameter>
+   <parameter name="TPCTrackerHitsCol" type="string" lcioOutType="TrackerHit"> TPCTrackerHits </parameter>
    <!--Name of the Name of TrackerHit SimTrackHit relation collection-->
    <parameter name="SimTrkHitRelCollection" type="string" lcioOutType="LCRelation">TPCTrackerHitRelations </parameter>
    <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
