@@ -24,7 +24,7 @@
 #include "UTIL/CellIDDecoder.h"
 #include "UTIL/ILDConf.h"
 
-#include "LCIterator.h"
+#include "UTIL/LCIterator.h"
 
 //-------gsl -----
 #include "gsl/gsl_randist.h"
@@ -1846,10 +1846,8 @@ void ClupatraProcessor::check( LCEvent * evt ) {
 
   streamlog_out( DEBUG5 ) <<   " ------------------- check()  called " << std::endl ;
 
-    LCCollection* tv  = evt->getCollection( _outColName  ) ;
-  //  LCCollection* tv  = evt->getCollection( _segmentsOutColName );
-
-  for(  LCIterator<Track> it( tv ) ; EVENT::Track* trk = it.next()  ; ) {
+  //  for(  LCIterator<Track> it(   evt, _segmentsOutColName  ) ; EVENT::Track* trk = it.next()  ; ) {
+  for(  LCIterator<Track> it(   evt, _outColName  ) ; EVENT::Track* trk = it.next()  ; ) {
     
     const EVENT::TrackState* ts0 = trk->getTrackState( lcio::TrackState::AtIP ) ; 
     const EVENT::TrackState* ts1 = trk->getTrackState( lcio::TrackState::AtFirstHit ) ; 

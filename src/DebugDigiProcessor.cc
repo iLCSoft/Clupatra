@@ -21,7 +21,7 @@
 //---- GEAR ----
 #include "gear/GEAR.h"
 
-#include "LCIterator.h"
+#include "UTIL/LCIterator.h"
 
 using namespace lcio ;
 using namespace marlin ;

@@ -39,7 +39,7 @@
 //---- ROOT -----
 #include "TH1F.h" 
 
-#include "LCIterator.h"
+#include "UTIL/LCIterator.h"
 
 using namespace lcio ;
 using namespace marlin ;
