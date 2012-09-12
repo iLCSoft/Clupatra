@@ -1,14 +1,16 @@
 #include "ClupatraProcessor.h"
 
+#include "clupatra_new.h"
+
 #include <time.h>
 #include <vector>
 #include <map>
 #include <set>
 #include <algorithm>
-
 #include <math.h>
 #include <cmath>
 #include <memory>
+#include <float.h>
 
 //---- MarlinUtil 
 #include "MarlinCED.h"
@@ -23,7 +25,6 @@
 #include "UTIL/LCTOOLS.h"
 #include "UTIL/CellIDDecoder.h"
 #include "UTIL/ILDConf.h"
-
 #include "UTIL/LCIterator.h"
 
 //-------gsl -----
@@ -50,13 +51,9 @@
 using namespace lcio ;
 using namespace marlin ;
 
-
-#include <float.h>
-
-#include "clupatra_new.h"
 using namespace clupatra_new ;
 
-
+#define WRITE_PICKED_DEBUG_TRACKS false
 
 /** helper method to create a track collections and add it to the event */
 inline LCCollectionVec* newTrkCol(const std::string& name, LCEvent * evt , bool isSubset=false){
@@ -158,7 +155,7 @@ struct MeanAbsZOfTrack{
       z += hV[i]->getPosition()[2]  ;
       ++hitCount ;
     }
-    return std::abs(  z )  / hitCount ;
+    return ( hitCount>0  ?  std::abs(  z )  / hitCount  : 0 ) ;
   }
 };
 
@@ -247,7 +244,8 @@ void printSimTrackerHit(const EVENT::LCObject* o){
 ClupatraProcessor aClupatraProcessor ;
 
 
-ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") {
+ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
+					 _trksystem(0), _gearTPC(0) ,_padLayout(0) {
   
   // modify processor description
   _description = "ClupatraProcessor : nearest neighbour clustering seeded pattern recognition" ;
@@ -417,7 +415,8 @@ void ClupatraProcessor::init() {
   _nEvt = 0 ;
   
 
-  CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK  , &printAndSaveTrack ) ; 
+  if( WRITE_PICKED_DEBUG_TRACKS ) 
+    CEDPickingHandler::getInstance().registerFunction( LCIO::TRACK  , &printAndSaveTrack ) ; 
 
   CEDPickingHandler::getInstance().registerFunction( LCIO::TRACKERHIT  , &printTrackerHit ) ; 
 
@@ -550,7 +549,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   const bool writeCluTrackSegments   = _createDebugCollections ;
   const bool writeLeftoverClusters   = _createDebugCollections ;
   const bool writeQualityTracks      = _createDebugCollections ;
-  const bool writeDebugTracks      =  true ;
+  const bool writeDebugTracks      =  WRITE_PICKED_DEBUG_TRACKS ;
   
   static const bool copyTrackSegments = false ;
   
@@ -567,7 +566,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCCollectionVec* poorCol  = ( writeQualityTracks ?  newTrkCol( "ClupatraPoorQualityTracks" , evt , true )  :   0   )  ; 
 
   LCCollectionVec* debugCol=  ( writeDebugTracks ?  newTrkCol( "ClupatraDebugTracks" , evt , false )  :   0   )  ; 
-  DebugTracks::setCol( debugCol , this ) ; 
+  if( WRITE_PICKED_DEBUG_TRACKS ) 
+    DebugTracks::setCol( debugCol , this ) ; 
 
   LCCollectionVec* outerCol  = ( _createDebugCollections ?  newTrkCol( "ClupatraOuterSegments" , evt ,true )  :   0   )  ; 
   LCCollectionVec* innerCol  = ( _createDebugCollections ?  newTrkCol( "ClupatraInnerSegments" , evt ,true )  :   0   )  ; 
@@ -1585,6 +1585,11 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
   // ============ sort tracks wrt pt (1./omega) ===============
   LCCollectionVec* tv  = dynamic_cast<LCCollectionVec*>(trackCol) ;
+
+  if( ! tv ) {
+    streamlog_out( ERROR  ) << " *** pickUpSiTrackerHits() :  dynamic_cast<LCCollectionVec*>(trackCol)  failed !! " << std::endl ; 
+    return ; 
+  }
 
   std::sort( tv->begin() , tv->end() ,  PtSort()  ) ;
   

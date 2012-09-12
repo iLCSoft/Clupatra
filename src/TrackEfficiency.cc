@@ -118,7 +118,8 @@ using namespace TrackEfficiencyHistos ;
 //======================================================================================================
 
 
-TrackEfficiency::TrackEfficiency() : Processor("TrackEfficiency") {
+TrackEfficiency::TrackEfficiency() : Processor("TrackEfficiency"),
+				     _nRun(0), _nEvt(0) {
   
   // modify processor description
   _description = "TrackEfficiency: analysis plots for Tracks" ;
@@ -535,7 +536,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
       }
 
 
-      Track* tr = dynamic_cast<Track*>( trkV.at(iMax)  ) ; 
+      Track* tr = (Track*) ( trkV.at(iMax)  ) ; 
  
       double d0 = tr->getD0() ;
       double ph = tr->getPhi() ;

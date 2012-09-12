@@ -130,11 +130,11 @@ namespace nnclu {
 
     int ID ; //DEBUG
   
-    Cluster()  {}
+    Cluster() : ID(0) {}
   
     /** C'tor that takes the first element */
     Cluster( Element<T>* element)  {
-      static int SID ;  //DEBUG
+      static int SID=0 ;  //DEBUG
       ID = SID++ ;      //DEBUG
       addElement( element ) ;
     }

@@ -45,7 +45,8 @@ int subdet( const T* t){
 DebugDigiProcessor aDebugDigiProcessor ;
 
 
-DebugDigiProcessor::DebugDigiProcessor() : Processor("DebugDigiProcessor") {
+DebugDigiProcessor::DebugDigiProcessor() : Processor("DebugDigiProcessor") ,
+					   _nRun(0), _nEvt(0) {
   
   // modify processor description
   _description = "DebugDigiProcessor: analysis plots for Tracks" ;

@@ -1093,7 +1093,7 @@ namespace clupatra_new{
 
     trk->ext<MarTrk>()  = mtrk ;
 
-    trk->setdEdx( e/nHit ) ;
+    trk->setdEdx( ( nHit ? e/nHit : -1. )  ) ;
     trk->subdetectorHitNumbers().resize( 2 * lcio::ILDDetID::ETD ) ;
 
     trk->subdetectorHitNumbers()[ 2*lcio::ILDDetID::TPC - 2 ] =  0 ; 

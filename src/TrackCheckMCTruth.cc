@@ -131,7 +131,8 @@ using namespace TrackCheckMCTruthHistos ;
 //======================================================================================================
 
 
-TrackCheckMCTruth::TrackCheckMCTruth() : Processor("TrackCheckMCTruth") {
+TrackCheckMCTruth::TrackCheckMCTruth() : Processor("TrackCheckMCTruth"),
+					 _nRun(0), _nEvt(0)  {
   
   // modify processor description
   _description = "TrackCheckMCTruth: analysis plots for Tracks" ;
@@ -576,7 +577,7 @@ void TrackCheckMCTruth::processEvent( LCEvent * evt ) {
       }
 
 
-      Track* tr = dynamic_cast<Track*>( trkV.at(iMax)  ) ; 
+      Track* tr = (Track*)( trkV.at(iMax)  ) ; 
 
  
       double d0 = tr->getD0() ;

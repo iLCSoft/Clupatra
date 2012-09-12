@@ -59,6 +59,10 @@
     - updated to use new PlanarDigiProcessor 
       (was: SimplePlanarTestDigiprocessor )
 
+    - fixed coverity issues: mostly unitialized c'tor, some unchecked dynamic_casts and division by zero (nhit++)
+
+    - deactivate pick'n save feature 
+      (#define WRITE_PICKED_DEBUG_TRACKS false)
 
   --------
  | v00-09 |

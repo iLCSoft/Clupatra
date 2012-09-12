@@ -23,7 +23,8 @@ using namespace marlin ;
 FixCellIDs aFixCellIDs ;
 
 
-FixCellIDs::FixCellIDs() : Processor("FixCellIDs") {
+FixCellIDs::FixCellIDs() : Processor("FixCellIDs") ,
+			   _nRun(0), _nEvt(0) {
   
   // modify processor description
   _description = "fix CellID0 for old TrackerHits ..." ;
@@ -153,9 +154,10 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
       
       TrackerHitImpl* h = dynamic_cast<TrackerHitImpl*>( vxdCol->getElementAt( i ) ) ;
       
+      if( !h )  continue ;
+
       gear::Vector3D   pos(  h->getPosition() ) ;
-      
-      
+            
       //-----------------------------------
       gear::SensorID sensorID ;
       
