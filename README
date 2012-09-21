@@ -46,6 +46,13 @@
  | v00-09-01 |
   -----------
 
+    - in TrackCircleDistance::operator()():
+      adapted to fix in KalTest where curler segments
+      now have correct Z0 (typically close to the IP)
+      - do not merge segements if the z-positions of
+        both their first hits is within 20 mm of the
+        IP
+
     - changed  LCIOTrackConverter::operator() to use the
       first constrained fit ( ~= 3rd hit) smoothed to extrapolate
       back to the calorimeter
