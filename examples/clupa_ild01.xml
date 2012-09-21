@@ -258,7 +258,7 @@
     <!--maximum distance in z [mm] from endplate of last hit, such that the track is considered to end at the end -->
     <parameter name="TrackEndsOuterForwardDist" type="float">40 </parameter>
     <!--minimum curvature omega of a track segment for being considered a curler-->
-    <parameter name="TrackIsCurlerOmega" type="float">0.002 </parameter>
+    <parameter name="TrackIsCurlerOmega" type="float">0.001 </parameter>
     <!--maximum radial distance [mm] from inner field cage of first hit, such that the track is considered to start at the beginning -->
     <parameter name="TrackStartsInnerDist" type="float">25 </parameter>
     <!--try to pick up hits from Si-trackers-->
