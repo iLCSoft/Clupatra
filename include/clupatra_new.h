@@ -613,8 +613,8 @@ namespace clupatra_new{
       const TrackState* ts0 =  trk0->getTrackState( TrackState::AtFirstHit ) ;
       const TrackState* ts1 =  trk1->getTrackState( TrackState::AtFirstHit ) ;
 
-      double z0 = ts0->getReferencePoint()[2]  ;
-      double z1 = ts1->getReferencePoint()[2]  ;
+      double z0 = ( ts0 ? ts0->getReferencePoint()[2]  : 0. ) ;
+      double z1 = ( ts1 ? ts1->getReferencePoint()[2]  : 0. ) ;
      
 
       streamlog_out( DEBUG2 ) << "TrackCircleDistance::operator() : " <<  trk0->id() << " <-> "  << trk1->id() 
