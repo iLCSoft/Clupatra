@@ -37,7 +37,7 @@ namespace clupatra_new{
       //      gear::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
       const gear::Vector3D& v0 = h->pos ;
 
-      double sigsr =  sqrt( h->lcioHit->getCovMatrix()[0] + h->lcioHit->getCovMatrix()[2] ) ;
+      double sigsr =  h->lcioHit->getCovMatrix()[0] + h->lcioHit->getCovMatrix()[2]  ;
       double sigsz =  h->lcioHit->getCovMatrix()[5] ;
       // double sigsr =  0.01 ; 
       // double sigsz =  0.1 ;
