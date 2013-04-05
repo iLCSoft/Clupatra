@@ -216,7 +216,8 @@ void printTrackerHit(const EVENT::LCObject* o){
   } else {
     
     streamlog_out( MESSAGE )  << " --- TrackerHit: " << *hit  
-			      << "\n --- delta Chi2 = " << hit->ext<DChi2>() << std::endl ;
+			      << "\n --- delta Chi2 = " << hit->ext<DChi2>()
+			      << "\n --- cov. matrix = " << hit->getCovMatrix()[0] <<", "<<hit->getCovMatrix()[2] <<", "<<hit->getCovMatrix()[5] <<"  "<< std::endl ;
   }
 }
 //----------------------------------------------------------------
