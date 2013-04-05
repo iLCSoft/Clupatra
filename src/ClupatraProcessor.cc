@@ -245,7 +245,8 @@ ClupatraProcessor aClupatraProcessor ;
 
 
 ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
-					 _trksystem(0), _gearTPC(0) ,_padLayout(0) {
+//					 _trksystem(0), _gearTPC(0) ,_padLayout(0) {
+					 _trksystem(0), _gearTPC(0) {
   
   // modify processor description
   _description = "ClupatraProcessor : nearest neighbour clustering seeded pattern recognition" ;
@@ -462,12 +463,16 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   LCIOTrackConverter converter ;
   
   _gearTPC = &Global::GEAR->getTPCParameters() ;
-  _padLayout = &_gearTPC->getPadLayout() ;
-
   _bfield = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
 
-  unsigned maxTPCLayers =  _padLayout->getNRows() ;
-  
+  // Support for more than one module
+  // The ternary operator is used to make the trick with the static variable which
+  // is supposed to be calculated only once, also for performance reason
+  static const unsigned int maxTPCLayers =
+      (Global::GEAR->getDetectorName() == "LPTPC" ) ?
+       _gearTPC->getModule(0).getNRows() + _gearTPC->getModule(2).getNRows() + _gearTPC->getModule(5).getNRows() :  // LCTPC
+       _gearTPC->getModule(0).getNRows(); // ILD
+
   double driftLength = _gearTPC->getMaxDriftLength() ;
   ZIndex zIndex( -driftLength , driftLength , _nZBins  ) ; 
   
@@ -779,7 +784,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     int padRangeRecluster = 50 ; // FIXME: make parameter 
     // define an inner cylinder where we exclude hits from re-clustering:
     double zMaxInnerHits   = driftLength * .67 ;   // FIXME: make parameter 
-    double rhoMaxInnerHits = _padLayout->getPlaneExtent()[0] + (  _padLayout->getPlaneExtent()[1] - _padLayout->getPlaneExtent()[0] ) * .67 ;// FIXME: make parameter 
+    double rhoMaxInnerHits = _gearTPC->getPlaneExtent()[0] + (  _gearTPC->getPlaneExtent()[1] - _gearTPC->getPlaneExtent()[0] ) * .67 ;// FIXME: make parameter
     
     streamlog_out( DEBUG5 ) << "  ===========================================================================\n"
 			    << "      recluster in leftover hits - outside a clyinder of :  z =" << zMaxInnerHits << " rho = " <<  rhoMaxInnerHits << "\n"
@@ -1392,8 +1397,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //===============================================================================================
   if( _createDebugCollections ) {
 
-    float r_inner = _padLayout->getPlaneExtent()[0] ;
-    float r_outer = _padLayout->getPlaneExtent()[1] ;
+    float r_inner = _gearTPC->getPlaneExtent()[0] ;
+    float r_outer = _gearTPC->getPlaneExtent()[1] ;
 
 
     for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
@@ -1795,8 +1800,8 @@ void ClupatraProcessor::computeTrackInfo(  lcio::Track* lTrk  ){
   if( ! lTrk->ext<TrackInfo>() )
     lTrk->ext<TrackInfo>() =  new TrackInfoStruct ;
 
-  float r_inner = _padLayout->getPlaneExtent()[0] ;
-  float r_outer = _padLayout->getPlaneExtent()[1] ;
+  float r_inner = _gearTPC->getPlaneExtent()[0] ;
+  float r_outer = _gearTPC->getPlaneExtent()[1] ;
   float driftLength = _gearTPC->getMaxDriftLength() ;
 
   // compute z-extend of this track segment

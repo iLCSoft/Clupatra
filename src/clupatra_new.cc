@@ -9,8 +9,9 @@
 
 ///---- GEAR ----
 #include "marlin/Global.h"
+#include "gear/GEAR.h"
 #include "gear/TPCParameters.h"
-#include "gear/PadRowLayout2D.h"
+#include "gear/TPCModule.h"
 
 #include "gear/BField.h"
 
@@ -42,7 +43,6 @@ namespace clupatra_new{
       // double sigsr =  0.01 ; 
       // double sigsz =  0.1 ;
     
-
       double dPhi = std::abs(  v0.phi() - v1.phi() )  ;
       if( dPhi > M_PI )
 	dPhi = 2.* M_PI - dPhi ;
@@ -79,8 +79,14 @@ namespace clupatra_new{
 
     const double bfield = marlin::Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
 
-    const int maxTPCLayerID  = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
-   
+    // Support for more than one module
+    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
+    // The ternary operator is used to make the trick with the static variable which
+    // is supposed to be calculated only once, also for performance reason
+    static const int maxTPCLayerID  = (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
+                                         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() - 1 : // LCTPC
+                                         gearTPC->getModule(0).getNRows() - 1 ; // ILD
+
     clu->sort( LayerSortIn() ) ;
     
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
@@ -190,7 +196,7 @@ namespace clupatra_new{
 	intersects  = theTrk->intersectionWithLayer( layerID, firstHit, xv, elementID , mode )   ; 
 	
       } else {
-	
+
 	intersects  = theTrk->intersectionWithLayer( layerID, xv, elementID , mode )  ; 
       }
 
@@ -508,9 +514,16 @@ namespace clupatra_new{
     // copy of the algorithm for creating three clusters (minimize angle between hits as seen from IP)
     
     hV.freeElements() ;
-    
-    static const int tpcNRow = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() ; 
-    
+
+    // Support for more than one module
+    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
+    // The ternary operator is used to make the trick with the static variable which
+    // is supposed to be calculated only once, also for performance reason
+    static const int tpcNRow =
+        (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
+         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() : // LCTPC
+         gearTPC->getModule(0).getNRows() ; // ILD
+
     HitListVector hitsInLayer( tpcNRow )  ; 
     addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
     
@@ -648,7 +661,14 @@ namespace clupatra_new{
     
     hV.freeElements() ;
     
-    int static tpcNRow = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() ; 
+    // Support for more than one module
+    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
+    // The ternary operator is used to make the trick with the static variable which
+    // is supposed to be calculated only once, also for performance reason
+    static const int tpcNRow =
+        (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
+         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() : // LCTPC
+         gearTPC->getModule(0).getNRows() ; // ILD
     
     HitListVector hitsInLayer( tpcNRow )  ; 
     addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
@@ -814,7 +834,14 @@ namespace clupatra_new{
     
     streamlog_out(  DEBUG ) << " create_two_clusters  --- called ! - size :  " << clu.size()  << std::endl ;
 
-    int static tpcNRow = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() ; 
+    // Support for more than one module
+    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
+    // The ternary operator is used to make the trick with the static variable which
+    // is supposed to be calculated only once, also for performance reason
+    static const int tpcNRow =
+        (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
+         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() : // LCTPC
+         gearTPC->getModule(0).getNRows() ; // ILD
     
     HitListVector hitsInLayer( tpcNRow )  ; 
 

@@ -7,6 +7,7 @@
 #include "lcio.h"
 #include <string>
 
+#include "gear/TPCModule.h"
 
 using namespace lcio ;
 using namespace marlin ;
@@ -150,7 +151,6 @@ class ClupatraProcessor : public Processor {
   MarlinTrk::IMarlinTrkSystem* _trksystem ;
 
   const gear::TPCParameters*  _gearTPC ;
-  const gear::PadRowLayout2D* _padLayout ;
 
 //   NNClusterer* _clusterer ;
 
