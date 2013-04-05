@@ -697,6 +697,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       }
     
       // now we have 'clean' seed clusters
+      // Write debug collection with seed clusters:
+      // convert the clusters into tracks and write the resulting tracks into the existing debug collection seedCol.
+      // The conversion is performed by the STL transform() function, the insertion to the end of the
+      // debug track collection is done by creating an STL back_inserter iterator on the LCCollectionVector seedCol
       if( writeSeedCluster ) {
 	std::transform( sclu.begin(), sclu.end(), std::back_inserter( *seedCol ) , converter ) ;
       }
@@ -826,6 +830,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 			     << " found " << loclu.size() << " clusters " 
 			     << std::endl ;
       
+      // Write debug collection using STL transform() function on the clusters 
       if( writeLeftoverClusters )
 	std::transform( loclu.begin(), loclu.end(), std::back_inserter( *locCol ) , converter ) ;
       
