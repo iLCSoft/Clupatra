@@ -507,7 +507,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     //------
     
     TrackerHit* th = (TrackerHit*) col->getElementAt(i) ;
-    
+    if ( fabs(th->getPosition()[2]) > driftLength ) continue;
+
     ClupaHit* ch  = & clupaHits[i] ; 
     
     Hit* gh =  new Hit( ch ) ;
