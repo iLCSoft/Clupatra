@@ -6,8 +6,24 @@
 #
 #    F.Gaede, DESY, 2011
 #
+#    Adaptation to TestBeam data:
+#    O. Volynets, DESY, 2013
+#
 #
 ############################################################################################################
+
+For examples see examples/README
+
+  --------
+ | v00-10 |
+  --------
+    - bug fix: remove sqrt from computation of r_phi_res^2 for finding best hit
+    - included multi-module TPC support via GEAR interface
+    - ignore hits that are outside of the TPC range (possible in data)
+    - added new processor FixCellIDs_Error_TestBeam (based on the original FixCellIDs)
+       that sets the correct hit CellIDs and hit uncertainties for test beam data
+    - added examples for test beam data. Look at examples/README for more details
+
 
 
 ------------------------------------------------------------
@@ -22,23 +38,6 @@
   
  - update cellIDs in plder file:      
    FixCellIDs.cc
-
-  steering files in ./examples
- 
-   clupa.xml, clupa_ild01.xml
-      - do patrec and display result in CED
-
-   clupa_ana.xml 
-      - pattern recognition in batch
-      - creates ClupatraTrackSegments
-                ClupatraTracks
-                
-   trkeff.xml
-     - create root file with histos for track finding efficiencies
-   
-    trkeff.C
-     - make nice plots for Clupatra, LEPTracking and FullLDCTracking
-
 
  =============================================================================================================
 
