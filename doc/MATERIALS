@@ -1,0 +1,19 @@
+This file contains a few links to the materials related to Clupatra, its algorithm, usage, use etc.
+
+There are presentations about Clupatra and related packages, namely MarlinTrk and KalDet/KalTest
+
+1. F. Gaede's and S. Aplin's presentations at International Workshop on Future Linear Colliders in Granada, Spain, September 2011
+http://ilcagenda.linearcollider.org/conferenceOtherViews.py?view=standard&confId=5134
+-> Clupatra: Clustering based pattern recognition in a TPC (F. Gaede)
+-> ILD Tracking code (S. Aplin)
+
+2. F. Gaede's presentation at CLIC Workshop at CERN in January-February 2013:
+http://indico.cern.ch/conferenceTimeTable.py?confId=204269#20130128
+-> ILD Tracking
+
+3. Here is also the presentation by O. Volynets given at LCTPC WP meeting #172 about
+the use of clupatra to the Test Beam data. The presentation contains several important
+things/limitations you need to know about using Clupatra for TB data:
+
+http://ilcagenda.linearcollider.org/conferenceDisplay.py?confId=6037  -> Clupatra Tracking for test beam data
+
