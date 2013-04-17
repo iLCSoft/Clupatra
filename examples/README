@@ -1,0 +1,43 @@
+############################################################################################################
+#
+#    Clupatra examples
+#
+#    F.Gaede, DESY, 2011
+#    O. Volynets, DESY, 2013
+#
+############################################################################################################
+
+There are several examples and scripts to help you start with Clupatra
+
+ - steering files in ./examples
+
+   clupa.xml, clupa_ild01.xml
+      - do patrec and display result in CED
+
+   clupa_ana.xml 
+      - pattern recognition in batch
+      - creates ClupatraTrackSegments
+                ClupatraTracks
+
+   trkeff.xml
+     - create root file with histos for track finding efficiencies
+
+   fit_view_TBdata_3modules.xml
+     - fit the data and draw the hits/tracks using CEDViewer. It also requires gearfile.xml (included)
+       to set the geometry (note the magnetic field Z component is NOT zero!).
+       If you switch off the viewers and uncomment the LCIOoutput processor, you get a regular fitting example file.
+       For comparison also a pathfinder example processor is included, but its parameters are
+       not guaranteed to be perfect for your application. Please consult the relevant developers for
+       more information.
+       Note: Take care that you use the correct geometry file for your application!
+       Note-2: Be sure that you draw the tracks at needed states. You might need to draw the Clupatra tracks
+       at the first hit but to draw Pathfinder tracks from the default track state (probably 
+       somewhere along the beam position). If you need to draw tracks at different states for both track finders
+       (e.g. default track state of PathFinder and AtFirstHit for Clupatra),
+       you might need to clone MyILDViewer viewer processor in the steering file and adopt the parameters accordingly
+
+
+    trkeff.C
+     - make nice plots for Clupatra, LEPTracking and FullLDCTracking
+
+

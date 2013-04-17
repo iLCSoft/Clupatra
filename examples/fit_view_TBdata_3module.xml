@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<!-- ?xml-stylesheet type="text/xsl" href="http://ilcsoft.desy.de/marlin/marlin.xsl"? -->
+<!-- ?xml-stylesheet type="text/xsl" href="marlin.xsl"? -->
+<marlin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ilcsoft.desy.de/marlin/marlin.xsd">
+
+   <execute>
+      <processor name="MyConditionsProcessor"/>
+      <!-- PathFinder part -->
+      <processor name="TrackFinderNoCut"/>
+
+      <!-- Clupatra part -->
+      <processor name="FixCellIDs_TestBeamProcessor"/>
+      <processor name="MyClupatraProcessor" />
+
+      <!--processor name="MyLCIOOutputProcessor"/-->
+
+      <!-- 3 types of viewers included: standard ILD-type 
+        with combined views of Clupatra and PathFinder tracks, ... -->
+      <processor name="MyILDViewer_Clu"/>
+      <processor name="MyILDViewer_PF"/>
+
+      <!-- and two (each for Clupatra and Pathfinder tracks) using TrackerRawViewer for TPC Test Beam -->
+      <!--processor name="MyTPCViewerClu"/-->
+      <!--processor name="MyTPCViewerPF"/-->
+
+   </execute>
+
+   <global>
+      <parameter name="LCIOInputFiles"> /space/volynets/Work/TPCdata/Mar2013/HitReco-run18974.slcio </parameter>
+      <parameter name="GearXMLFile" value="gearfile_TB.xml"/>
+      <parameter name="MaxRecordNumber" value="30" />
+      <parameter name="SkipNEvents" value="0"/>
+      <parameter name="SupressCheck" value="false"/>
+      <!--parameter name="Verbosity" options="DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT"> DEBUG  </parameter-->
+      <parameter name="Verbosity" value="WARNING"/>
+   </global>
+
+<processor name="MyConditionsProcessor" type="ConditionsProcessor">
+  <parameter name="DBInit" type="string">lctpcconddb02.desy.de:lctpc:lctpcreader:cptr123R:3306 </parameter>
+  <parameter name="DBCondHandler" type="StringVec">ADCChannelMapping /LP1/T24_1/DESY/Grid_GEM_Module_V.2/channelmapping HEAD</parameter>
+  <parameter name="DBCondHandler" type="StringVec">Pedestals /LP1/T24_1/DESY/Grid_GEM_Module_V.2/pedestal_readout HEAD</parameter>
+  <parameter name="DBCondHandler" type="StringVec">ADCElectronicsParameters /LP1/T24_1/DESY/Grid_GEM_Module_V.2/ADCElectronicsParameters HEAD </parameter>
+  <parameter name="Verbosity" options="DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT"> WARNING </parameter>
+</processor>
+
+<processor name="FixCellIDs_TestBeamProcessor" type="FixCellIDs_Errors_TestBeam">
+  <parameter name="Verbosity" value="WARNING"/>
+  <parameter name="TPCCollectionName" type="string" value="TPCHits"/>
+</processor>
+
+  <processor name="MyClupatraProcessor" type="ClupatraProcessor">
+    <!--ClupatraProcessor : nearest neighbour clustering seeded pattern recognition-->
+    <!--the maximum chi2-distance for which a hit is considered for merging -->
+    <parameter name="Chi2Cut" type="float">100 </parameter>
+    <!--optionally create some debug collection with intermediate track segments and used and unused hits-->
+    <parameter name="CreateDebugCollections" type="bool"> true  </parameter>
+    <!--Cut for distance between hits in mm-->
+    <parameter name="DistanceCut" type="float">40 </parameter>
+    <parameter name="NLoopForSeeding" type="float">1 </parameter>
+    <!--allowed fraction of hits in same pad row per track-->
+    <parameter name="DuplicatePadRowFraction" type="float">0.1 </parameter>
+    <!--Use Energy Loss in Fit-->
+    <parameter name="EnergyLossOn" type="bool"> false </parameter>
+    <!--the maximum delta Chi2 for which a hit is added to a track segement-->
+    <parameter name="MaxDeltaChi2" type="float">100 </parameter>
+    <!--the maximum number of layers without finding a hit before hit search search is stopped -->
+    <parameter name="MaxStepWithoutHit" type="int">5 </parameter>
+    <!--minimum fraction of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
+    <parameter name="MinLayerFractionWithMultiplicity" type="float">0.5 </parameter>
+    <!--minimum number of layers that have a given multiplicity, when forcing a cluster into sub clusters-->
+    <parameter name="MinLayerNumberWithMultiplicity" type="int">3 </parameter>
+    <!--minimum number of hits per cluster-->
+    <parameter name="MinimumClusterSize" type="int">5 </parameter>
+    <!--Use MultipleScattering in Fit-->
+    <parameter name="MultipleScatteringOn" type="bool">false</parameter>
+    <!--number of bins in z over total length of TPC - hits from different z bins are nver merged-->
+    <parameter name="NumberOfZBins" type="int">10 </parameter>
+    <!--Name of the output collection-->
+    <parameter name="OutputCollection" type="string" lcioOutType="Track">ClupatraTracks </parameter>
+    <!--Name of the output collection that has the individual track segments-->
+    <parameter name="SegmentCollectionName" type="string" lcioOutType="Track">ClupatraTrackSegments </parameter>
+
+    <!--number of pad rows used in initial seed clustering-->
+    <parameter name="PadRowRange" type="int">5 </parameter>
+    
+    <!--try to pick up hits from Si-trackers-->
+    <parameter name="pickUpSiHits" type="bool">false </parameter>
+    <!--name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
+<!--     <parameter name="SITHitCollection" type="string">SITTrackerHits </parameter> -->
+    <!--name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)-->
+<!--     <parameter name="VXDHitCollection" type="string">VXDTrackerHits </parameter> -->
+    
+    <!--Smooth All Mesurement Sites in Fit-->
+    <parameter name="SmoothOn" type="bool">false </parameter>
+    <!--Name of the tpc hit input collections-->
+    <parameter name="TPCHitCollection" type="string" lcioInType="TrackerHit">TPCHits </parameter>
+    
+   <!--maximum radial distance [mm] from outer field cage of last hit, such that the track is considered to end at the end -->
+   <parameter name="TrackEndsOuterCentralDist" type="float">25 </parameter>
+   <!--maximum distance in z [mm] from endplate of last hit, such that the track is considered to end at the end -->
+   <parameter name="TrackEndsOuterForwardDist" type="float">40 </parameter>
+   <!--minimum curvature omega of a track segment for being considered a curler-->
+   <parameter name="TrackIsCurlerOmega" type="float">0.001 </parameter>
+   <!--maximum radial distance [mm] from inner field cage of first hit, such that the track is considered to start at the beginning -->
+   <parameter name="TrackStartsInnerDist" type="float">25 </parameter>
+
+   <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+   <parameter name="Verbosity" type="string">DEBUG0</parameter>
+  </processor>
+
+
+ <processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
+ <!--Writes the current event to the specified LCIO outputfile. Needs to be the last ActiveProcessor.-->
+  <!--drops the named collections from the event-->
+  <!--parameter name="DropCollectionNames" type="StringVec"> TPCHits HCalHits </parameter-->
+  <!--drops all collections of the given type from the event-->
+  <!--parameter name="DropCollectionTypes" type="StringVec"> SimTrackerHit SimCalorimeterHit </parameter-->
+  <!-- write complete objects in subset collections to the file (i.e. ignore subset flag)-->
+  <!--parameter name="FullSubsetCollections" type="StringVec" value="MCParticlesSkimmed"/-->
+  <!--force keep of the named collections - overrules DropCollectionTypes (and DropCollectionNames)-->
+  <!--parameter name="KeepCollectionNames" type="StringVec" value="MyPreciousSimTrackerHits"/-->
+  <!-- name of output file -->
+  <parameter name="LCIOOutputFile" type="string" value="TPCTracks.slcio"/>
+  <!--write mode for output file:  WRITE_APPEND or WRITE_NEW-->
+  <parameter name="LCIOWriteMode" type="string" value="WRITE_NEW"/>
+  <!--will split output file if size in kB exceeds given value - doesn't work with APPEND and NEW-->
+  <!--parameter name="SplitFileSizekB" type="int" value="1992294"/-->
+</processor>
+
+<processor name="TrackFinderNoCut" type="PathFinderInterfaceProcessor">
+ <!--PathFinderInterfaceProcessor is intended to ...-->
+  <!--Name of the input Hit Collection-->
+  <parameter name="InputCollectionName" type="string" lcioInType="TrackerHit"> TPCHits </parameter>
+  <!--Name of the output Track Collection-->
+  <parameter name="OutputCollectionName" type="string" lcioOutType="Track">  FoundTracksNocut </parameter>
+  <!--Name of the output Hit Collection containing all hits on Track-->
+  <parameter name="OutputHitCollectionName" type="string" lcioOutType="TrackerHit"> HitsOnTrackNocut </parameter>
+  <!--max possible distance of closest approach for straight lines-->
+  <parameter name="MaxDsz" type="double" value="4000"/>
+  <!--max possible distance between origin and center of circle/ max possible distance of closest approach for straight lines-->
+  <parameter name="MaxDxy" type="double" value="10"/>
+  <!--minimum number of hits on track-->
+  <parameter name="MinHitNumber" type="int" value="5"/>
+  <!--Optional Parameter to set a point to 
+  shift the hits. ReferencePointY and ReferencePointZ must be set and ShiftHits must be true to have any effect-->
+  <!--parameter name="ReferencePointXOverride" type="double" value="1503.62"/-->
+  <!--Optional Parameter to set a point to shift the hits. ReferencePointX and ReferencePointZ must be set and ShiftHits must be true to have any effect-->
+  <!--parameter name="ReferencePointYOverride" type="double" value="0"/-->
+  <!--Optional Parameter to set a point to shift the hits. ReferencePointX and ReferencePointY must be set and ShiftHits must be true to have any effect-->
+  <!--parameter name="ReferencePointZOverride" type="double" value="0"/-->
+  <!--HoughSpace binning d0 sz-->
+  <parameter name="SZDZeroBins" type="int" value="1000"/>
+  <!--maximum distance of hits from track in sz projection-->
+  <parameter name="SZDistance" type="double" value="10"/>
+  <!--maximum distance of hits from track in sz projection after fit-->
+  <parameter name="SZDistanceFit" type="double" value="10"/>
+  <!--HoughSpace binning theta sz-->
+  <parameter name="SZThetaBins" type="int" value="1000"/>
+  <!--is true if root file should be saved-->
+  <parameter name="SaveRootFile" type="bool" value="false"/>
+  <!--is true if the neighborhood of maxima in Hough space are to be searched-->
+  <parameter name="SearchNeighborhood" type="bool" value="false"/>
+  <!--is true if hits should be shifted closer to the origin of track finding-->
+  <parameter name="ShiftHits" type="bool" value="true"/>
+  <!--straight line = 0, helix = 1, curler = 2-->
+  <parameter name="TrackModel" type="int" value="1"/>
+  <!--true if conformal mapping should be used-->
+  <parameter name="UseConformalMapping" type="bool" value="false"/>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string" value="WARNING"/>
+  <!--Optional parameter to set vertex x position VertexPositionY must be set to have an effect-->
+  <!--parameter name="VertexPositionX" type="double" value="0"/-->
+  <!--Optional parameter to set vertex y position VertexPositionX must be set to have an effect-->
+  <!--parameter name="VertexPositionY" type="double" value="0"/-->
+  <!--HoughSpace binning d0 xy-->
+  <parameter name="XYDZeroBins" type="int" value="1000"/>
+  <!--maximum distance of hits from track in xy projection-->
+  <parameter name="XYDistance" type="double" value="10"/>
+  <!--maximum distance of hits from track in xy projection after fit-->
+  <parameter name="XYDistanceFit" type="double" value="10"/>
+  <!--HoughSpace binning Omega xy-->
+  <parameter name="XYOmegaBins" type="int" value="1000"/>
+  <!--HoughSpace binning theta xy-->
+  <parameter name="XYThetaBins" type="int" value="1000"/>
+  <!--Limit number of hits per event for track reco to run-->
+  <parameter name="MaxHitsPerEvent" type="int" value="300"/>
+</processor>
+
+
+<processor name="MyILDViewer_Clu" type="CEDViewer">
+  <!--color scheme -->
+      <parameter name="ColorScheme" type="int">12 </parameter>
+
+  <!--draw a helix for Track objects:-1 none, 0:default, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
+     <parameter name="DrawHelixForTrack" type="int"> 2 </parameter>
+
+     <!--minimum energy of MCParticles to be drawn-->
+     <parameter name="MCParticleEnergyCut" type="float"> 1. </parameter>
+
+    <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
+     <parameter name="DrawDetectorID" type="int">0 </parameter>
+
+     <!--ClupatraTracks 0 6 2 
+	FoundTracksNocut 0 6 3 -->
+     <parameter name="DrawInLayer"> 
+	TPCHits 0 4 1
+
+        ClupatraTracks 0 6 2
+
+	ClupatraSeedCluster 0 4 5
+	ClupatraInitialTrackSegments 0 3 6
+	ClupatraLeftoverClusters 0 3 7
+
+	ClupatraIncompleteSegments   0 3 8
+	ClupatraCurlerSegments   0 3 9
+	ClupatraFinalSegments   0 3 10
+
+	ClupatraOuterSegments   0 3 11
+	ClupatraInnerSegments   0 3 12
+	ClupatraMiddleSegments  0 3 13
+
+	ClupatraTrackSegments 0 4 14
+
+	ClupatraUsedTPCHits   0 2  15
+	ClupatraUnUsedTPCHits 0 3 16
+
+     </parameter>
+
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">DEBUG </parameter>
+</processor>
+
+<processor name="MyILDViewer_PF" type="CEDViewer">
+  <!--color scheme -->
+      <parameter name="ColorScheme" type="int">12 </parameter>
+
+  <!--draw a helix for Track objects:-1 none, 0:default, 1: atIP, 2: atFirstHit, 3: atLastHit, 4: atCalorimeter-->
+     <parameter name="DrawHelixForTrack" type="int"> 0 </parameter>
+
+     <!--minimum energy of MCParticles to be drawn-->
+     <parameter name="MCParticleEnergyCut" type="float"> 1. </parameter>
+
+    <!--draw detector from GEAR file with given ID (see MarlinCED::newEvent() ) : 0 ILD, -1 none-->
+     <parameter name="DrawDetectorID" type="int">0 </parameter>
+
+     <parameter name="DrawInLayer"> 
+	FoundTracksNocut 0 6 3
+     </parameter>
+
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">DEBUG </parameter>
+</processor>
+
+
+<processor name="MyTPCViewerClu" type="TrackerRawViewer">
+  <!--TrackerRawViewer does whatever it does ...-->
+  <!--Name of the LCCD collection with channel mapping-->
+  <parameter name="ChannelMappingCollection" type="string">ADCChannelMapping </parameter>
+  <!--Optionally use a text file for the hardware channel to position mapping - overwrites mapping from LCCD and GEAR-->
+  <!--parameter name="ChannelPositionTextFile" type="string">ch2pos_20101214.txt </parameter-->
+  <!--Name of the TrackewrRawData collection-->
+  <parameter name="CollectionName" type="string" lcioInType="TrackerRawData">AltroRawData </parameter>
+  <!--drift velocity in mu/ns-->
+  <parameter name="DriftVelocity" type="float"> 80. </parameter>
+  <!--ADC value used for the maximum of the color scale-->
+  <parameter name="ColorScaleMaxADC" type="int"> 32 </parameter>
+  <!--color scheme - 1: hot , 2 : cold -->
+  <parameter name="ColorScheme" type="int">12 </parameter>
+  <!--true: display one event and wait for 'return' - false: continiously display events-->
+  <parameter name="WaitForKeyBoard" type="bool"> true </parameter>
+  <!--Name of the TrackerHit collection-->
+  <parameter name="HitCollectionName" type="string" lcioInType="TrackerHit">TPCHits </parameter>
+  <!--Name of the Track collection-->
+  <parameter name="TrackCollectionName" type="string" lcioInType="Track">ClupatraTracks </parameter>
+  <!--parameter name="TrackCollectionName" type="string" lcioInType="Track">RefittedTracks </parameter-->
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">WARNING </parameter>
+</processor>
+
+<processor name="MyTPCViewerPF" type="TrackerRawViewer">
+  <!--TrackerRawViewer does whatever it does ...-->
+  <!--Name of the LCCD collection with channel mapping-->
+  <parameter name="ChannelMappingCollection" type="string">ADCChannelMapping </parameter>
+  <!--Optionally use a text file for the hardware channel to position mapping - overwrites mapping from LCCD and GEAR-->
+  <!--parameter name="ChannelPositionTextFile" type="string">ch2pos_20101214.txt </parameter-->
+  <!--Name of the TrackewrRawData collection-->
+  <parameter name="CollectionName" type="string" lcioInType="TrackerRawData">AltroRawData </parameter>
+  <!--drift velocity in mu/ns-->
+  <parameter name="DriftVelocity" type="float"> 80. </parameter>
+  <!--ADC value used for the maximum of the color scale-->
+  <parameter name="ColorScaleMaxADC" type="int"> 32 </parameter>
+  <!--color scheme - 1: hot , 2 : cold -->
+  <parameter name="ColorScheme" type="int">12 </parameter>
+  <!--true: display one event and wait for 'return' - false: continiously display events-->
+  <parameter name="WaitForKeyBoard" type="bool"> true </parameter>
+  <!--Name of the TrackerHit collection-->
+  <parameter name="HitCollectionName" type="string" lcioInType="TrackerHit">TPCHits </parameter>
+  <!--Name of the Track collection-->
+  <parameter name="TrackCollectionName" type="string" lcioInType="Track"> FoundTracksNocut </parameter>
+  <!--verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")-->
+  <parameter name="Verbosity" type="string">DEBUG</parameter>
+</processor>
+
+</marlin>
