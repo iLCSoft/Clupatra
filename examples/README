@@ -34,7 +34,9 @@ There are several examples and scripts to help you start with Clupatra
        at the first hit but to draw Pathfinder tracks from the default track state (probably 
        somewhere along the beam position). If you need to draw tracks at different states for both track finders
        (e.g. default track state of PathFinder and AtFirstHit for Clupatra),
-       you might need to clone MyILDViewer viewer processor in the steering file and adopt the parameters accordingly
+       you need two MyILDViewer-s processors in the steering file (as in the present version) and
+       if you want to draw the tracks as same states (e.g. default) you may combine it into one single viewer processor
+       by only changing the collections to be displayed (via DrawInLayer parameter)
 
 
     trkeff.C

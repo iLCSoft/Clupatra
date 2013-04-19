@@ -14,8 +14,8 @@
 
       <!--processor name="MyLCIOOutputProcessor"/-->
 
-      <!-- 3 types of viewers included: standard ILD-type 
-        with combined views of Clupatra and PathFinder tracks, ... -->
+      <!-- 4 types of viewers included:
+        two standard ILD-type with Clupatra and PathFinder tracks, ... -->
       <processor name="MyILDViewer_Clu"/>
       <processor name="MyILDViewer_PF"/>
 
