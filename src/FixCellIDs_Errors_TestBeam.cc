@@ -160,9 +160,11 @@ void FixCellIDs_Errors_TestBeam::modifyEvent( LCEvent * evt ) {
       }
 
       // Sigma squared along Z
-      double zSigmaSquare = sigmaz0 * sigmaz0 + sigmaz1 * sigmaz1 * zdrift;
+      // CR fix by AM: wrong square
+      double zSigmaSquare = sigmaz0 + sigmaz1 * zdrift;
       // Sigma squared in RPhi plane
-      double rphiSigmaSquare = sigmax0 * sigmax0 + sigmax1 * sigmax1 * zdrift;
+      // CR fix by AM: wrong square
+      double rphiSigmaSquare = sigmax0 + sigmax1 * zdrift;
 
       // The phi angle of the hit.
       // FIXME: probably the phi should be determined in local coordinate system rather than in the global.
