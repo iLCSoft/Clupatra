@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include <EVENT/LCCollection.h>
+#include <IMPL/SimTrackerHitImpl.h>
 #include <IMPL/TrackerHitImpl.h>
 #include <UTIL/BitField64.h>
 #include <UTIL/ILDConf.h>
@@ -27,7 +28,7 @@ FixCellIDs::FixCellIDs() : Processor("FixCellIDs") ,
 			   _nRun(0), _nEvt(0) {
   
   // modify processor description
-  _description = "fix CellID0 for old TrackerHits ..." ;
+  _description = "fix CellID0  TrackerHits  based on the position and the GEAR information ..." ;
   
   
   // register steering parameters: name, description, class-variable, default value
@@ -54,6 +55,33 @@ FixCellIDs::FixCellIDs() : Processor("FixCellIDs") ,
 }
 
 
+bool position( lcio::LCObject* o, gear::Vector3D& pos ){
+  
+  TrackerHit* th = dynamic_cast<TrackerHit*>( o ) ;
+  if( th ) {
+    pos = th->getPosition() ;
+  }
+  SimTrackerHit* sth = dynamic_cast<SimTrackerHit*>( o ) ;
+  if( sth ) {
+    pos = sth->getPosition() ;
+  }
+
+  return ( th != 0 || sth != 0 ) ;
+}
+
+void setCellID(  lcio::LCObject* o, const UTIL::BitField64& enc ){
+
+  TrackerHitImpl* th = dynamic_cast<TrackerHitImpl*>( o ) ;
+  if( th ) th->setCellID0(   enc.lowWord() ) ;
+  
+  
+  SimTrackerHitImpl* sth = dynamic_cast<SimTrackerHitImpl*>( o ) ;
+  if( sth ) sth->setCellID0(   enc.lowWord() ) ;
+
+}
+
+
+
 void FixCellIDs::init() { 
   
   streamlog_out(DEBUG) << "   init called  " << std::endl ;
@@ -71,6 +99,69 @@ void FixCellIDs::processRunHeader( LCRunHeader* run) {
   
   _nRun++ ;
 } 
+
+
+
+void fixZPlanarHits(LCEvent* evt, const std::string& colName, int detID , const gear::ZPlanarParameters& gearZPLAN ){
+  
+  LCCollection* zplanCol = 0 ;
+
+  UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
+  
+  try{   zplanCol =  dynamic_cast<LCCollection*> (evt->getCollection( colName )  ); 
+    
+  } catch( lcio::DataNotAvailableException& e) { 
+    
+    streamlog_out( DEBUG5 ) <<  " input collection not in event : " << colName << "   - nothing to do for ZPLAN hits  !!! " << std::endl ;  
+  } 
+  
+  if( zplanCol ) { 
+    
+    
+ 
+   int nHit = zplanCol->getNumberOfElements()  ;
+    
+    for(int i=0; i< nHit ; i++){
+      
+      // TrackerHitImpl* h = dynamic_cast<TrackerHitImpl*>( zplanCol->getElementAt( i ) ) ;
+      // if( !h )  continue ;
+      // gear::Vector3D   pos(  h->getPosition() ) ;
+
+      lcio::LCObject* h =  zplanCol->getElementAt( i ) ;
+      gear::Vector3D   pos ;
+      if( ! position( h, pos ) ) continue ;
+		 
+      //-----------------------------------
+      gear::SensorID sensorID ;
+      
+      bool hitOnLadder =  gearZPLAN.isPointInSensitive( pos ,  &sensorID ) ;
+
+      if( !hitOnLadder ) {
+	
+	streamlog_out( DEBUG5 ) <<  " hit not in sensitive volume  - distance: " << gearZPLAN.distanceToNearestSensitive( pos ).r() 
+				<<  " pos : " << pos << std::endl ;
+      }
+     //-------------------------------------
+      
+      encoder.reset() ;  // reset to 0
+      
+      encoder[ILDCellID0::subdet] = detID  ;
+      encoder[ILDCellID0::side]   = 0 ; //sensorID.side   ; 
+      encoder[ILDCellID0::layer]  = sensorID.layer  ;
+      encoder[ILDCellID0::module] = sensorID.module ;
+      encoder[ILDCellID0::sensor] = sensorID.sensor ;
+      
+      //int layerID = encoder.lowWord() ;  
+      // h->setCellID0(  layerID ) ;
+
+      setCellID( h, encoder ) ;
+      
+    }
+    zplanCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
+
+  }
+}
+
 
 
 
@@ -131,61 +222,13 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
   }
 
   //=====================================================================================================
-  //      VXD 
+  //      ZPlanar detectors 
   //=====================================================================================================
 
 
-  LCCollection* vxdCol = 0 ;
-  
-  try{   vxdCol =  dynamic_cast<LCCollection*> (evt->getCollection( _vxdColName )  ); 
-    
-  } catch( lcio::DataNotAvailableException& e) { 
-    
-    streamlog_out( DEBUG5 ) <<  " input collection not in event : " << _vxdColName << "   - nothing to do for VXD hits  !!! " << std::endl ;  
-  } 
-  
-  if( vxdCol ) { 
-    
-    const gear::ZPlanarParameters& gearVXD = Global::GEAR->getVXDParameters() ;
-    
-    int nHit = vxdCol->getNumberOfElements()  ;
-    
-    for(int i=0; i< nHit ; i++){
-      
-      TrackerHitImpl* h = dynamic_cast<TrackerHitImpl*>( vxdCol->getElementAt( i ) ) ;
-      
-      if( !h )  continue ;
+  fixZPlanarHits( evt, _vxdColName , ILDDetID::VXD , Global::GEAR->getVXDParameters() ) ;  
 
-      gear::Vector3D   pos(  h->getPosition() ) ;
-            
-      //-----------------------------------
-      gear::SensorID sensorID ;
-      
-      bool hitOnLadder =  gearVXD.isPointInSensitive( pos ,  &sensorID ) ;
-
-      if( !hitOnLadder ) {
-	
-	streamlog_out( DEBUG5 ) <<  " hit not in sensitive volume  - distance: " << gearVXD.distanceToNearestSensitive( pos ).r() 
-				<<  " pos : " << pos << std::endl ;
-      }
-     //-------------------------------------
-      
-      encoder.reset() ;  // reset to 0
-      
-      encoder[ILDCellID0::subdet] = ILDDetID::VXD   ;
-      encoder[ILDCellID0::side]   = 0 ; //sensorID.side   ; 
-      encoder[ILDCellID0::layer]  = sensorID.layer  ;
-      encoder[ILDCellID0::module] = sensorID.module ;
-      encoder[ILDCellID0::sensor] = sensorID.sensor ;
-      
-      int layerID = encoder.lowWord() ;  
-      
-      h->setCellID0(  layerID ) ;
-      
-    }
-    vxdCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
-
-  }
+  //  fixZPlanarHits( evt, _sitColName , ILDDetID::SIT , Global::GEAR->getSITParameters() ) ;  
 
 
 

@@ -1550,7 +1550,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     
     LCIterator<TrackerHit> it( evt, _sitColName ) ;
     
-    streamlog_out( DEBUG2  ) << " --  pickUpSiTrackerHits - read SIT hits from collection " <<  _sitColName << "  with size = " << it->getNumberOfElements() << "\n" ;
+    streamlog_out( DEBUG2  ) << " --  pickUpSiTrackerHits - read SIT hits from collection " <<  _sitColName << "  with size = " << it.size() << "\n" ;
 
     while( TrackerHit* hit = it.next()  ){
 

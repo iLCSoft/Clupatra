@@ -12,9 +12,12 @@ using namespace lcio ;
 using namespace marlin ;
 
 
-/** Fix CellID0s for TPC TrackerHits from old data files  according to ILDCellID0::encoder_string.
+/** Fix CellID0s for TPC TrackerHits from old data files  according to ILDCellID0::encoder_string
+ * based on the position and the gear information.
  *
- * @param CollectionName Name of the TrackerHit collection
+ * @param TPCCollectionName Name of the TPC (Sim)TrackerHit collection
+ * @param VXDCollectionName Name of the VXD (Sim)TrackerHit collection
+ * @param SITCollectionName Name of the SIT (Sim)TrackerHit collection
  * 
  * @author F. Gaede, DESY
  * @version $Id$
