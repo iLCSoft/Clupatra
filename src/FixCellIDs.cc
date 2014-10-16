@@ -226,10 +226,23 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
   //=====================================================================================================
 
 
-  fixZPlanarHits( evt, _vxdColName , ILDDetID::VXD , Global::GEAR->getVXDParameters() ) ;  
+  try{
+    const gear::ZPlanarParameters& gearVXD = Global::GEAR->getVXDParameters() ;
 
-  //  fixZPlanarHits( evt, _sitColName , ILDDetID::SIT , Global::GEAR->getSITParameters() ) ;  
+    fixZPlanarHits( evt, _vxdColName , ILDDetID::VXD , gearVXD ) ;
+   
+  }catch(gear::UnknownParameterException& ){
+    streamlog_out( WARNING ) << " FixCellIDs : no gear parameters found for VXD " << std::endl ;
+  }
 
+  try{
+    const gear::ZPlanarParameters& gearSIT = Global::GEAR->getSITParameters() ;
+
+    fixZPlanarHits( evt, _sitColName , ILDDetID::SIT , gearSIT ) ;
+   
+  }catch(gear::UnknownParameterException& ){
+    streamlog_out( WARNING ) << " FixCellIDs : no gear parameters found for SIT " << std::endl ;
+  }
 
 
   
