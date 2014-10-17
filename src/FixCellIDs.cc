@@ -52,6 +52,13 @@ FixCellIDs::FixCellIDs() : Processor("FixCellIDs") ,
 			   _sitColName ,
 			   std::string("SITTrackerHits")
 			   );
+
+  registerInputCollection( LCIO::TRACKERHIT,
+			   "SETCollectionName" , 
+			   "Name of the SET TrackerHit collection"  ,
+			   _setColName ,
+			   std::string("SETTrackerHits")
+			   );
 }
 
 
@@ -261,6 +268,15 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
    
   }catch(gear::UnknownParameterException& ){
     streamlog_out( WARNING ) << " FixCellIDs : no gear parameters found for SIT " << std::endl ;
+  }
+
+  try{
+    const gear::ZPlanarParameters& gearSET = Global::GEAR->getSETParameters() ;
+
+    fixZPlanarHits( evt, _setColName , ILDDetID::SET , gearSET ) ;
+   
+  }catch(gear::UnknownParameterException& ){
+    streamlog_out( WARNING ) << " FixCellIDs : no gear parameters found for SET " << std::endl ;
   }
 
 

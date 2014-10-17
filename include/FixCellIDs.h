@@ -66,6 +66,8 @@ class FixCellIDs : public Processor, public EventModifier {
 
   std::string _sitColName ;
 
+  std::string _setColName ;
+
   int _nRun ;
   int _nEvt ;
 } ;
