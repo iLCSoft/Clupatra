@@ -80,6 +80,20 @@ void setCellID(  lcio::LCObject* o, const UTIL::BitField64& enc ){
 
 }
 
+unsigned cellID0(  lcio::LCObject* o ){
+  
+  TrackerHitImpl* th = dynamic_cast<TrackerHitImpl*>( o ) ;
+  if( th ) return th->getCellID0() ;
+  
+  
+  SimTrackerHitImpl* sth = dynamic_cast<SimTrackerHitImpl*>( o ) ;
+  if( sth ) return sth->getCellID0() ;
+
+  return 0 ;
+}
+
+
+
 
 
 void FixCellIDs::init() { 
@@ -141,8 +155,12 @@ void fixZPlanarHits(LCEvent* evt, const std::string& colName, int detID , const 
 	streamlog_out( DEBUG5 ) <<  " hit not in sensitive volume  - distance: " << gearZPLAN.distanceToNearestSensitive( pos ).r() 
 				<<  " pos : " << pos << std::endl ;
       }
-     //-------------------------------------
+      //-------------------------------------
       
+      encoder.setValue( cellID0( h ) ) ;
+      streamlog_out( DEBUG5 ) <<  " old cellID: " << encoder.valueString() <<  " - " << cellID0( h )  << std::endl ;
+      
+      //------------------------------------
       encoder.reset() ;  // reset to 0
       
       encoder[ILDCellID0::subdet] = detID  ;
@@ -156,6 +174,7 @@ void fixZPlanarHits(LCEvent* evt, const std::string& colName, int detID , const 
 
       setCellID( h, encoder ) ;
       
+      streamlog_out( DEBUG5 ) <<  " new cellID: " << encoder.valueString() << std::endl ;
     }
     zplanCol->parameters().setValue( "CellIDEncoding" , ILDCellID0::encoder_string ) ;
 
