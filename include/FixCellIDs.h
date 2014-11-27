@@ -68,6 +68,12 @@ class FixCellIDs : public Processor, public EventModifier {
 
   std::string _setColName ;
 
+  std::string _ftdColName ;
+
+  bool _setSideForVXD ;
+
+  int _layerOffset ;
+
   int _nRun ;
   int _nEvt ;
 } ;
