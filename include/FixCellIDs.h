@@ -72,6 +72,8 @@ class FixCellIDs : public Processor, public EventModifier {
 
   bool _setSideForVXD ;
 
+  bool _setSideForTPC ;
+
   int _layerOffset ;
 
   int _nRun ;

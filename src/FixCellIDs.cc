@@ -78,7 +78,13 @@ FixCellIDs::FixCellIDs() : Processor("FixCellIDs") ,
 			    bool( false ) ) ;
 
 
-  registerProcessorParameter("LayerOffset",
+  registerProcessorParameter("SetSideForTPC",
+			     "if true, the side is decoded as +-1 in the cellID for the TPC hits",
+			     _setSideForTPC,
+			     bool( false ) ) ;
+
+
+ registerProcessorParameter("LayerOffset",
 			     " add  LayerOffset to layer index in cellID",
 			     _layerOffset,
 			     int(0) ) ;
@@ -284,7 +290,7 @@ void FixCellIDs::modifyEvent( LCEvent * evt ) {
       encoder.reset() ;  // reset to 0
       
       encoder[ILDCellID0::subdet] = ILDDetID::TPC ;
-      encoder[ILDCellID0::side]   = 0 ;
+      encoder[ILDCellID0::side]   = ( _setSideForTPC ? ( pos[2] > 0. ? +1 :-1 ) : 0 )  ;
       encoder[ILDCellID0::layer]  = layer ;
       encoder[ILDCellID0::module] = 0 ;
       encoder[ILDCellID0::sensor] = 0 ;
