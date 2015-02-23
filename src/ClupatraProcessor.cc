@@ -1796,7 +1796,12 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
       trk->setChi2( chi2 + initial_chi2 ) ;
       trk->setNdf(  ndf  + initial_ndf  ) ;
-    } 
+
+    } else { 
+
+      delete tsi ;
+
+    }
   }
 }
 
