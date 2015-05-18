@@ -149,6 +149,7 @@ class ClupatraProcessor : public Processor {
   int _nEvt ;
 
   MarlinTrk::IMarlinTrkSystem* _trksystem ;
+  std::string _trkSystemName ;
 
   const gear::TPCParameters*  _gearTPC ;
 

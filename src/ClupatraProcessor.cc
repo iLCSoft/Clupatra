@@ -398,6 +398,12 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
 			     "optionally create some debug collection with intermediate track segments and used and unused hits",
 			     _createDebugCollections,
 			     bool(false));
+
+  registerProcessorParameter( "TrackSystemName",
+			      "Name of the track fitting system to be used (KalTest, DDKalTest, aidaTT, ... )",
+			      _trkSystemName,
+			      std::string("KalTest") );
+
 }
 
 
@@ -406,7 +412,13 @@ void ClupatraProcessor::init() {
   // usually a good idea to
   printParameters() ;
   
-  _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( "KalTest" , marlin::Global::GEAR , "" ) ;
+  // set upt the geometry
+    _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , marlin::Global::GEAR , "" ) ;  
+  
+  if( _trksystem == 0 ){
+    
+    throw EVENT::Exception( std::string("  Cannot initialize MarlinTrkSystem of Type: ") + _trkSystemName ) ;
+  }
   
   _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::useQMS,        _MSOn ) ;
   _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::usedEdx,       _ElossOn) ;
