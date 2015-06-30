@@ -14,6 +14,33 @@
 
 For examples see examples/README
 
+
+  --------
+ | v00-11 |
+  --------
+  - no change in CLupatra algorithm ...
+ 
+  - add option to use DDKalTest
+   - parameter "TrackSystemName"
+
+  - added parameter "SetSideForTPC" to allow
+    for setting the side to +/- 1
+
+  - modified FixCellIDs: added new parameters
+    - FTDCollectionName: set cellIDs for FTD
+    - SetSideForVXD: set side to +-1 if true
+    - LayerOffset: offset applied to layer number (ZPalanar)
+    - needed for compatibility between gear and dd4hep
+    - added SET hits ( used for debugging mainly)
+    - added debug printout for cellIDs
+    - protect against missing gear parameters 
+
+  - minor bug fix in ClupatraProcessor (in DEBUG printout)
+
+  - remove FixCellIDs_Errors_TestBeam : 
+    - moved to MarlinTPC
+
+
   --------
  | v00-10 |
   --------
