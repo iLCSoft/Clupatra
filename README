@@ -14,6 +14,15 @@
 
 For examples see examples/README
 
+  --------
+ | v00-12 |
+  --------
+    - added parameters CaloFaceBarrelID/CaloFaceEndcapID
+      to ClupatraProcessor ( needed for lcgeo based simulations )
+      default value for both : ILDDetID::Ecal
+    - adopted LCIOTrackConverter to use these paramters
+
+
 
   --------
  | v00-11 |
@@ -23,8 +32,6 @@ For examples see examples/README
   - add option to use DDKalTest
    - parameter "TrackSystemName"
 
-  - added parameter "SetSideForTPC" to allow
-    for setting the side to +/- 1
 
   - modified FixCellIDs: added new parameters
     - FTDCollectionName: set cellIDs for FTD
@@ -34,6 +41,8 @@ For examples see examples/README
     - added SET hits ( used for debugging mainly)
     - added debug printout for cellIDs
     - protect against missing gear parameters 
+    - added parameter "SetSideForTPC" to allow
+      for setting the side to +/- 1
 
   - minor bug fix in ClupatraProcessor (in DEBUG printout)
 
