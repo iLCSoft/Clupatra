@@ -145,6 +145,10 @@ class ClupatraProcessor : public Processor {
 
   bool _createDebugCollections ;
 
+  int _caloFaceBarrelID ;
+  int _caloFaceEndcapID ;
+
+
   int _nRun ;
   int _nEvt ;
 

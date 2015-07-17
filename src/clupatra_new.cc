@@ -1202,7 +1202,7 @@ namespace clupatra_new{
 	// ======= get TrackState at calo face  ========================
 	//
 	encoder.reset() ;
-	encoder[ lcio::ILDCellID0::subdet ] =  lcio::ILDDetID::ECAL ;
+	encoder[ lcio::ILDCellID0::subdet ] = CaloFaceBarrelID ;
 	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
 	encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
 	int layerID  = encoder.lowWord() ;  
@@ -1216,7 +1216,9 @@ namespace clupatra_new{
 	
 	if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
 	  
+	  encoder[ lcio::ILDCellID0::subdet ] = CaloFaceEndcapID ;
 	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
+
 	  layerID = encoder.lowWord() ;
 	  
 #if use_fit_at_last_hit

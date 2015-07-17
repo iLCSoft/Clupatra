@@ -404,6 +404,17 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
 			      _trkSystemName,
 			      std::string("KalTest") );
 
+  registerProcessorParameter( "CaloFaceBarrelID" , 
+			      "system ID of the subdetector at the calorimeter face in the barrel - default: lcio::ILDDetID::ECAL=20 ",
+			      _caloFaceBarrelID,
+			      (int) 20) ;
+
+  registerProcessorParameter( "CaloFaceEndcapID" , 
+			      "system ID of the subdetector at the calorimeter face in the endcap - default: lcio::ILDDetID::ECAL=20 ",
+			      _caloFaceEndcapID,
+			      (int) 20) ;
+
+
 }
 
 
@@ -474,7 +485,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   
 
   LCIOTrackConverter converter ;
-  
+  converter.CaloFaceBarrelID  = _caloFaceBarrelID ;
+  converter.CaloFaceEndcapID = _caloFaceEndcapID ;
+
+
   _gearTPC = &Global::GEAR->getTPCParameters() ;
   _bfield = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
 
