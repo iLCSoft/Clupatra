@@ -215,7 +215,7 @@ namespace clupatra_new{
 
     LCIOTrackConverter() : UsePropagate(false ) , 
 			   CaloFaceBarrelID( lcio::ILDDetID::ECAL) , 
-			   CaloFaceEndcapID( lcio::ILDDetID::ECAL){} 
+			   CaloFaceEndcapID( lcio::ILDDetID::ECAL_ENDCAP){} 
 
     lcio::Track* operator() (CluTrack* c) ;
 

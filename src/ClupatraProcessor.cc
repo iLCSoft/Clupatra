@@ -410,9 +410,9 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
 			      (int) 20) ;
 
   registerProcessorParameter( "CaloFaceEndcapID" , 
-			      "system ID of the subdetector at the calorimeter face in the endcap - default: lcio::ILDDetID::ECAL=20 ",
+			      "system ID of the subdetector at the calorimeter face in the endcap - default: lcio::ILDDetID::ECAL=29 ",
 			      _caloFaceEndcapID,
-			      (int) 20) ;
+			      (int) 29) ;
 
 
 }
@@ -483,10 +483,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   Clusterer::cluster_list cluList ;    
   cluList.setOwner() ;
   
-
   LCIOTrackConverter converter ;
+  converter.UsePropagate  = true ;
   converter.CaloFaceBarrelID  = _caloFaceBarrelID ;
-  converter.CaloFaceEndcapID = _caloFaceEndcapID ;
+  converter.CaloFaceEndcapID  = _caloFaceEndcapID ;
 
 
   _gearTPC = &Global::GEAR->getTPCParameters() ;
