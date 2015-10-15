@@ -18,6 +18,9 @@
 #include "IMPL/TrackerHitImpl.h"
 #include "IMPL/TrackStateImpl.h"
 
+#include "MarlinTrk/Factory.h"
+#include "MarlinTrk/MarlinKalTest.h"
+
 using namespace MarlinTrk ;
 
 namespace lcio{
@@ -1200,7 +1203,18 @@ namespace clupatra_new{
 	}
 	
 	// ======= get TrackState at calo face  ========================
-	//
+
+	// FG: this is a temporary workaround for the old Mokka based simulation and KalTest - we force the 
+	// CaloFaceEndcapID to be the canincal lcio::ILDDetID::ECAL
+	 MarlinTrk::IMarlinTrkSystem* trksystem =  MarlinTrk::Factory::getCurrentMarlinTrkSystem() ;
+	 
+	 MarlinKalTest* trksys = dynamic_cast< MarlinKalTest* >( trksystem ) ;
+	 
+	 if( trksys != 0 ) { // we are in KalTest world
+	   CaloFaceEndcapID = lcio::ILDDetID::ECAL ;
+	 }
+	 //=========================================================================================================
+
 	encoder.reset() ;
 	encoder[ lcio::ILDCellID0::subdet ] = CaloFaceBarrelID ;
 	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
