@@ -486,8 +486,12 @@ namespace clupatra_new{
       streamlog_out( DEBUG3  )  << "               -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
       
       //need to add a dummy hit to the track
-      mTrk->addHit(  trk->getTrackerHits()[0] ) ;  // is this the right hit ??????????
-      
+      int result = mTrk->addHit(  trk->getTrackerHits()[0] ) ;  // is this the right hit ??????????
+
+      if( result !=  MarlinTrk::IMarlinTrack::success ){
+	     return false ;
+      }
+
       mTrk->initialise( *ts ,  _b ,  MarlinTrk::IMarlinTrack::backward ) ;
       
       double deltaChi ;
