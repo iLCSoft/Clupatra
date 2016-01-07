@@ -1247,6 +1247,15 @@ namespace clupatra_new{
 	  streamlog_out( DEBUG6 ) << "  >>>>>>>>>>> LCIOTrackConverter :  could not get TrackState at calo face !!?? " << std::endl ;
 	}
 	
+	//fg: for curling tracks the propagated track has the wrong z0 whereas it should be 0. really 
+	if( std::abs( tsCA->getZ0() ) > std::abs( 2.*M_PI/tsCA->getOmega() * tsCA->getTanLambda() ) ){
+	  
+	  streamlog_out( DEBUG2 ) << "  >>>>>>>>>>> createTrackStateAtCaloFace : setting z0 to 0. for track state at calorimeteter : " 
+				  << toString(tsCA) << std::endl ;
+	  
+	  tsCA->setZ0( 0. ) ;
+	} 
+
 	// ======= get TrackState at IP ========================
 	
 	const gear::Vector3D ipv( 0.,0.,0. );
