@@ -15,6 +15,17 @@
 For examples see examples/README
 
   --------
+ | v00-13 |
+  --------
+
+    - fix for TS @calo: set z0 to 0
+    - protect against failure in adding a trackerhit in TrackSegmentMerger
+    - make track state at calo again compatible w/ old sim/rec
+    - fixed creation of track state at calo
+    - activate propagete in track fit
+      (-> needed for pull distributions)
+
+  --------
  | v00-12 |
   --------
     - added parameters CaloFaceBarrelID/CaloFaceEndcapID
