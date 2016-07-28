@@ -14,6 +14,16 @@
 
 For examples see examples/README
 
+  -------- 
+ | v00-14 |
+  --------
+
+F. Gaede
+  - made compatible with c++11
+  - removed -ansi -pedantic -Wno-long-long
+  - fixed template parameters in nnclu::(not)inRange<int,int>
+
+
   --------
  | v00-13 |
   --------
