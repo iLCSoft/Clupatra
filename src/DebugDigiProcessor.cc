@@ -18,8 +18,6 @@
 #include "UTIL/CellIDDecoder.h"
 // #include "UTIL/LCTOOLS.h"
 
-//---- GEAR ----
-#include "gear/GEAR.h"
 
 #include "UTIL/LCIterator.h"
 
@@ -97,7 +95,7 @@ void DebugDigiProcessor::init() {
   _nEvt = 0 ;
 }
 
-void DebugDigiProcessor::processRunHeader( LCRunHeader* run) { 
+void DebugDigiProcessor::processRunHeader( LCRunHeader* ) { 
 
   _nRun++ ;
 } 
@@ -230,7 +228,7 @@ void DebugDigiProcessor::processEvent( LCEvent * evt ) {
 
 
 /*************************************************************************************************/
-void DebugDigiProcessor::check( LCEvent * evt ) { 
+void DebugDigiProcessor::check( LCEvent *  ) { 
   /*************************************************************************************************/
 
 }

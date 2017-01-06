@@ -7,19 +7,22 @@
 #include <UTIL/ILDConf.h>
 #include <UTIL/BitSet32.h>
 
-///---- GEAR ----
 #include "marlin/Global.h"
-#include "gear/GEAR.h"
-#include "gear/TPCParameters.h"
-#include "gear/TPCModule.h"
-
-#include "gear/BField.h"
 
 #include "IMPL/TrackerHitImpl.h"
 #include "IMPL/TrackStateImpl.h"
 
 #include "MarlinTrk/Factory.h"
 #include "MarlinTrk/MarlinKalTest.h"
+
+// --- DD4hep ---
+#include "DD4hep/LCDD.h"
+#include "DDSurfaces/Vector3D.h"
+#include "DD4hep/DD4hepUnits.h" 
+#include "DDRec/DetectorData.h"
+
+
+#include "gearimpl/Vector3D.h"
 
 using namespace MarlinTrk ;
 
@@ -34,12 +37,12 @@ namespace clupatra_new{
   
   /** helper class to compute the chisquared of two points in rho and z coordinate */
   struct Chi2_RPhi_Z_Hit{
-    //    double operator()( const TrackerHit* h, const gear::Vector3D& v1) {
-    double operator()( const ClupaHit* h, const gear::Vector3D& v1) {
+    //    double operator()( const TrackerHit* h, const DDSurfaces::Vector3D& v1) {
+    double operator()( const ClupaHit* h, const DDSurfaces::Vector3D& v1) {
 
 
-      //      gear::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
-      const gear::Vector3D& v0 = h->pos ;
+      //      DDSurfaces::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
+      const DDSurfaces::Vector3D& v0 = h->pos ;
 
       double sigsr =  h->lcioHit->getCovMatrix()[0] + h->lcioHit->getCovMatrix()[2]  ;
       double sigsz =  h->lcioHit->getCovMatrix()[5] ;
@@ -80,16 +83,19 @@ namespace clupatra_new{
 
     int nHitsAdded = 0 ;
 
-    const double bfield = marlin::Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
+    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
 
-    // Support for more than one module
-    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
-    // The ternary operator is used to make the trick with the static variable which
-    // is supposed to be calculated only once, also for performance reason
-    static const int maxTPCLayerID  = (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
-                                         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() - 1 : // LCTPC
-                                         gearTPC->getModule(0).getNRows() - 1 ; // ILD
+    double bfieldV[3] ;
+    DD4hep::Geometry::OverlayedField ovField = lcdd.field() ;
+    ovField.magneticField( { 0., 0., 0. }  , bfieldV  ) ;
+    const double bfield = bfieldV[2] ;
+    
 
+    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
+    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    const int maxTPCLayerID  = tpc->maxRow ;
+
+    
     clu->sort( LayerSortIn() ) ;
     
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
@@ -180,7 +186,8 @@ namespace clupatra_new{
 
       encoder[ UTIL::ILDCellID0::layer ]  = layer ;
       
-      gear::Vector3D xv ;
+      //fixme: for now still use gear::Vector3D until IMarlinTrk is changed
+      gear::Vector3D gxv ;
       
       bool hitAdded = false ;
       
@@ -196,14 +203,15 @@ namespace clupatra_new{
       
       if( firstHit )  {
 
-	intersects  = theTrk->intersectionWithLayer( layerID, firstHit, xv, elementID , mode )   ; 
+	intersects  = theTrk->intersectionWithLayer( layerID, firstHit, gxv, elementID , mode )   ; 
 	
       } else {
 
-	intersects  = theTrk->intersectionWithLayer( layerID, xv, elementID , mode )  ; 
+	intersects  = theTrk->intersectionWithLayer( layerID, gxv, elementID , mode )  ; 
       }
 
-
+      DDSurfaces::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )   ;
+	
 
       streamlog_out( DEBUG2 ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
 			     <<  "  Step : " << step 
@@ -241,11 +249,11 @@ namespace clupatra_new{
  	if( bestHit != 0 ){
 	  
 	  streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
-				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
+				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  DDSurfaces::Vector3D() ) 
 				  <<   " chi2: " <<  ch2Min 
 				  <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
 	  
-	  const gear::Vector3D&  hPos = bestHit->first->pos  ;
+	  const DDSurfaces::Vector3D&  hPos = bestHit->first->pos  ;
 	  
 	  if( ch2Min  < chi2Cut ) { 
 	    
@@ -315,13 +323,16 @@ namespace clupatra_new{
     
     int layerID = encoder.lowWord() ;  
     
-    gear::Vector3D xv ;
+    //fixme: for now still use gear::Vector3D until IMarlinTrk is changed
+    gear::Vector3D gxv ;
     
     int elementID = -1 ;
     
-    int intersects = trk->intersectionWithLayer( layerID, xv, elementID , IMarlinTrack::modeClosest  ) ; 
+    int intersects = trk->intersectionWithLayer( layerID, gxv, elementID , IMarlinTrack::modeClosest  ) ; 
     
-    //  IMarlinTrack::modeBackward , IMarlinTrack::modeForward 
+    DDSurfaces::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )  ;
+ 
+ //  IMarlinTrack::modeBackward , IMarlinTrack::modeForward 
     
     streamlog_out( DEBUG2 ) <<  "  ============ addHitAndFilter(): looked for intersection - " 
 			    <<  "  detector : " <<  detectorID 
@@ -360,13 +371,13 @@ namespace clupatra_new{
       
       
       streamlog_out( DEBUG2 ) <<   " ************ bestHit "  << bestHit 
-			     <<   " pos : " <<   (bestHit ? bestHit->first->pos :  gear::Vector3D() ) 
+			     <<   " pos : " <<   (bestHit ? bestHit->first->pos :  DDSurfaces::Vector3D() ) 
 			     <<   " chi2: " <<  ch2Min 
 			     <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
       
       if( bestHit != 0 ){
 	
-	const gear::Vector3D&  hPos = bestHit->first->pos  ;
+	const DDSurfaces::Vector3D&  hPos = bestHit->first->pos  ;
 	
 	if( ch2Min  < chi2Cut ) { 
 	  
@@ -410,10 +421,6 @@ namespace clupatra_new{
   //------------------------------------------------------------------------------------------------------------
 
   void getHitMultiplicities( CluTrack* clu, std::vector<int>& mult ){
-    
-    // int static maxTPCLayerID = marlin::Global::GEAR->getTPCParameters().getPadLayout().getNRows() - 1 ; 
-    // HitListVector hLV( maxTPCLayerID )  ;
-    // addToHitListVector( clu->begin(), clu->end(),  hLV ) ;
     
     std::map<int, unsigned > hm ;
     
@@ -518,21 +525,18 @@ namespace clupatra_new{
     
     hV.freeElements() ;
 
-    // Support for more than one module
-    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
-    // The ternary operator is used to make the trick with the static variable which
-    // is supposed to be calculated only once, also for performance reason
-    static const int tpcNRow =
-        (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
-         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() : // LCTPC
-         gearTPC->getModule(0).getNRows() ; // ILD
+    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
+    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    const int tpcNRow  = tpc->maxRow ;
+
 
     HitListVector hitsInLayer( tpcNRow )  ; 
     addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
     
     std::vector< CluTrack*> clu(n)  ;
     
-    std::vector< gear::Vector3D > lastp(n) ;
+    std::vector< DDSurfaces::Vector3D > lastp(n) ;
     
     for(unsigned i=0; i<n; ++i){
       
@@ -555,7 +559,7 @@ namespace clupatra_new{
       HitList::iterator iH = hL.begin() ;
       
       std::vector<Hit*> h(n) ;
-      std::vector< gear::Vector3D>  p(n) ;
+      std::vector< DDSurfaces::Vector3D>  p(n) ;
       
 
       streamlog_out(  DEBUG2 ) << " create_n_clusters  ---  layer " << l << std::endl ;
@@ -588,7 +592,7 @@ namespace clupatra_new{
       
       
       // unit vector in direction of current hits
-      std::vector< gear::Vector3D > pu(n) ;
+      std::vector< DDSurfaces::Vector3D > pu(n) ;
 
       for(unsigned i=0; i<n; ++i){
 
@@ -664,22 +668,18 @@ namespace clupatra_new{
     
     hV.freeElements() ;
     
-    // Support for more than one module
-    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
-    // The ternary operator is used to make the trick with the static variable which
-    // is supposed to be calculated only once, also for performance reason
-    static const int tpcNRow =
-        (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
-         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() : // LCTPC
-         gearTPC->getModule(0).getNRows() ; // ILD
+    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
+    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    const int tpcNRow  = tpc->maxRow ;
     
     HitListVector hitsInLayer( tpcNRow )  ; 
     addToHitListVector(  hV.begin(), hV.end(), hitsInLayer ) ;
     
     CluTrack* clu[3] ;
 
-    gear::Vector3D lastp[3] ;
-    //    gear::Vector3D cluDir[3] ;
+    DDSurfaces::Vector3D lastp[3] ;
+    //    DDSurfaces::Vector3D cluDir[3] ;
 
     clu[0] = new CluTrack ;
     clu[1] = new CluTrack ;
@@ -708,7 +708,7 @@ namespace clupatra_new{
       h[1] = *iH++   ;
       h[2] = *iH   ;
       
-      gear::Vector3D p[3] ;
+      DDSurfaces::Vector3D p[3] ;
       p[0] = h[0]->first->pos ;
       p[1] = h[1]->first->pos ;
       p[2] = h[2]->first->pos ;
@@ -741,7 +741,7 @@ namespace clupatra_new{
       
 
       // unit vector in direction of current hits
-      gear::Vector3D pu[3] ;
+      DDSurfaces::Vector3D pu[3] ;
       pu[0] = ( 1. / p[0].r() ) * p[0] ;
       pu[1] = ( 1. / p[1].r() ) * p[1] ;
       pu[2] = ( 1. / p[2].r() ) * p[2] ;
@@ -755,7 +755,7 @@ namespace clupatra_new{
   	for( int j = 0 ; j < 3 ; ++j ){
 	  
   	  // // unit vector in direction of last hit and 
-  	  // gear::Vector3D pu = - ( p[0] - lastp[0] ) ;
+  	  // DDSurfaces::Vector3D pu = - ( p[0] - lastp[0] ) ;
   	  // pu[1] = - ( p[1] - lastp[1] ) ;
   	  // pu[2] = - ( p[2] - lastp[2] ) ;
   	  // pu[0] =  (  1. / pu[0].r() ) * pu[0]  ;
@@ -837,14 +837,10 @@ namespace clupatra_new{
     
     streamlog_out(  DEBUG ) << " create_two_clusters  --- called ! - size :  " << clu.size()  << std::endl ;
 
-    // Support for more than one module
-    static const gear::TPCParameters*  gearTPC = &marlin::Global::GEAR->getTPCParameters();
-    // The ternary operator is used to make the trick with the static variable which
-    // is supposed to be calculated only once, also for performance reason
-    static const int tpcNRow =
-        (marlin::Global::GEAR->getDetectorName() == "LPTPC" ) ?
-         gearTPC->getModule(0).getNRows() + gearTPC->getModule(2).getNRows() + gearTPC->getModule(5).getNRows() : // LCTPC
-         gearTPC->getModule(0).getNRows() ; // ILD
+    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
+    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    const int tpcNRow  = tpc->maxRow ;
     
     HitListVector hitsInLayer( tpcNRow )  ; 
 
@@ -858,7 +854,7 @@ namespace clupatra_new{
     cluVec.push_back( clu1 ) ;
 
 
-    gear::Vector3D lastDiffVec(0.,0.,0.) ;
+    DDSurfaces::Vector3D lastDiffVec(0.,0.,0.) ;
     
     for( int l=tpcNRow-1 ; l >= 0 ; --l){
 
@@ -878,8 +874,8 @@ namespace clupatra_new{
       Hit* h0 = *iH++ ;
       Hit* h1 = *iH   ;
       
-      gear::Vector3D& p0 = h0->first->pos ;
-      gear::Vector3D& p1 = h1->first->pos ;
+      DDSurfaces::Vector3D& p0 = h0->first->pos ;
+      DDSurfaces::Vector3D& p1 = h1->first->pos ;
 
 
       streamlog_out(  DEBUG ) << " create_two_clusters  ---  layer " << l 
@@ -899,7 +895,7 @@ namespace clupatra_new{
   	continue ;  
       }
 
-      gear::Vector3D d = p1 - p0 ;
+      DDSurfaces::Vector3D d = p1 - p0 ;
       
       float s0 =  ( lastDiffVec + d ).r() ;
       float s1 =  ( lastDiffVec - d ).r() ;
@@ -942,7 +938,7 @@ namespace clupatra_new{
   //   for(CluTrack::iterator it= clu.begin() ; it != clu.end() ; ++it ){
       
   //     Hit* hit0 = *it ; 
-  //     gear::Vector3D& pos0 =  hit0->first->pos ;
+  //     DDSurfaces::Vector3D& pos0 =  hit0->first->pos ;
       
   //     int layer = hit0->first->layerID ;
       
@@ -957,7 +953,7 @@ namespace clupatra_new{
   // 	for( HitList::iterator iH = hL.begin() ; iH != hL.end() ; ++iH ) {
 	  
   // 	  Hit* hit1 = *iH ; 
-  // 	  gear::Vector3D& pos1 = hit1->first->pos ;
+  // 	  DDSurfaces::Vector3D& pos1 = hit1->first->pos ;
 	  
   // 	  double dist2 = ( pos0 - pos1 ).r2() ;
 	  
@@ -983,7 +979,7 @@ namespace clupatra_new{
   // 	for( HitList::iterator iH = hL.begin() ; iH != hL.end() ; ++iH ) {
 	  
   // 	  Hit* hit1 = *iH ; 
-  // 	  gear::Vector3D&  pos1 =  hit1->first->pos ;
+  // 	  DDSurfaces::Vector3D&  pos1 =  hit1->first->pos ;
 	  
   // 	  double dist2 = ( pos0 - pos1 ).r2() ;
 	  
@@ -1192,7 +1188,7 @@ namespace clupatra_new{
 	  EVENT::TrackerHit* last_constrained_hit = 0 ;     
 	  mtrk->getTrackerHitAtPositiveNDF( last_constrained_hit );
 	  code = mtrk->smooth() ;
-	  gear::Vector3D last_hit_pos( lHit->getPosition() );
+	  DDSurfaces::Vector3D last_hit_pos( lHit->getPosition() );
 	  code = mtrk->propagate( last_hit_pos, last_constrained_hit, *tsLH, chi2, ndf);
 
 #endif
@@ -1258,7 +1254,7 @@ namespace clupatra_new{
 
 	// ======= get TrackState at IP ========================
 	
-	const gear::Vector3D ipv( 0.,0.,0. );
+	const DDSurfaces::Vector3D ipv( 0.,0.,0. );
 	
 	// fg: propagate is quite slow  and might not really be needed for the TPC
 	

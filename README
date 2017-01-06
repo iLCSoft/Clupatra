@@ -15,6 +15,14 @@
 For examples see examples/README
 
   -------- 
+ | v01-00 |
+  --------
+ F.Gaede
+  - replaced GEAR with DD4hep
+    - use DD4hep::DDRec::FixedPadSizeTPCData for gear::TPCData
+    - use DDSurfaces::Vector3D for gear::Vector3D
+
+  -------- 
  | v00-14 |
   --------
 
