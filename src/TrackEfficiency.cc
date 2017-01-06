@@ -24,12 +24,10 @@
 #include "UTIL/ILDConf.h"
 #include "UTIL/LCTOOLS.h"
 
-//---- GEAR ----
-// #include "marlin/Global.h"
-#include "gear/GEAR.h"
-// #include "gear/TPCParameters.h"
-// #include "gear/PadRowLayout2D.h"
-// #include "gear/BField.h"
+// --- DD4hep ---
+#include "DD4hep/LCDD.h"
+#include "DDSurfaces/Vector3D.h"
+#include "DD4hep/DD4hepUnits.h" 
 
 
 //MarlinUtil
@@ -189,7 +187,7 @@ void TrackEfficiency::init() {
   _nEvt = 0 ;
 }
 
-void TrackEfficiency::processRunHeader( LCRunHeader* run) { 
+void TrackEfficiency::processRunHeader( LCRunHeader* ) { 
 
   _nRun++ ;
 } 
@@ -199,8 +197,12 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
   clock_t start =  clock() ; 
 
-  static const double bField = 3.5 ;   // should get this from Gear  ....
+  DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+  double bfieldV[3] ;
+  lcdd.field().magneticField( { 0., 0., 0. }  , bfieldV  ) ;
+  const double bField = bfieldV[2] ;
 
+  
   static const double alpha =  2.99792458e-4 * bField ;  ;
   // p_t[GeV] = alpha / omega[mm] ;
 
@@ -389,9 +391,9 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
     //    APPLY_CUT( DEBUG, cut,  mcp->getGeneratorStatus() == 1   ) ;   // no documentation lines
 
-    gear::Vector3D v( mcp->getVertex()[0], mcp->getVertex()[1], mcp->getVertex()[2] );
-    gear::Vector3D e( mcp->getEndpoint()[0], mcp->getEndpoint()[1], mcp->getEndpoint()[2] );
-    gear::Vector3D p( mcp->getMomentum()[0], mcp->getMomentum()[1], mcp->getMomentum()[2] );
+    DDSurfaces::Vector3D v( mcp->getVertex()[0], mcp->getVertex()[1], mcp->getVertex()[2] );
+    DDSurfaces::Vector3D e( mcp->getEndpoint()[0], mcp->getEndpoint()[1], mcp->getEndpoint()[2] );
+    DDSurfaces::Vector3D p( mcp->getMomentum()[0], mcp->getMomentum()[1], mcp->getMomentum()[2] );
 
     APPLY_CUT( DEBUG, cut, v.r() < 100.   ) ;   // start at IP+/-10cm
 
@@ -461,7 +463,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     mom[1] = trm->getMomentum()[1] ;
     mom[2] = trm->getMomentum()[2] ;
 
-    gear::Vector3D p( trm->getMomentum()[0], trm->getMomentum()[1], trm->getMomentum()[2] );
+    DDSurfaces::Vector3D p( trm->getMomentum()[0], trm->getMomentum()[1], trm->getMomentum()[2] );
     double costhmcp  = cos( p.theta() ) ;
 
     float q = trm->getCharge() ;
@@ -668,7 +670,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
 
 /*************************************************************************************************/
-void TrackEfficiency::check( LCEvent * evt ) { 
+void TrackEfficiency::check( LCEvent * ) { 
   /*************************************************************************************************/
 
 }
