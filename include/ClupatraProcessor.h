@@ -1,34 +1,30 @@
 #ifndef ClupatraProcessor_h
 #define ClupatraProcessor_h 1
 
-//#include "assert.h"
+#include "assert.h"
 
 #include "marlin/Processor.h"
-
 #include "lcio.h"
-
-#include "DDRec/DetectorData.h"
-
 #include <string>
 
+#include "gear/TPCModule.h"
 
-// forward declarations
+using namespace lcio ;
+using namespace marlin ;
+
 namespace MarlinTrk{
   class IMarlinTrkSystem ;
+}
+namespace gear{
+  class TPCParameters ;
+  class PadRowLayout2D ;
 }
 
 namespace EVENT{ 
   class Track ;
 }
 
-// namespace DD4hep{
-//   namespace DDRec{
-//     struct FixedPadSizeTPCData ;
-//   }
-//
-
-
-/** ClupatraProcessor : nearest neighbour clustering seeded pattern recognition using a Kalman-Filter for extrapolation and 
+/** ClupatraProcessor : nearest neighbour clustering seeded pattern recognition using Kalman-Filter for extrapolation and 
  *  hit search.
  * 
  *   @parameter TPCHitCollection         Name of the tpc hit input collections
@@ -67,9 +63,9 @@ namespace EVENT{
  *   @parameter Verbosity               verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")
  * 
  * @author F.Gaede, DESY, 2011/2012
- * 
+ * @version $Id$ 
  */
-class ClupatraProcessor : public marlin::Processor {
+class ClupatraProcessor : public Processor {
   
  public:
   
@@ -85,16 +81,16 @@ class ClupatraProcessor : public marlin::Processor {
   
   /** Called for every run.
    */
-  virtual void processRunHeader( lcio::LCRunHeader* run ) ;
+  virtual void processRunHeader( LCRunHeader* run ) ;
   
   /** Called for every event - the working horse.
    */
-  virtual void processEvent( lcio::LCEvent * evt ) ;
+  virtual void processEvent( LCEvent * evt ) ;
 
   //  void doBLA() ;
   
   
-  virtual void check( lcio::LCEvent * evt ) ; 
+  virtual void check( LCEvent * evt ) ; 
   
   
   /** Called after data processing for clean up.
@@ -159,7 +155,9 @@ class ClupatraProcessor : public marlin::Processor {
   MarlinTrk::IMarlinTrkSystem* _trksystem ;
   std::string _trkSystemName ;
 
-  const DD4hep::DDRec::FixedPadSizeTPCData*  _tpc ;
+  const gear::TPCParameters*  _gearTPC ;
+
+//   NNClusterer* _clusterer ;
 
 } ;
 

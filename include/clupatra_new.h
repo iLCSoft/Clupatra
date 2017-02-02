@@ -11,11 +11,6 @@
 
 #include "NNClusterer.h"
 
-// --- DD4hep ---
-#include "DD4hep/LCDD.h"
-#include "DDSurfaces/Vector3D.h"
-#include "DD4hep/DD4hepUnits.h" 
-
 #include "lcio.h"
 #include "EVENT/TrackerHit.h"
 #include "IMPL/TrackImpl.h"
@@ -23,6 +18,7 @@
 #include "UTIL/CellIDDecoder.h"
 #include "UTIL/ILDConf.h"
 
+#include "GEAR.h"
 
 #include "MarlinTrk/IMarlinTrack.h"
 #include "MarlinTrk/IMarlinTrkSystem.h"
@@ -60,7 +56,7 @@ namespace clupatra_new{
     int zIndex ;
     int phiIndex ;
     lcio::TrackerHit* lcioHit ;
-    DDSurfaces::Vector3D pos ;
+    gear::Vector3D pos ;
 
   };
   
@@ -174,8 +170,8 @@ namespace clupatra_new{
 
       if(  _caCut > 0.  && std::abs( h0->first->layer - h1->first->layer ) == 1 ){
 
-	DDSurfaces::Vector3D& p0 =  h0->first->pos   ;
-	DDSurfaces::Vector3D& p1 =  h1->first->pos   ;
+	gear::Vector3D& p0 =  h0->first->pos   ;
+	gear::Vector3D& p1 =  h1->first->pos   ;
 	
 	double cosAlpha = p0.dot( p1 ) / p0.r() / p1.r()  ;
 
@@ -504,7 +500,7 @@ namespace clupatra_new{
       //-----   now try to add the three hits : ----------------
       addHit = mTrk->addAndFit(  th0 , deltaChi, _chi2Max ) ;
       
-      streamlog_out( DEBUG3 ) << "    ****  adding first hit : " <<  DDSurfaces::Vector3D( th0->getPosition() )  
+      streamlog_out( DEBUG3 ) << "    ****  adding first hit : " <<  gear::Vector3D( th0->getPosition() )  
 			      << "         added : " << MarlinTrk::errorCode( addHit )
 			      << "         deltaChi2: " << deltaChi 
 			      << std::endl ;
@@ -514,7 +510,7 @@ namespace clupatra_new{
       //---------------------
       addHit = mTrk->addAndFit(  th1 , deltaChi, _chi2Max ) ;
       
-      streamlog_out( DEBUG3 ) << "    ****  adding second hit : " <<  DDSurfaces::Vector3D( th1->getPosition() )  
+      streamlog_out( DEBUG3 ) << "    ****  adding second hit : " <<  gear::Vector3D( th1->getPosition() )  
 			      << "         added : " << MarlinTrk::errorCode( addHit )
 			      << "         deltaChi2: " << deltaChi 
 			      << std::endl ;
@@ -524,7 +520,7 @@ namespace clupatra_new{
       //--------------------
       addHit = mTrk->addAndFit(  th2 , deltaChi, _chi2Max ) ;
       
-      streamlog_out( DEBUG3 ) << "    ****  adding third hit : " <<  DDSurfaces::Vector3D( th2->getPosition() )  
+      streamlog_out( DEBUG3 ) << "    ****  adding third hit : " <<  gear::Vector3D( th2->getPosition() )  
 			      << "         added : " << MarlinTrk::errorCode( addHit )
 			      << "         deltaChi2: " << deltaChi 
 			      << std::endl ;
