@@ -27,19 +27,16 @@
 #include "UTIL/ILDConf.h"
 #include "UTIL/LCIterator.h"
 
+// --- DD4hep ---
+#include "DD4hep/LCDD.h"
+#include "DDSurfaces/Vector3D.h"
+#include "DD4hep/DD4hepUnits.h" 
+#include "DDRec/DetectorData.h"
+
+
 //-------gsl -----
 #include "gsl/gsl_randist.h"
 #include "gsl/gsl_cdf.h"
-
-
-//---- GEAR ----
-#include "marlin/Global.h"
-#include "gear/GEAR.h"
-#include "gear/TPCParameters.h"
-#include "gear/ZPlanarParameters.h"
-#include "gear/ZPlanarLayerLayout.h"
-#include "gear/PadRowLayout2D.h"
-#include "gear/BField.h"
 
 
 #include "MarlinTrk/Factory.h"
@@ -110,29 +107,31 @@ template <class In, class Pred> In find_smallest(In first, In last, Pred p, doub
   return res ;
 }
 //----------------------------------------------------------------
+template <class VEC_3D>
 struct Distance3D2{
-  gear::Vector3D _pos ;
-  Distance3D2( const gear::Vector3D& pos) : _pos( pos ) {}
+  VEC_3D _pos ;
+  Distance3D2( const VEC_3D& pos) : _pos( pos ) {}
   template <class T>
   double operator()( const T* t) { 
-    gear::Vector3D p( t->getPosition() ) ;
+    VEC_3D p( t->getPosition() ) ;
     return ( p - _pos ).r2() ; 
 
   }
 };
 
 //----------------------------------------------------------------
+template <class VEC_3D>
 struct StripDistance2{
-  gear::Vector3D _pos ;
-  StripDistance2( const gear::Vector3D& pos) : _pos( pos ) {}
+  VEC_3D _pos ;
+  StripDistance2( const VEC_3D& pos) : _pos( pos ) {}
   
   double operator()( const TrackerHit* t) { 
 
-    gear::Vector3D p( t->getPosition() ) ;
+    VEC_3D p( t->getPosition() ) ;
 
     const TrackerHitPlane* h = (const TrackerHitPlane*) t ;
 
-    gear::Vector3D v( 1. , h->getU()[1] ,  h->getU()[0] , gear::Vector3D::spherical ) ;
+    VEC_3D v( 1. , h->getU()[1] ,  h->getU()[0] , VEC_3D::spherical ) ;
 
     double d = ( p - _pos ).dot(v)  ;
 
@@ -246,8 +245,7 @@ ClupatraProcessor aClupatraProcessor ;
 
 
 ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
-//					 _trksystem(0), _gearTPC(0) ,_padLayout(0) {
-					 _trksystem(0), _gearTPC(0) {
+					 _trksystem(0), _tpc(0) {
   
   // modify processor description
   _description = "ClupatraProcessor : nearest neighbour clustering seeded pattern recognition" ;
@@ -424,7 +422,8 @@ void ClupatraProcessor::init() {
   printParameters() ;
   
   // set upt the geometry
-    _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , marlin::Global::GEAR , "" ) ;  
+  _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , marlin::Global::GEAR , "" ) ;  
+
   
   if( _trksystem == 0 ){
     
@@ -449,7 +448,7 @@ void ClupatraProcessor::init() {
   
 }
 
-void ClupatraProcessor::processRunHeader( LCRunHeader* run) { 
+void ClupatraProcessor::processRunHeader( LCRunHeader* ) { 
 
   _nRun++ ;
 } 
@@ -488,19 +487,21 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   converter.CaloFaceBarrelID  = _caloFaceBarrelID ;
   converter.CaloFaceEndcapID  = _caloFaceEndcapID ;
 
+  // --------  get the TPC geometry information from the DD4hep model
 
-  _gearTPC = &Global::GEAR->getTPCParameters() ;
-  _bfield = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z() ;
+  DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+  DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
+  _tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
 
-  // Support for more than one module
-  // The ternary operator is used to make the trick with the static variable which
-  // is supposed to be calculated only once, also for performance reason
-  static const unsigned int maxTPCLayers =
-      (Global::GEAR->getDetectorName() == "LPTPC" ) ?
-       _gearTPC->getModule(0).getNRows() + _gearTPC->getModule(2).getNRows() + _gearTPC->getModule(5).getNRows() :  // LCTPC
-       _gearTPC->getModule(0).getNRows(); // ILD
+  double bfieldV[3] ;
+  DD4hep::Geometry::OverlayedField ovField = lcdd.field() ;
+  ovField.magneticField( { 0., 0., 0. }  , bfieldV  ) ;
+  _bfield = bfieldV[2] ;
 
-  double driftLength = _gearTPC->getMaxDriftLength() ;
+  // fixme:  currently LCTPC not supported until DDRec data exists ...
+  static const unsigned int maxTPCLayers = _tpc->maxRow ;
+  
+  double driftLength = _tpc->driftLength / dd4hep::mm ;
   ZIndex zIndex( -driftLength , driftLength , _nZBins  ) ; 
   
 
@@ -547,7 +548,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     ch->lcioHit = th ; 
     
-    ch->pos = gear::Vector3D(  th->getPosition() ) ;
+    ch->pos = DDSurfaces::Vector3D(  th->getPosition() ) ;
     
     //  int padIndex = padLayout.getNearestPad( ch->pos.rho() , ch->pos.phi() ) ;
     //    ch->layer = padLayout.getRowNumber( padIndex ) ;
@@ -687,7 +688,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	smallclu.setOwner() ;      
 	split_list( sclu, std::back_inserter(smallclu),  ClusterSize(  int( _padRowRange * _smallClusterPadRowFraction) ) ) ; 
 	for( Clusterer::cluster_list::iterator sci=smallclu.begin(), end= smallclu.end() ; sci!=end; ++sci ){
-	  for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
+	  for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end1= (*sci)->end() ; ci!=end1;++ci ){
 	    seedhits.push_back( *ci ) ; 
 	  }
 	}
@@ -717,7 +718,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
      
       // ---- now we also need to remove the hits from good cluster seeds from the hitsInLayers:
       for( Clusterer::cluster_list::iterator sci=sclu.begin(), end= sclu.end() ; sci!=end; ++sci ){
-	for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end= (*sci)->end() ; ci!=end;++ci ){
+	for( Clusterer::cluster_type::iterator ci=(*sci)->begin(), end1= (*sci)->end() ; ci!=end1;++ci ){
 	
 	  // this is not cheap ...
 	  hitsInLayer[ (*ci)->first->layer ].remove( *ci )  ; 
@@ -767,7 +768,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 				 << *lcioTrk << std::endl ;
 	  
 	  
-	  for( Clusterer::cluster_type::iterator ci=(*icv)->begin(), end= (*icv)->end() ; ci!=end; ++ci ) {
+	  for( Clusterer::cluster_type::iterator ci=(*icv)->begin(), end1= (*icv)->end() ; ci!=end1; ++ci ) {
 	    hitsInLayer[ (*ci)->first->layer ].push_back( *ci )   ; 
 	  }
 	  (*icv)->freeElements() ;
@@ -816,7 +817,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     int padRangeRecluster = 50 ; // FIXME: make parameter 
     // define an inner cylinder where we exclude hits from re-clustering:
     double zMaxInnerHits   = driftLength * .67 ;   // FIXME: make parameter 
-    double rhoMaxInnerHits = _gearTPC->getPlaneExtent()[0] + (  _gearTPC->getPlaneExtent()[1] - _gearTPC->getPlaneExtent()[0] ) * .67 ;// FIXME: make parameter
+    double rhoMaxInnerHits =  ( _tpc->rMinReadout +  0.67 * 
+				( _tpc->rMaxReadout - _tpc->rMinReadout ) ) /dd4hep::mm ; // FIXME: make parameter
+
     
     streamlog_out( DEBUG5 ) << "  ===========================================================================\n"
 			    << "      recluster in leftover hits - outside a clyinder of :  z =" << zMaxInnerHits << " rho = " <<  rhoMaxInnerHits << "\n"
@@ -897,7 +900,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	  
 	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
 	  
-	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end1= reclu.end() ; ir != end1 ; ++ir ){
 	    
 	    streamlog_out( DEBUG5 ) << " extending mult-5 clustre  of length " << (*ir)->size() << std::endl ;
 	    
@@ -918,7 +921,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
 	
-	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end1= reclu.end() ; ir != end1 ; ++ir ){
 	  
 	    streamlog_out( DEBUG5 ) << " extending mult-4 clustre  of length " << (*ir)->size() << std::endl ;
 	  
@@ -939,7 +942,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
 	
-	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end1= reclu.end() ; ir != end1 ; ++ir ){
 	  
 	    streamlog_out( DEBUG5 ) << " extending triplet clustre  of length " << (*ir)->size() << std::endl ;
 	  
@@ -960,7 +963,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	
 	  std::transform( reclu.begin(), reclu.end(), std::back_inserter( seedTrks) , fitter ) ;
 	
-	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end= reclu.end() ; ir != end ; ++ir ){
+	  for( Clusterer::cluster_list::iterator ir= reclu.begin(), end1= reclu.end() ; ir != end1 ; ++ir ){
 	  
 	    streamlog_out( DEBUG5 ) << " extending doublet clustre  of length " << (*ir)->size() << std::endl ;
 	  
@@ -1159,8 +1162,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 	  //	std::copy( trk->getTrackerHits().begin() , trk->getTrackerHits().end() , std::back_inserter( hits ) ) ;
 
-	  for( lcio::TrackerHitVec::const_iterator it = trk->getTrackerHits().begin() , END =  trk->getTrackerHits().end() ; it != END ; ++ it ){
-	    hits.addElement( (*it)->ext<GHit>() )  ;
+	  for( lcio::TrackerHitVec::const_iterator it1 = trk->getTrackerHits().begin() , END =  trk->getTrackerHits().end() ; it1 != END ; ++ it ){
+	    hits.addElement( (*it1)->ext<GHit>() )  ;
 	  }
 
 	  // flag the segments so they can be ignored for final list 
@@ -1429,9 +1432,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   //  create some debug collections ....
   //===============================================================================================
   if( _createDebugCollections ) {
-
-    float r_inner = _gearTPC->getPlaneExtent()[0] ;
-    float r_outer = _gearTPC->getPlaneExtent()[1] ;
+    
+    float r_inner =  _tpc->rMinReadout / dd4hep::mm ; 
+    float r_outer =  _tpc->rMaxReadout / dd4hep::mm ; 
 
 
     for(  LCIterator<TrackImpl> it( outCol ) ;  TrackImpl* trk = it.next()  ; ) {
@@ -1447,8 +1450,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	continue; 
       }
 
-      gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
-      gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
+      DDSurfaces::Vector3D fhPos( tsF->getReferencePoint() ) ;
+      DDSurfaces::Vector3D lhPos( tsL->getReferencePoint() ) ;
       
 
       bool startsInner =  std::abs( fhPos.rho() - r_inner )     <  _trackStartsInnerDist ;        // first hit close to inner field cage 
@@ -1608,15 +1611,24 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   }
   
   int nSITLayers = 0 ;
-  try{
-    const gear::ZPlanarParameters& gearSIT = Global::GEAR->getSITParameters() ;
-    const gear::ZPlanarLayerLayout& gearSITLayout = gearSIT.getZPlanarLayerLayout() ;
-    nSITLayers = gearSITLayout.getNLayers() ;
-  }catch(gear::UnknownParameterException& ){}
+  int nVXDLayers = 0 ;
 
-  const gear::ZPlanarParameters& gearVXD = Global::GEAR->getVXDParameters() ;
-  const gear::ZPlanarLayerLayout& gearVXDLayout = gearVXD.getZPlanarLayerLayout() ;
-  int nVXDLayers = gearVXDLayout.getNLayers() ;
+  DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+
+  try{
+
+    DD4hep::Geometry::DetElement sitDE = lcdd.detector("SIT") ;
+    DD4hep::DDRec::ZPlanarData* sit = sitDE.extension<DD4hep::DDRec::ZPlanarData>() ;
+    
+    nSITLayers = sit->layers.size() ;
+    
+    DD4hep::Geometry::DetElement vxdDE = lcdd.detector("VXD") ;
+    DD4hep::DDRec::ZPlanarData* vxd = vxdDE.extension<DD4hep::DDRec::ZPlanarData>() ;
+    
+    nVXDLayers = vxd->layers.size() ;
+    
+  }catch(...){ } // fixme
+
 
   int nLayers  = nVXDLayers + nSITLayers  ;
 
@@ -1649,8 +1661,6 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       
       std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
 
-      //      double b = Global::GEAR->getBField().at( gear::Vector3D(0.,0.0,0.) ).z()  ;
-      
       const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
       
       //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
@@ -1706,7 +1716,9 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       encoder[ ILDCellID0::layer  ] = layer ;
       int layerID = encoder.lowWord() ;  
       
-      gear::Vector3D point ; 
+      //      DDSurfaces::Vector3D point ; 
+      // fixme:  use gear Vector3D for now until IMarlinTrk has been updated...
+      gear::Vector3D point ;
       
       int sensorID = -1 ;
 
@@ -1733,11 +1745,11 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	if( detID == ILDDetID::SIT ) {
 
-	  bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2( point ) , min ) ;
+	  bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2<gear::Vector3D>( point ) , min ) ;
 
 	} else {
 
-	  bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2( point ) , min ) ;
+	  bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2<gear::Vector3D>( point ) , min ) ;
 	}
 
 	if( bestIt == hL.end() || min  > maxDist ){
@@ -1755,7 +1767,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	int addHit = mTrk->addAndFit( *bestIt , deltaChi, _dChi2Max ) ;
 	    
-	streamlog_out( DEBUG3 ) << "    ****  best matching hit : " <<  gear::Vector3D( (*bestIt)->getPosition() )  
+	streamlog_out( DEBUG3 ) << "    ****  best matching hit : " <<  DDSurfaces::Vector3D( (*bestIt)->getPosition() )  
 				<< "         added : " << MarlinTrk::errorCode( addHit )
 				<< "   deltaChi2: " << deltaChi 
 				<< std::endl ;
@@ -1786,7 +1798,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     lcio::TrackStateImpl* tsi =  new lcio::TrackStateImpl ;
     double chi2 ;
     int ndf  ;
-    const gear::Vector3D ipv( 0.,0.,0. );
+    const DDSurfaces::Vector3D ipv( 0.,0.,0. );
     
     
     // get track state at the IP 
@@ -1838,9 +1850,9 @@ void ClupatraProcessor::computeTrackInfo(  lcio::Track* lTrk  ){
   if( ! lTrk->ext<TrackInfo>() )
     lTrk->ext<TrackInfo>() =  new TrackInfoStruct ;
 
-  float r_inner = _gearTPC->getPlaneExtent()[0] ;
-  float r_outer = _gearTPC->getPlaneExtent()[1] ;
-  float driftLength = _gearTPC->getMaxDriftLength() ;
+  float r_inner = _tpc->rMinReadout / dd4hep::mm ;
+  float r_outer = _tpc->rMaxReadout / dd4hep::mm ;
+  float driftLength = _tpc->driftLength / dd4hep::mm  ;
 
   // compute z-extend of this track segment
   const lcio::TrackerHitVec& hv = lTrk->getTrackerHits() ;
@@ -1868,8 +1880,8 @@ void ClupatraProcessor::computeTrackInfo(  lcio::Track* lTrk  ){
   if(  tsF == 0 ) return ;
   if(  tsL == 0 ) return ;
   
-  gear::Vector3D fhPos( tsF->getReferencePoint() ) ;
-  gear::Vector3D lhPos( tsL->getReferencePoint() ) ;
+  DDSurfaces::Vector3D fhPos( tsF->getReferencePoint() ) ;
+  DDSurfaces::Vector3D lhPos( tsL->getReferencePoint() ) ;
   
 
   TrackInfoStruct* ti = lTrk->ext<TrackInfo>() ;

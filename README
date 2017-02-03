@@ -15,6 +15,17 @@
 For examples see examples/README
 
   -------- 
+ | v01-00 |
+  --------
+ F.Gaede
+  - replaced GEAR with DD4hep
+    - use DD4hep::DDRec::FixedPadSizeTPCData for gear::TPCData
+    - use DDSurfaces::Vector3D for gear::Vector3D
+    - still use gear::Vector3D for MarlinTrk intersection
+      calculations until it is chaned there
+  - fix warning from clang ( mostly shadowing variables )  
+
+  -------- 
  | v00-14 |
   --------
 
