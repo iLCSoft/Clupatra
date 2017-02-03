@@ -1162,7 +1162,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 	  //	std::copy( trk->getTrackerHits().begin() , trk->getTrackerHits().end() , std::back_inserter( hits ) ) ;
 
-	  for( lcio::TrackerHitVec::const_iterator it1 = trk->getTrackerHits().begin() , END =  trk->getTrackerHits().end() ; it1 != END ; ++ it ){
+	  for( lcio::TrackerHitVec::const_iterator it1 = trk->getTrackerHits().begin() , END =  trk->getTrackerHits().end() ; it1 != END ; ++it1 ){
 	    hits.addElement( (*it1)->ext<GHit>() )  ;
 	  }
 
