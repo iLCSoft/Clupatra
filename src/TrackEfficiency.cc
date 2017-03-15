@@ -166,7 +166,42 @@ TrackEfficiency::TrackEfficiency() : Processor("TrackEfficiency"),
 			      "Min and max value of pt range [GeV]"  ,
 			      _ptRange ,
 			      ptRange ) ;
-  
+
+  registerProcessorParameter("PhysSampleOn",
+                             "Enable when we run diagnostics to a simulated physics sample",
+                             _physSampleOn,
+                             bool(false));
+
+  registerProcessorParameter("CosThetaCut",
+                             "Maximum costheta of examined MCParticles sample",
+                             _cosTheta,
+                             double(0.99));
+
+  registerProcessorParameter("PCut",
+                             "Minimum momentum of examined MCParticles sample (in GeV)",
+                             _pCut,
+                             double(1.0));
+
+  registerProcessorParameter("PTCut",
+                             "Minimum transverse momentum of examined MCParticles sample (in GeV)",
+                             _ptCut,
+                             double(0.1));
+
+  registerProcessorParameter("DistFromIP",
+                             "Maximum distance from IP of examined MCParticles sample (in mm)",
+                             _originCut,
+                             double(100.0));
+
+  registerProcessorParameter("RequiredPurity",
+                             "ratio of hits belonging to the dominant MC particle to total number of track hits",
+                             _minPurity,
+                             double(0.75));
+
+  registerProcessorParameter("RequiredSiHits",
+                             "minimum required hits on Si detectors in order to consider the track found",
+                             _minHits,
+                             int(4));
+
 }
 
 
@@ -378,7 +413,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
   }
 
-  //--- check if we hav any tracks in the relation (not always for LEP trk)
+  //--- check if we have any tracks in the relation (not always for LEP trk)
 
 
   while( MCParticle* mcp = mcpIt.next()  ){
@@ -390,13 +425,14 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
     if( cut )
       streamlog_out( DEBUG ) <<  lcshort( mcp ) << std::endl ;
 
+    //if ( _physSampleOn )
     //    APPLY_CUT( DEBUG, cut,  mcp->getGeneratorStatus() == 1   ) ;   // no documentation lines
 
     DDSurfaces::Vector3D v( mcp->getVertex()[0], mcp->getVertex()[1], mcp->getVertex()[2] );
     DDSurfaces::Vector3D e( mcp->getEndpoint()[0], mcp->getEndpoint()[1], mcp->getEndpoint()[2] );
     DDSurfaces::Vector3D p( mcp->getMomentum()[0], mcp->getMomentum()[1], mcp->getMomentum()[2] );
 
-    APPLY_CUT( DEBUG, cut, v.r() < 100.   ) ;   // start at IP+/-10cm
+    APPLY_CUT( DEBUG, cut, v.r() < _originCut   ) ;   // start at IP+/-10cm
 
     // ==== vzeros =========
     // APPLY_CUT( DEBUG, cut, v.rho() > 100.   ) ;   // non prompt track
@@ -409,11 +445,12 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
     APPLY_CUT( DEBUG, cut, e.rho()==0.0  || e.rho() > 40.   ) ; // end at rho > 40 cm
 
-    APPLY_CUT( DEBUG, cut, p.rho() > .1 ) ; //FIXME 1. Gev <->  pt> 100 MeV
+    APPLY_CUT( DEBUG, cut, p.rho() > _ptCut ) ; //FIXME 1. Gev <->  pt> 100 MeV
+    APPLY_CUT( DEBUG, cut, p.r()   >  _pCut ) ;
 
-    APPLY_CUT( DEBUG, cut, std::abs( cos( p.theta() ) )  < 0.99  ) ; //FIXME 0.9 <=> .99  //  | cos( theta ) | > 0.99
+    APPLY_CUT( DEBUG, cut, std::abs( cos( p.theta() ) )  < _cosTheta  ) ; //FIXME 0.9 <=> .99  //  | cos( theta ) | > 0.99
 
-    APPLY_CUT( DEBUG, cut, hitMap[ mcp ]  > 5 ) ; //  require at least 5 tracker hits 
+    APPLY_CUT( DEBUG, cut, hitMap[ mcp ]  > _minHits ) ; //  require at least 5 tracker hits 
 
     //....
 
@@ -520,7 +557,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 	}  
       } 
 
-      double minGoodHitFraction = 0.75 ; // 90 ;
+      double minGoodHitFraction = _minPurity ; //0.75 ; // 90 ;
 
       int nSplitSegments = 0 ;
       
