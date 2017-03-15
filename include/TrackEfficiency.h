@@ -65,7 +65,15 @@ class TrackEfficiency : public Processor {
 
   int _nRun ;
   int _nEvt ;
-
+  
+  bool   _physSampleOn ;
+  double _pCut ;
+  double _ptCut ;
+  double _originCut ;
+  double _cosTheta ;
+  double _minPurity ;
+  int    _minHits ;
+  
 } ;
 
 #endif
