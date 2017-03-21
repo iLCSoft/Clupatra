@@ -14,7 +14,8 @@
 #include "UTIL/Operators.h"
 // #include "UTIL/LCRelationNavigator.h"
 // #include "UTIL/LCTypedVector.h"
-#include "UTIL/ILDConf.h"
+#include "UTIL/LCTrackerConf.h"
+#include <UTIL/ILDConf.h>
 #include "UTIL/CellIDDecoder.h"
 // #include "UTIL/LCTOOLS.h"
 
@@ -30,9 +31,9 @@ using namespace marlin ;
 template <class T>
 int subdet( const T* t){
   
-  static CellIDDecoder<T> idDec(  ILDCellID0::encoder_string ) ;
+  static CellIDDecoder<T> idDec(  LCTrackerCellID::encoding_string() ) ;
   
-  return idDec( t )[ ILDCellID0::subdet ] ;  
+  return idDec( t )[ LCTrackerCellID::subdet() ] ;  
 }
 
 //--------------------------------------------------------------------------------------------

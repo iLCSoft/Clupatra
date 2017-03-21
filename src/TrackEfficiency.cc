@@ -21,6 +21,7 @@
 #include "UTIL/LCRelationNavigator.h"
 #include "UTIL/LCTypedVector.h"
 #include "UTIL/LCTypedVector.h"
+#include "UTIL/LCTrackerConf.h"
 #include "UTIL/ILDConf.h"
 #include "UTIL/LCTOOLS.h"
 
