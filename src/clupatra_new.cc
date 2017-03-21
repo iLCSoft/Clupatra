@@ -4,6 +4,7 @@
 
 
 #include <UTIL/BitField64.h>
+#include "UTIL/LCTrackerConf.h"
 #include <UTIL/ILDConf.h>
 #include <UTIL/BitSet32.h>
 
@@ -119,8 +120,8 @@ namespace clupatra_new{
     
     unsigned step = 0 ;
     
-    UTIL::BitField64 encoder( UTIL::ILDCellID0::encoder_string ) ; 
-    encoder[UTIL::ILDCellID0::subdet] = UTIL::ILDDetID::TPC ;
+    UTIL::BitField64 encoder( UTIL::LCTrackerCellID::encoding_string() ) ; 
+    encoder[UTIL::LCTrackerCellID::subdet()] = UTIL::ILDDetID::TPC ;
     
     EVENT::TrackerHit* firstHit =  0 ; 
 
@@ -184,7 +185,7 @@ namespace clupatra_new{
 	break ;
 
 
-      encoder[ UTIL::ILDCellID0::layer ]  = layer ;
+      encoder[ UTIL::LCTrackerCellID::layer() ]  = layer ;
       
       //fixme: for now still use gear::Vector3D until IMarlinTrk is changed
       gear::Vector3D gxv ;
@@ -316,10 +317,10 @@ namespace clupatra_new{
     
     IMarlinTrack* trk =  clu->ext<MarTrk>() ;
     
-    UTIL::BitField64 encoder( UTIL::ILDCellID0::encoder_string ) ; 
+    UTIL::BitField64 encoder( UTIL::LCTrackerCellID::encoding_string() ) ; 
     
-    encoder[ UTIL::ILDCellID0::subdet ] = detectorID ;
-    encoder[ UTIL::ILDCellID0::layer  ] = layer ;
+    encoder[ UTIL::LCTrackerCellID::subdet() ] = detectorID ;
+    encoder[ UTIL::LCTrackerCellID::layer()  ] = layer ;
     
     int layerID = encoder.lowWord() ;  
     
@@ -1096,7 +1097,7 @@ namespace clupatra_new{
 
    lcio::Track* LCIOTrackConverter::operator() (CluTrack* c) {  
     
-    static lcio::BitField64 encoder( lcio::ILDCellID0::encoder_string ) ; 
+    static lcio::BitField64 encoder( lcio::LCTrackerCellID::encoding_string() ) ; 
 
     lcio::TrackImpl* trk = new lcio::TrackImpl ;
 
@@ -1212,9 +1213,9 @@ namespace clupatra_new{
 	 //=========================================================================================================
 
 	encoder.reset() ;
-	encoder[ lcio::ILDCellID0::subdet ] = CaloFaceBarrelID ;
-	encoder[ lcio::ILDCellID0::layer  ] =  0  ;
-	encoder[ lcio::ILDCellID0::side   ] =  lcio::ILDDetID::barrel;
+	encoder[ lcio::LCTrackerCellID::subdet() ] = CaloFaceBarrelID ;
+	encoder[ lcio::LCTrackerCellID::layer()  ] =  0  ;
+	encoder[ lcio::LCTrackerCellID::side()   ] =  lcio::ILDDetID::barrel;
 	int layerID  = encoder.lowWord() ;  
 	int sensorID = -1 ;
 	
@@ -1226,8 +1227,8 @@ namespace clupatra_new{
 	
 	if( code ==  MarlinTrk::IMarlinTrack::no_intersection ){
 	  
-	  encoder[ lcio::ILDCellID0::subdet ] = CaloFaceEndcapID ;
-	  encoder[ lcio::ILDCellID0::side   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
+	  encoder[ lcio::LCTrackerCellID::subdet() ] = CaloFaceEndcapID ;
+	  encoder[ lcio::LCTrackerCellID::side()   ] = ( lHit->getPosition()[2] > 0.  ?   lcio::ILDDetID::fwd  :  lcio::ILDDetID::bwd  ) ;
 
 	  layerID = encoder.lowWord() ;
 	  

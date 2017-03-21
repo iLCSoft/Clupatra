@@ -13,7 +13,7 @@ using namespace marlin ;
 
 
 /** DebugDigiProcessor puts all TrackerHits from the tracks in TrackCollection  into one or more TrackerHitCollections.
- *  The Hits are sorted into the output collections based on CellIDDecoder<T>( ILDCellID0::encoder_string )( t )[ ILDCellID0::subdet ] <br/>
+ *  The Hits are sorted into the output collections based on CellIDDecoder<T>( LCTrackerCellID::encoding_string() )( t )[ LCTrackerCellID::subdet() ] <br/>
  *  Pre-existing collections with the names of the TrackerHitCollections are renamed to NAME_OLD - as is the TrackCollection.
  *
  * @parameter TrackCollection                           Name of the input collections with  Tracks

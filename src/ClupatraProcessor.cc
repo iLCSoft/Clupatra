@@ -24,7 +24,8 @@
 #include "UTIL/Operators.h"
 #include "UTIL/LCTOOLS.h"
 #include "UTIL/CellIDDecoder.h"
-#include "UTIL/ILDConf.h"
+#include "UTIL/LCTrackerConf.h"
+#include <UTIL/ILDConf.h>
 #include "UTIL/LCIterator.h"
 
 // --- DD4hep ---
@@ -552,9 +553,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     //  int padIndex = padLayout.getNearestPad( ch->pos.rho() , ch->pos.phi() ) ;
     //    ch->layer = padLayout.getRowNumber( padIndex ) ;
-    ch->layer = ILD_cellID( th )[ ILDCellID0::layer ] ;
+    ch->layer = ILD_cellID( th )[ LCTrackerCellID::layer() ] ;
  
-    streamlog_out( DEBUG ) << "  ch->layer = idDec( th )[ ILDCellID0::layer ] = " <<  ch->layer << " - CellID0 " << th->getCellID0() << std::endl ;
+    streamlog_out( DEBUG ) << "  ch->layer = idDec( th )[ LCTrackerCellID::layer() ] = " <<  ch->layer << " - CellID0 " << th->getCellID0() << std::endl ;
 
     ch->zIndex = zIndex( th ) ;
     
@@ -1572,7 +1573,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   
   std::map< int , std::list<TrackerHit*> > hLMap ;
   
-  UTIL::BitField64 encoder( ILDCellID0::encoder_string ) ; 
+  UTIL::BitField64 encoder( LCTrackerCellID::encoding_string() ) ; 
   
 
   if(  parameterSet( "SITHitCollection" ) ) {
@@ -1712,8 +1713,8 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       int layer = (  lx >= nVXDLayers  ?  lx - nVXDLayers  :  lx              ) ;
 
       encoder.reset() ;
-      encoder[ ILDCellID0::subdet ] = detID ;
-      encoder[ ILDCellID0::layer  ] = layer ;
+      encoder[ LCTrackerCellID::subdet() ] = detID ;
+      encoder[ LCTrackerCellID::layer()  ] = layer ;
       int layerID = encoder.lowWord() ;  
       
       //      DDSurfaces::Vector3D point ; 

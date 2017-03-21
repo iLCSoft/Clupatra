@@ -21,7 +21,8 @@
 #include "IMPL/TrackImpl.h"
 #include "UTIL/Operators.h"
 #include "UTIL/CellIDDecoder.h"
-#include "UTIL/ILDConf.h"
+#include "UTIL/LCTrackerConf.h"
+#include <UTIL/ILDConf.h>
 
 
 #include "MarlinTrk/IMarlinTrack.h"
@@ -35,7 +36,7 @@
  */
 namespace lcio{
   struct ILDDecoder : public CellIDDecoder<TrackerHit>{
-    ILDDecoder() :  lcio::CellIDDecoder<TrackerHit>( ILDCellID0::encoder_string ) {} 
+    ILDDecoder() :  lcio::CellIDDecoder<TrackerHit>( LCTrackerCellID::encoding_string() ) {} 
   } ;
   static ILDDecoder ILD_cellID ;
 
@@ -436,11 +437,11 @@ namespace clupatra_new{
       // lcio::TrackerHit* thm1 = trk1->getTrackerHits()[ nhit1 / 2 ] ;
       // lcio::TrackerHit* thm0 = trk0->getTrackerHits()[ nhit0 / 2 ] ;
 
-      int lthf0 = ILD_cellID(  thf0 )[ ILDCellID0::layer ] ;
-      int lthf1 = ILD_cellID(  thf1 )[ ILDCellID0::layer ] ;
+      int lthf0 = ILD_cellID(  thf0 )[ LCTrackerCellID::layer() ] ;
+      int lthf1 = ILD_cellID(  thf1 )[ LCTrackerCellID::layer() ] ;
 
-      int lthl0 = ILD_cellID(  thl0 )[ ILDCellID0::layer ] ;
-      int lthl1 = ILD_cellID(  thl1 )[ ILDCellID0::layer ] ;
+      int lthl0 = ILD_cellID(  thl0 )[ LCTrackerCellID::layer() ] ;
+      int lthl1 = ILD_cellID(  thl1 )[ LCTrackerCellID::layer() ] ;
       
       //      if( lthf0 <= lthl1 && lthf1 <= lthl0 )   return false ; 
 
