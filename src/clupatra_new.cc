@@ -84,7 +84,7 @@ namespace clupatra_new{
 
     int nHitsAdded = 0 ;
 
-
+    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
     DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
     DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
     const int maxTPCLayerID  = tpc->maxRow ;
