@@ -495,9 +495,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   _tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
 
   double bfieldV[3] ;
-  DD4hep::Geometry::OverlayedField ovField = lcdd.field() ;
-  ovField.magneticField( { 0., 0., 0. }  , bfieldV  ) ;
-  _bfield = bfieldV[2] ;
+  lcdd.field().magneticField( { 0., 0., 0. }  , bfieldV  ) ;
+  _bfield = bfieldV[2]/dd4hep::tesla ;
 
   // fixme:  currently LCTPC not supported until DDRec data exists ...
   static const unsigned int maxTPCLayers = _tpc->maxRow ;
