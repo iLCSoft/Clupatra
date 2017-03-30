@@ -38,7 +38,11 @@ namespace lcio{
   struct ILDDecoder : public CellIDDecoder<TrackerHit>{
     ILDDecoder() :  lcio::CellIDDecoder<TrackerHit>( LCTrackerCellID::encoding_string() ) {} 
   } ;
-  static ILDDecoder ILD_cellID ;
+
+  static const BitField64& ILD_cellID( TrackerHit* th ){
+    static ILDDecoder encoder;
+    return encoder( th );
+  }
 
   struct ILDTrackTypeBit{
     static const int SEGMENT ;
