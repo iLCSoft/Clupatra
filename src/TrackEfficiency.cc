@@ -236,7 +236,7 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
   DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
   double bfieldV[3] ;
   lcdd.field().magneticField( { 0., 0., 0. }  , bfieldV  ) ;
-  const double bField = bfieldV[2] ;
+  const double bField = bfieldV[2]/dd4hep::tesla ;
 
   
   static const double alpha =  2.99792458e-4 * bField ;  ;

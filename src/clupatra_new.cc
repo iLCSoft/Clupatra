@@ -84,13 +84,6 @@ namespace clupatra_new{
 
     int nHitsAdded = 0 ;
 
-    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
-
-    double bfieldV[3] ;
-    DD4hep::Geometry::OverlayedField ovField = lcdd.field() ;
-    ovField.magneticField( { 0., 0., 0. }  , bfieldV  ) ;
-    const double bfield = bfieldV[2] ;
-    
 
     DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
     DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
@@ -169,7 +162,8 @@ namespace clupatra_new{
       bwTrk->addHit(  firstHit  ) ; // use the hit we smoothed back to
       
       // note: backward here is forward in the MarlinTrk sense, ie. in direction of energy loss
-      bwTrk->initialise( ts ,  bfield ,  MarlinTrk::IMarlinTrack::forward ) ;
+      double unusedField = 0. ; // the field is taken from the hits in initialize()
+      bwTrk->initialise( ts , unusedField ,  MarlinTrk::IMarlinTrack::forward ) ;
 
     }
 
