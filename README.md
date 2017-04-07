@@ -1,5 +1,6 @@
 # Clupatra
 [![Build Status](https://travis-ci.org/iLCSoft/Clupatra.svg?branch=master)](https://travis-ci.org/iLCSoft/Clupatra)
+[![Build Status](https://scan.coverity.com/projects/12346/badge.svg)](https://scan.coverity.com/projects/ilcsoft-clupatra)
 
 Topological pattern recognition (for the TPC)
 
