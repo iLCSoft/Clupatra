@@ -1,5 +1,12 @@
 # v01-00
-F.Gaede
+
+* 2017-03-30 Andre Sailer ([PR#7](https://github.com/iLCSoft/Clupatra/pull/7))
+  - Wrap static ILDDecoder helper object in function to avoid static initialisation at library loading time
+
+* 2017-03-30 Frank Gaede ([PR#6](https://github.com/iLCSoft/Clupatra/pull/6))
+  - add units to B-field from DD4hep
+        - previously B-field was taken to be zero (10e-13)
+
 - replaced GEAR with DD4hep
   - use DD4hep::DDRec::FixedPadSizeTPCData for gear::TPCData
   - use DDSurfaces::Vector3D for gear::Vector3D
