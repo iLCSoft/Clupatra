@@ -7,11 +7,12 @@
   - add units to B-field from DD4hep
         - previously B-field was taken to be zero (10e-13)
 
-- replaced GEAR with DD4hep
-  - use DD4hep::DDRec::FixedPadSizeTPCData for gear::TPCData
-  - use DDSurfaces::Vector3D for gear::Vector3D
-  - still use gear::Vector3D for MarlinTrk intersection calculations until it is chaned there
-- fix warning from clang ( mostly shadowing variables )  
+* 2017-01-09 Frank Gaede 
+  - replaced GEAR with DD4hep
+    - use DD4hep::DDRec::FixedPadSizeTPCData for gear::TPCData
+    - use DDSurfaces::Vector3D for gear::Vector3D
+    - still use gear::Vector3D for MarlinTrk intersection calculations until it is chaned there
+  - fix warning from clang ( mostly shadowing variables )  
 
 # v00-14
 F. Gaede
