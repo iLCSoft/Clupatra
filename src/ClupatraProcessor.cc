@@ -399,9 +399,9 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
 			     bool(false));
 
   registerProcessorParameter( "TrackSystemName",
-			      "Name of the track fitting system to be used (KalTest, DDKalTest, aidaTT, ... )",
+			      "Name of the track fitting system to be used ( DDKalTest, aidaTT, ... )",
 			      _trkSystemName,
-			      std::string("KalTest") );
+			      std::string("DDKalTest") );
 
   registerProcessorParameter( "CaloFaceBarrelID" , 
 			      "system ID of the subdetector at the calorimeter face in the barrel - default: lcio::ILDDetID::ECAL=20 ",
@@ -423,7 +423,8 @@ void ClupatraProcessor::init() {
   printParameters() ;
   
   // set upt the geometry
-  _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , marlin::Global::GEAR , "" ) ;  
+  _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , 0 , "" ) ;  
+  // _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , marlin::Global::GEAR , "" ) ;  
 
   
   if( _trksystem == 0 ){
@@ -1716,9 +1717,8 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       encoder[ LCTrackerCellID::layer()  ] = layer ;
       int layerID = encoder.lowWord() ;  
       
-      //      DDSurfaces::Vector3D point ; 
-      // fixme:  use gear Vector3D for now until IMarlinTrk has been updated...
-      gear::Vector3D point ;
+
+      MarlinTrk::Vector3D point ;
       
       int sensorID = -1 ;
 
@@ -1745,11 +1745,11 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	if( detID == ILDDetID::SIT ) {
 
-	  bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2<gear::Vector3D>( point ) , min ) ;
+	  bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2<MarlinTrk::Vector3D>( point ) , min ) ;
 
 	} else {
 
-	  bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2<gear::Vector3D>( point ) , min ) ;
+	  bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2<MarlinTrk::Vector3D>( point ) , min ) ;
 	}
 
 	if( bestIt == hL.end() || min  > maxDist ){
