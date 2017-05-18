@@ -14,7 +14,6 @@
 #include "IMPL/TrackStateImpl.h"
 
 #include "MarlinTrk/Factory.h"
-#include "MarlinTrk/MarlinKalTest.h"
 
 // --- DD4hep ---
 #include "DD4hep/LCDD.h"
@@ -22,8 +21,6 @@
 #include "DD4hep/DD4hepUnits.h" 
 #include "DDRec/DetectorData.h"
 
-
-#include "gearimpl/Vector3D.h"
 
 using namespace MarlinTrk ;
 
@@ -181,8 +178,7 @@ namespace clupatra_new{
 
       encoder[ UTIL::LCTrackerCellID::layer() ]  = layer ;
       
-      //fixme: for now still use gear::Vector3D until IMarlinTrk is changed
-      gear::Vector3D gxv ;
+      MarlinTrk::Vector3D gxv ;
       
       bool hitAdded = false ;
       
@@ -318,8 +314,7 @@ namespace clupatra_new{
     
     int layerID = encoder.lowWord() ;  
     
-    //fixme: for now still use gear::Vector3D until IMarlinTrk is changed
-    gear::Vector3D gxv ;
+    MarlinTrk::Vector3D gxv ;
     
     int elementID = -1 ;
     
@@ -1194,17 +1189,6 @@ namespace clupatra_new{
 	}
 	
 	// ======= get TrackState at calo face  ========================
-
-	// FG: this is a temporary workaround for the old Mokka based simulation and KalTest - we force the 
-	// CaloFaceEndcapID to be the canincal lcio::ILDDetID::ECAL
-	 MarlinTrk::IMarlinTrkSystem* trksystem =  MarlinTrk::Factory::getCurrentMarlinTrkSystem() ;
-	 
-	 MarlinKalTest* trksys = dynamic_cast< MarlinKalTest* >( trksystem ) ;
-	 
-	 if( trksys != 0 ) { // we are in KalTest world
-	   CaloFaceEndcapID = lcio::ILDDetID::ECAL ;
-	 }
-	 //=========================================================================================================
 
 	encoder.reset() ;
 	encoder[ lcio::LCTrackerCellID::subdet() ] = CaloFaceBarrelID ;
