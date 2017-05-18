@@ -424,7 +424,6 @@ void ClupatraProcessor::init() {
   
   // set upt the geometry
   _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , 0 , "" ) ;  
-  // _trksystem =  MarlinTrk::Factory::createMarlinTrkSystem( _trkSystemName , marlin::Global::GEAR , "" ) ;  
 
   
   if( _trksystem == 0 ){
