@@ -16,7 +16,7 @@
 #include "MarlinTrk/Factory.h"
 
 // --- DD4hep ---
-#include "DD4hep/LCDD.h"
+#include "DD4hep/Detector.h"
 #include "DDSurfaces/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 #include "DDRec/DetectorData.h"
@@ -81,9 +81,9 @@ namespace clupatra_new{
 
     int nHitsAdded = 0 ;
 
-    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
-    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
-    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
+    dd4hep::DetElement tpcDE = lcdd.detector("TPC") ;
+    dd4hep::rec::FixedPadSizeTPCData* tpc = tpcDE.extension<dd4hep::rec::FixedPadSizeTPCData>() ;
     const int maxTPCLayerID  = tpc->maxRow ;
 
     
@@ -515,9 +515,9 @@ namespace clupatra_new{
     
     hV.freeElements() ;
 
-    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
-    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
-    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
+    dd4hep::DetElement tpcDE = lcdd.detector("TPC") ;
+    dd4hep::rec::FixedPadSizeTPCData* tpc = tpcDE.extension<dd4hep::rec::FixedPadSizeTPCData>() ;
     const int tpcNRow  = tpc->maxRow ;
 
 
@@ -658,9 +658,9 @@ namespace clupatra_new{
     
     hV.freeElements() ;
     
-    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
-    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
-    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
+    dd4hep::DetElement tpcDE = lcdd.detector("TPC") ;
+    dd4hep::rec::FixedPadSizeTPCData* tpc = tpcDE.extension<dd4hep::rec::FixedPadSizeTPCData>() ;
     const int tpcNRow  = tpc->maxRow ;
     
     HitListVector hitsInLayer( tpcNRow )  ; 
@@ -827,9 +827,9 @@ namespace clupatra_new{
     
     streamlog_out(  DEBUG ) << " create_two_clusters  --- called ! - size :  " << clu.size()  << std::endl ;
 
-    DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
-    DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
-    DD4hep::DDRec::FixedPadSizeTPCData* tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+    dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
+    dd4hep::DetElement tpcDE = lcdd.detector("TPC") ;
+    dd4hep::rec::FixedPadSizeTPCData* tpc = tpcDE.extension<dd4hep::rec::FixedPadSizeTPCData>() ;
     const int tpcNRow  = tpc->maxRow ;
     
     HitListVector hitsInLayer( tpcNRow )  ; 

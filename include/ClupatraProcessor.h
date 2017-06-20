@@ -159,7 +159,7 @@ class ClupatraProcessor : public marlin::Processor {
   MarlinTrk::IMarlinTrkSystem* _trksystem ;
   std::string _trkSystemName ;
 
-  const DD4hep::DDRec::FixedPadSizeTPCData*  _tpc ;
+  const dd4hep::rec::FixedPadSizeTPCData*  _tpc ;
 
 } ;
 

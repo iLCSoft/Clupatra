@@ -29,7 +29,7 @@
 #include "UTIL/LCIterator.h"
 
 // --- DD4hep ---
-#include "DD4hep/LCDD.h"
+#include "DD4hep/Detector.h"
 #include "DDSurfaces/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 #include "DDRec/DetectorData.h"
@@ -490,9 +490,9 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   // --------  get the TPC geometry information from the DD4hep model
 
-  DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
-  DD4hep::Geometry::DetElement tpcDE = lcdd.detector("TPC") ;
-  _tpc = tpcDE.extension<DD4hep::DDRec::FixedPadSizeTPCData>() ;
+  dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
+  dd4hep::DetElement tpcDE = lcdd.detector("TPC") ;
+  _tpc = tpcDE.extension<dd4hep::rec::FixedPadSizeTPCData>() ;
 
   double bfieldV[3] ;
   lcdd.field().magneticField( { 0., 0., 0. }  , bfieldV  ) ;
@@ -1613,17 +1613,17 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   int nSITLayers = 0 ;
   int nVXDLayers = 0 ;
 
-  DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+  dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
 
   try{
 
-    DD4hep::Geometry::DetElement sitDE = lcdd.detector("SIT") ;
-    DD4hep::DDRec::ZPlanarData* sit = sitDE.extension<DD4hep::DDRec::ZPlanarData>() ;
+    dd4hep::DetElement sitDE = lcdd.detector("SIT") ;
+    dd4hep::rec::ZPlanarData* sit = sitDE.extension<dd4hep::rec::ZPlanarData>() ;
     
     nSITLayers = sit->layers.size() ;
     
-    DD4hep::Geometry::DetElement vxdDE = lcdd.detector("VXD") ;
-    DD4hep::DDRec::ZPlanarData* vxd = vxdDE.extension<DD4hep::DDRec::ZPlanarData>() ;
+    dd4hep::DetElement vxdDE = lcdd.detector("VXD") ;
+    dd4hep::rec::ZPlanarData* vxd = vxdDE.extension<dd4hep::rec::ZPlanarData>() ;
     
     nVXDLayers = vxd->layers.size() ;
     

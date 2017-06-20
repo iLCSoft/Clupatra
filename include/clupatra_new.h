@@ -12,7 +12,7 @@
 #include "NNClusterer.h"
 
 // --- DD4hep ---
-#include "DD4hep/LCDD.h"
+#include "DD4hep/Detector.h"
 #include "DDSurfaces/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 
