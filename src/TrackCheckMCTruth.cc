@@ -27,7 +27,7 @@
 #include "HelixClass.h"
 
 // --- DD4hep ---
-#include "DD4hep/LCDD.h"
+#include "DD4hep/Detector.h"
 #include "DDSurfaces/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 
@@ -234,9 +234,9 @@ void TrackCheckMCTruth::processEvent( LCEvent * evt ) {
 
   clock_t start =  clock() ; 
 
-  DD4hep::Geometry::LCDD& lcdd = DD4hep::Geometry::LCDD::getInstance();
+  dd4hep::Detector& theDetector = dd4hep::Detector::getInstance();
   double bfieldV[3] ;
-  lcdd.field().magneticField( { 0., 0., 0. }  , bfieldV  ) ;
+  theDetector.field().magneticField( { 0., 0., 0. }  , bfieldV  ) ;
   const double bField = bfieldV[2]/dd4hep::tesla ;
 
   static const double alpha =  2.99792458e-4 * bField ;  ;
