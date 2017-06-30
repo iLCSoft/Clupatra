@@ -1,3 +1,12 @@
+# v01-01
+
+* 2017-06-20 Andre Sailer ([PR#11](https://github.com/iLCSoft/Clupatra/pull/11))
+  - Adapt to changes in namespaces and LCDD -->  Detector
+
+* 2017-05-18 Frank Gaede ([PR#10](https://github.com/iLCSoft/Clupatra/pull/10))
+  - remove last leftover dependencies to Gear
+  - remove any dependency on MarlinKalTest
+
 # v01-00
 
 * 2017-03-30 Andre Sailer ([PR#7](https://github.com/iLCSoft/Clupatra/pull/7))
