@@ -701,7 +701,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
       } //------------------------------------------------------------------------------------------
 
-      streamlog_out( DEBUG ) << "     found " <<  sclu.size() << "  clusters " << std::endl ;
+      streamlog_out( DEBUG3 ) << "     found " <<  sclu.size() << "  clusters " << std::endl ;
 
       // try to split up clusters according to multiplicity
       int layerWithMultiplicity = _padRowRange - 2  ; // fixme: make parameter 
@@ -737,7 +737,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
       //      std::transform( sclu.begin(), sclu.end(), std::back_inserter( seedTrks) , fitter ) ;
       // reduce memory footprint: deal with one KalTest track at a time and delete it, when done
     
-      streamlog_out( DEBUG2 ) << "  -------- search seeds with distCut=" << nloop * dcut 
+      streamlog_out( DEBUG3 ) << "  -------- search seeds with distCut=" << nloop * dcut
 			      << " starting in row "   <<  outerRow 
 			      << " with padrow range " << _padRowRange
 			      <<  " - found " << sclu.size() << " seed clusters " 
@@ -764,7 +764,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 	  std::auto_ptr<Track> lcioTrk( converter( *icv ) ) ; 
 
-	  streamlog_out( DEBUG2) << "=============  poor seed cluster - no hits added - started from row " <<  outerRow << "\n" 
+	  streamlog_out( DEBUG3) << "=============  poor seed cluster - no hits added - started from row " <<  outerRow << "\n"
 				 << *lcioTrk << std::endl ;
 	  
 	  

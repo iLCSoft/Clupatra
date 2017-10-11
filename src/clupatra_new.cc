@@ -92,7 +92,7 @@ namespace clupatra_new{
     int layer =  ( backward ?  clu->front()->first->layer : clu->back()->first->layer   ) ; 
 
     
-    streamlog_out( DEBUG2 ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
+    streamlog_out( DEBUG3 ) <<  " ======================  addHitsAndFilter():  - layer " << layer << "  backward: " << backward << std::endl  ;
 
 
    if( layer <= 0  || layer >=  maxTPCLayerID   ) 
@@ -108,6 +108,36 @@ namespace clupatra_new{
       return  nHitsAdded;
     } 
     
+
+    if( streamlog_level( DEBUG3  ) ){
+      IMPL::TrackStateImpl ts ; double chi2 ; int ndf ;
+      trk->getTrackState( ts, chi2, ndf ) ;
+      std::vector<std::pair<EVENT::TrackerHit*, double> > hits , outliers ;
+      trk->getHitsInFit( hits ) ;
+      trk->getOutliers( outliers ) ;
+      streamlog_out( DEBUG3 ) << " ======================  addHitsAndFilter(): initial track state: \n" << ts
+			      << "\n chi2: " << chi2 <<  " ndf: " << ndf
+			      << std::endl ;
+      streamlog_out( DEBUG3 ) << " hits in fit: " << hits.size() ;
+      for( auto p : hits )
+	streamlog_out( DEBUG3 ) << "\n"
+	<< UTIL::LCTrackerCellID::valueString( p.first->getCellID0() ) << "["
+	<<  p.first->getPosition()[0] << ", "
+	<<  p.first->getPosition()[1] << ", "
+	<<  p.first->getPosition()[2] << "]"
+	<< " - dchi2: " << p.second ;
+      streamlog_out( DEBUG3 ) << "\n" ;
+      streamlog_out( DEBUG3 ) << " outliers in fit: " << outliers.size() ;
+      for( auto p : outliers )
+	streamlog_out( DEBUG3 ) << "\n"
+	<< UTIL::LCTrackerCellID::valueString( p.first->getCellID0() ) << "["
+	<<  p.first->getPosition()[0] << ", "
+	<<  p.first->getPosition()[1] << ", "
+	<<  p.first->getPosition()[2] << "]"
+	<< " - dchi2: " << p.second ;
+      streamlog_out( DEBUG3 ) << "\n" ;
+    }
+
     unsigned step = 0 ;
     
     UTIL::BitField64 encoder( UTIL::LCTrackerCellID::encoding_string() ) ; 
@@ -204,12 +234,11 @@ namespace clupatra_new{
       DDSurfaces::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )   ;
 	
 
-      streamlog_out( DEBUG2 ) <<  "  -- addHitsAndFilter(): looked for intersection - " 
-			     <<  "  Step : " << step 
-			     <<  "  at layer: "   << layer      
-			     <<  "   intersects: " << MarlinTrk::errorCode( intersects )
-			     <<  "  next xing point : " <<  xv  ;
-      
+      streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): looked for intersection - "
+			      <<  "  Step : " << step
+			      <<  "  at layer: "   << layer
+			      <<  "   intersects: " << MarlinTrk::errorCode( intersects )
+			      <<  "  next xing point : " <<  xv  ;
       
       if( intersects == IMarlinTrack::success ) { // found a crossing point 
 	
