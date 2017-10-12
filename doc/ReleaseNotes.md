@@ -1,3 +1,8 @@
+# v01-02
+
+* 2017-10-12 Frank Gaede ([PR#12](https://github.com/iLCSoft/Clupatra/pull/12))
+  - set correct MarlinTrkSystem configuration for every event with `MarlinTrk::TrkSysConfig`
+
 # v01-01
 
 * 2017-06-20 Andre Sailer ([PR#11](https://github.com/iLCSoft/Clupatra/pull/11))
