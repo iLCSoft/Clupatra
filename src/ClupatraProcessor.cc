@@ -468,7 +468,13 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
   unsigned t_pickup     = timer.registerTimer(" pick up Si hits     " ) ;
   
   timer.start() ;
+
+  // set the correct configuration for the tracking system for this event 
+  MarlinTrk::TrkSysConfig< MarlinTrk::IMarlinTrkSystem::CFG::useQMS>       mson( _trksystem,  _MSOn ) ;
+  MarlinTrk::TrkSysConfig< MarlinTrk::IMarlinTrkSystem::CFG::usedEdx>      elosson( _trksystem,_ElossOn) ;
+  MarlinTrk::TrkSysConfig< MarlinTrk::IMarlinTrkSystem::CFG::useSmoothing> smoothon( _trksystem,_SmoothOn) ;
   
+
   // the clupa wrapper hits that hold pointers to LCIO hits plus some additional parameters
   // create them in a vector for convenient memeory mgmt 
   std::vector<ClupaHit> clupaHits ;
