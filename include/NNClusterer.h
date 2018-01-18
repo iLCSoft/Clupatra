@@ -128,7 +128,7 @@ namespace nnclu {
     typedef Element<T> element_type ; 
     typedef std::list< Element<T> * > base ;
 
-    int ID ; //DEBUG
+    int ID{} ; //DEBUG
   
     Cluster() : ID(0) {}
   
@@ -167,12 +167,6 @@ namespace nnclu {
       for( typename Cluster<T>::iterator it = this->begin(), end = this->end() ; it != end ; it++ ){
         (*it)->second = 0 ;
       }
-      
-      // typename Cluster<T>::iterator it = this->begin() ;
-      // while( it !=  this->end() ){
-      //   (*it)->second = 0 ;
-      //   it = this->erase(it) ;
-      // }
     }
     
     /** Merges all elements from the other cluster cl into this cluster */

@@ -121,9 +121,9 @@ namespace clupatra_new{
 
   protected:
     ZIndex() {} ;
-    float _zmin ;
-    float _zmax ;
-    int _N ;
+    float _zmin{} ;
+    float _zmax{} ;
+    int _N{} ;
   } ;
   
   //------------------------------------------------------------------------------------------
