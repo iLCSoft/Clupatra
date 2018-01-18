@@ -74,7 +74,9 @@ class ClupatraProcessor : public marlin::Processor {
  public:
   
   virtual Processor*  newProcessor() { return new ClupatraProcessor ; }
-  
+
+  ClupatraProcessor(const ClupatraProcessor&) = delete ;
+  ClupatraProcessor& operator=(const ClupatraProcessor&) = delete ;
   
   ClupatraProcessor() ;
   
@@ -113,53 +115,53 @@ class ClupatraProcessor : public marlin::Processor {
 
   /** Input collection name.
    */
-  std::string _colName ;
-  std::string _vxdColName ;
-  std::string _sitColName ;
-  std::string _outColName ;
-  std::string  _segmentsOutColName ;
+  std::string _colName {};
+  std::string _vxdColName {};
+  std::string _sitColName {};
+  std::string _outColName {};
+  std::string  _segmentsOutColName {};
 
-  float _distCut ;
-  float _cosAlphaCut ;
+  float _distCut {};
+  float _cosAlphaCut {};
 
-  float _duplicatePadRowFraction ;
-  float _bfield ;
+  float _duplicatePadRowFraction {};
+  float _bfield {};
   
-  float  _dChi2Max ;
-  float  _chi2Cut ;
-  int    _maxStep ; 
+  float  _dChi2Max {};
+  float  _chi2Cut {};
+  int    _maxStep {}; 
 
-  float _minLayerFractionWithMultiplicity ;
-  int   _minLayerNumberWithMultiplicity ;
-  int   _nLoop ;
+  float _minLayerFractionWithMultiplicity {};
+  int   _minLayerNumberWithMultiplicity {};
+  int   _nLoop {};
   
-  float _trackStartsInnerDist ;
-  float _trackEndsOuterCentralDist ;
-  float _trackEndsOuterForwardDist ;
-  float _trackIsCurlerOmega ;
+  float _trackStartsInnerDist {};
+  float _trackEndsOuterCentralDist {};
+  float _trackEndsOuterForwardDist {};
+  float _trackIsCurlerOmega {};
   
-  int   _minCluSize ;
-  int   _padRowRange ; 
-  int   _nZBins ;
+  int   _minCluSize {};
+  int   _padRowRange {}; 
+  int   _nZBins {};
 
-  bool _MSOn ;
-  bool _ElossOn ;
-  bool _SmoothOn ;
-  bool _pickUpSiHits ;
+  bool _MSOn {};
+  bool _ElossOn {};
+  bool _SmoothOn {};
+  bool _pickUpSiHits {};
 
-  bool _createDebugCollections ;
+  bool _createDebugCollections {};
 
-  int _caloFaceBarrelID ;
-  int _caloFaceEndcapID ;
+  int _caloFaceBarrelID {};
+  int _caloFaceEndcapID {};
 
 
-  int _nRun ;
-  int _nEvt ;
+  int _nRun {};
+  int _nEvt {};
 
-  MarlinTrk::IMarlinTrkSystem* _trksystem ;
-  std::string _trkSystemName ;
+  MarlinTrk::IMarlinTrkSystem* _trksystem {};
+  std::string _trkSystemName {};
 
-  const dd4hep::rec::FixedPadSizeTPCData*  _tpc ;
+  const dd4hep::rec::FixedPadSizeTPCData*  _tpc {};
 
 } ;
 

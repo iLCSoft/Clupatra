@@ -61,13 +61,13 @@ class DebugDigiProcessor : public Processor, public EventModifier {
 
  protected:
 
-  std::string _trkColName ;
+  std::string _trkColName {};
 
-  StringVec _hitColNames ;
-  IntVec    _subDetIDs ;
+  StringVec _hitColNames {};
+  IntVec    _subDetIDs {};
 
-  int _nRun ;
-  int _nEvt ;
+  int _nRun {};
+  int _nEvt {};
 
 } ;
 

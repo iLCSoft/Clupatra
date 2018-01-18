@@ -50,27 +50,27 @@ class TrackCheckMCTruth : public Processor {
   /** Input collection names.
    */
 
-  std::string _mcpColName ;
+  std::string _mcpColName {};
 
-  StringVec _sthColNames ;
+  StringVec _sthColNames {};
 
-  std::string _relTrkMCPColName ;
-  std::string _relMCPTrkColName ;
+  std::string _relTrkMCPColName {};
+  std::string _relMCPTrkColName {};
   
-  std::string _trkColName ;
+  std::string _trkColName {};
   
-  std::string _mergedColName ;
-  std::string _splitColName ;
+  std::string _mergedColName {};
+  std::string _splitColName {};
 
-  float _hitFractionSplit ;
-  float _hitFractionMerged ;
+  float _hitFractionSplit {};
+  float _hitFractionMerged {};
 
-  FloatVec _ptRange ;
+  FloatVec _ptRange {};
 
-  std::vector< TH1* > _h1 ;
+  std::vector< TH1* > _h1 {};
   
-  int _nRun ;
-  int _nEvt ;
+  int _nRun {};
+  int _nEvt {};
 
 } ;
 

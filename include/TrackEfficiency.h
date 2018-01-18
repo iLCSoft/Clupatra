@@ -53,26 +53,26 @@ class TrackEfficiency : public Processor {
   /** Input collection names.
    */
 
-  std::string _mcpColName ;
-  std::string _sthColName ;
-  std::string _t2mColName ;
-  std::string _m2tColName ;
-  std::string _trkColName ;
+  std::string _mcpColName {};
+  std::string _sthColName {};
+  std::string _t2mColName {};
+  std::string _m2tColName {};
+  std::string _trkColName {};
 
-  std::vector< TH1* > _h1 ;
+  std::vector< TH1* > _h1 {};
   
-  FloatVec _ptRange ;
+  FloatVec _ptRange {};
 
-  int _nRun ;
-  int _nEvt ;
+  int _nRun {};
+  int _nEvt {};
   
-  bool   _physSampleOn ;
-  double _pCut ;
-  double _ptCut ;
-  double _originCut ;
-  double _cosTheta ;
-  double _minPurity ;
-  int    _minHits ;
+  bool   _physSampleOn {};
+  double _pCut {};
+  double _ptCut {};
+  double _originCut {};
+  double _cosTheta {};
+  double _minPurity {};
+  int    _minHits {};
   
 } ;
 
