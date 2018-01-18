@@ -100,16 +100,47 @@ namespace nnclu {
    *  delete these when going out of scope.
    */
   template <class T> 
-  class PtrList : public std::list<T*> {
-    typedef std::list<T*> vec ;
+  class PtrList : private std::list<T*> {
+
     bool _isOwner ;
+
   public:
+    typedef std::list<T*> base ;
+    typedef typename base::value_type  value_type;
+    typedef typename base::const_iterator  const_iterator;
+    typedef typename base::iterator iterator;
+    typedef typename base::reverse_iterator reverse_iterator;
+    typedef typename base::const_reverse_iterator const_reverse_iterator;
+    typedef typename base::const_reference  const_reference;
+
     PtrList() : _isOwner( false ) {}
     ~PtrList() {
       if( _isOwner ) 
-        for( typename vec::iterator i = vec::begin(),end = vec::end(); i != end ; delete *i++ ) ; //++i ) delete *i ;
+        for( typename base::iterator i = base::begin(),end = base::end(); i != end ; delete *i++ ) ; //++i ) delete *i ;
     }
     void setOwner( bool val=true ) { _isOwner = val ; }
+
+    // make (part of) list interface public
+    typename base::size_type size() const { return base::size() ; }
+    const_iterator begin() const { return base::begin() ; }
+    const_iterator end() const { return base::end() ; }
+    iterator begin() { return base::begin() ; }
+    iterator end() { return base::end() ; }
+    reverse_iterator rbegin() { return base::rbegin() ; }
+    reverse_iterator rend()   { return base::rend() ; }
+    const_reverse_iterator rbegin() const { return base::rbegin() ; }
+    const_reverse_iterator rend() const { return base::rend() ; }
+    template< class Compare >
+    void sort( Compare comp ) { base::sort( comp ) ; }
+    const_reference front() const { return base::front() ; }
+    const_reference back() const { return base::back() ; }
+    void clear() { base::clear() ; }
+    bool empty() const { return base::empty() ; };
+    iterator erase( iterator pos ) { return base::erase( pos ) ; }
+    iterator erase( const_iterator pos ) { return base::erase( pos ) ; }
+    void merge( PtrList& other ) { base::merge( other ) ; }
+
+    void push_back(T* t)  { base::push_back(t) ; }
   };
   
   
@@ -122,16 +153,41 @@ namespace nnclu {
    *  @version $Id$
    */
   template <class T >
-  class Cluster : public std::list< Element<T> * >, public lcrtrel::LCRTRelations {
+  class Cluster : private std::list< Element<T> * >, public lcrtrel::LCRTRelations {
   
   public :
     typedef Element<T> element_type ; 
     typedef std::list< Element<T> * > base ;
+    typedef typename base::value_type  value_type;
+    typedef typename base::iterator iterator;
+    typedef typename base::const_iterator  const_iterator;
+    typedef typename base::reverse_iterator reverse_iterator;
+    typedef typename base::const_reverse_iterator const_reverse_iterator;
+    typedef typename base::const_reference  const_reference;
 
     int ID{} ; //DEBUG
   
     Cluster() : ID(0) {}
   
+    typename base::size_type size() const { return base::size() ; }
+    const_iterator begin() const { return base::begin() ; }
+    const_iterator end() const { return base::end() ; }
+    iterator begin() { return base::begin() ; }
+    iterator end() { return base::end() ; }
+    reverse_iterator rbegin() { return base::rbegin() ; }
+    reverse_iterator rend()   { return base::rend() ; }
+    const_reverse_iterator rbegin() const { return base::rbegin() ; }
+    const_reverse_iterator rend() const { return base::rend() ; }
+    template< class Compare >
+    void sort( Compare comp ) { base::sort( comp ) ; }
+    const_reference front() const { return base::front() ; }
+    const_reference back() const { return base::back() ; }
+    void clear() { base::clear() ; }
+    bool empty() const { return base::empty() ; };
+    iterator erase( iterator pos ) { return base::erase( pos ) ; }
+    iterator erase( const_iterator pos ) { return base::erase( pos ) ; }
+    void merge( Cluster& other ) { base::merge( other ) ; }
+
     /** C'tor that takes the first element */
     Cluster( Element<T>* element)  {
       static int SID=0 ;  //DEBUG
