@@ -108,10 +108,6 @@ using namespace TrackEfficiencyHistos ;
 			   << " run: "  << evt->getRunNumber()   << std::endl ; \
     Cut = false ; }
 
-// #define APPLY_CUT( LEVEL, Cut, Exp )  if( (Exp) == false ) { Cut = false ; \
-//            streamlog_out( LEVEL ) << "  ***** failed cut:  [ " <<  #Exp \
-// 			   <<  " ] in evt: " << evt->getEventNumber()	\
-// 			   << " run: "  << evt->getRunNumber()   << std::endl ; }
 //======================================================================================================
 
 //======================================================================================================
