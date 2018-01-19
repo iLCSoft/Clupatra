@@ -768,7 +768,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	// drop seed clusters with no hits added - but not in the very forward region...
 	if( nHitsAdded < 1  &&  outerRow >   2*_padRowRange  ){  //FIXME: make parameter ?
 
-	  std::auto_ptr<Track> lcioTrk( converter( *icv ) ) ; 
+	  std::unique_ptr<Track> lcioTrk( converter( *icv ) ) ;
 
 	  streamlog_out( DEBUG3) << "=============  poor seed cluster - no hits added - started from row " <<  outerRow << "\n"
 				 << *lcioTrk << std::endl ;
@@ -1665,7 +1665,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       // create a temporary MarlinTrk
       //--------------------------------------------
       
-      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
+      std::unique_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
 
       const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
       

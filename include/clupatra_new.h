@@ -482,7 +482,7 @@ namespace clupatra_new{
       // 				 <<  std::endl ;
       // }
 
-      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
+      std::unique_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
       
       int nHit = trk->getTrackerHits().size() ;
       
@@ -733,8 +733,8 @@ namespace clupatra_new{
       return s.str() ;
     }
   protected:  
-    std::vector< clock_t> _clocks ;
-    std::vector< std::string > _names ;
+    std::vector< clock_t> _clocks{} ;
+    std::vector< std::string > _names{} ;
   };
 
 

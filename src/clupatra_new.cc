@@ -182,7 +182,6 @@ namespace clupatra_new{
 
  
 
-      //      std::auto_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
       bwTrk = trkSys->createTrack()  ;
 
       //need to add a dummy hit to the track
