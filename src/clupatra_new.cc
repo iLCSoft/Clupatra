@@ -23,6 +23,7 @@
 
 
 using namespace MarlinTrk ;
+using namespace lcio;
 
 namespace lcio{
   // bits 0-15 are reserved !?

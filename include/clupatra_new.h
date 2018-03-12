@@ -441,11 +441,11 @@ namespace clupatra_new{
       // lcio::TrackerHit* thm1 = trk1->getTrackerHits()[ nhit1 / 2 ] ;
       // lcio::TrackerHit* thm0 = trk0->getTrackerHits()[ nhit0 / 2 ] ;
 
-      int lthf0 = ILD_cellID(  thf0 )[ LCTrackerCellID::layer() ] ;
-      int lthf1 = ILD_cellID(  thf1 )[ LCTrackerCellID::layer() ] ;
+      int lthf0 = lcio::ILD_cellID(  thf0 )[ lcio::LCTrackerCellID::layer() ] ;
+      int lthf1 = lcio::ILD_cellID(  thf1 )[ lcio::LCTrackerCellID::layer() ] ;
 
-      int lthl0 = ILD_cellID(  thl0 )[ LCTrackerCellID::layer() ] ;
-      int lthl1 = ILD_cellID(  thl1 )[ LCTrackerCellID::layer() ] ;
+      int lthl0 = lcio::ILD_cellID(  thl0 )[ lcio::LCTrackerCellID::layer() ] ;
+      int lthl1 = lcio::ILD_cellID(  thl1 )[ lcio::LCTrackerCellID::layer() ] ;
       
       //      if( lthf0 <= lthl1 && lthf1 <= lthl0 )   return false ; 
 
@@ -492,7 +492,7 @@ namespace clupatra_new{
       // float initial_chi2 = trk->getChi2() ;
       // float initial_ndf  = trk->getNdf() ;
       
-      streamlog_out( DEBUG3  )  << "               -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+      streamlog_out( DEBUG3  )  << "               -- extrapolate TrackState : " << lcio::lcshort( ts )    << std::endl ;
       
       //need to add a dummy hit to the track
       int result = mTrk->addHit(  trk->getTrackerHits()[0] ) ;  // is this the right hit ??????????
@@ -628,8 +628,8 @@ namespace clupatra_new{
       // 	return false ;
 
       
-      const TrackState* ts0 =  trk0->getTrackState( TrackState::AtFirstHit ) ;
-      const TrackState* ts1 =  trk1->getTrackState( TrackState::AtFirstHit ) ;
+      const lcio::TrackState* ts0 =  trk0->getTrackState( lcio::TrackState::AtFirstHit ) ;
+      const lcio::TrackState* ts1 =  trk1->getTrackState( lcio::TrackState::AtFirstHit ) ;
 
       double z0 = ( ts0 ? ts0->getReferencePoint()[2]  : 0. ) ;
       double z1 = ( ts1 ? ts1->getReferencePoint()[2]  : 0. ) ;
