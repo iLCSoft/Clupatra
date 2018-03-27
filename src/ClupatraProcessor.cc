@@ -30,7 +30,7 @@
 
 // --- DD4hep ---
 #include "DD4hep/Detector.h"
-#include "DDSurfaces/Vector3D.h"
+#include "DDRec/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 #include "DDRec/DetectorData.h"
 
@@ -554,7 +554,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     
     ch->lcioHit = th ; 
     
-    ch->pos = DDSurfaces::Vector3D(  th->getPosition() ) ;
+    ch->pos = dd4hep::rec::Vector3D(  th->getPosition() ) ;
     
     //  int padIndex = padLayout.getNearestPad( ch->pos.rho() , ch->pos.phi() ) ;
     //    ch->layer = padLayout.getRowNumber( padIndex ) ;
@@ -1456,8 +1456,8 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 	continue; 
       }
 
-      DDSurfaces::Vector3D fhPos( tsF->getReferencePoint() ) ;
-      DDSurfaces::Vector3D lhPos( tsL->getReferencePoint() ) ;
+      dd4hep::rec::Vector3D fhPos( tsF->getReferencePoint() ) ;
+      dd4hep::rec::Vector3D lhPos( tsL->getReferencePoint() ) ;
       
 
       bool startsInner =  std::abs( fhPos.rho() - r_inner )     <  _trackStartsInnerDist ;        // first hit close to inner field cage 
@@ -1772,7 +1772,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 
 	int addHit = mTrk->addAndFit( *bestIt , deltaChi, _dChi2Max ) ;
 	    
-	streamlog_out( DEBUG3 ) << "    ****  best matching hit : " <<  DDSurfaces::Vector3D( (*bestIt)->getPosition() )  
+	streamlog_out( DEBUG3 ) << "    ****  best matching hit : " <<  dd4hep::rec::Vector3D( (*bestIt)->getPosition() )
 				<< "         added : " << MarlinTrk::errorCode( addHit )
 				<< "   deltaChi2: " << deltaChi 
 				<< std::endl ;
@@ -1803,7 +1803,7 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     lcio::TrackStateImpl* tsi =  new lcio::TrackStateImpl ;
     double chi2 ;
     int ndf  ;
-    const DDSurfaces::Vector3D ipv( 0.,0.,0. );
+    const dd4hep::rec::Vector3D ipv( 0.,0.,0. );
     
     
     // get track state at the IP 
@@ -1885,8 +1885,8 @@ void ClupatraProcessor::computeTrackInfo(  lcio::Track* lTrk  ){
   if(  tsF == 0 ) return ;
   if(  tsL == 0 ) return ;
   
-  DDSurfaces::Vector3D fhPos( tsF->getReferencePoint() ) ;
-  DDSurfaces::Vector3D lhPos( tsL->getReferencePoint() ) ;
+  dd4hep::rec::Vector3D fhPos( tsF->getReferencePoint() ) ;
+  dd4hep::rec::Vector3D lhPos( tsL->getReferencePoint() ) ;
   
 
   TrackInfoStruct* ti = lTrk->ext<TrackInfo>() ;

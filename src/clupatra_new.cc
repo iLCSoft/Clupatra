@@ -17,7 +17,7 @@
 
 // --- DD4hep ---
 #include "DD4hep/Detector.h"
-#include "DDSurfaces/Vector3D.h"
+#include "DDRec/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 #include "DDRec/DetectorData.h"
 
@@ -36,12 +36,12 @@ namespace clupatra_new{
   
   /** helper class to compute the chisquared of two points in rho and z coordinate */
   struct Chi2_RPhi_Z_Hit{
-    //    double operator()( const TrackerHit* h, const DDSurfaces::Vector3D& v1) {
-    double operator()( const ClupaHit* h, const DDSurfaces::Vector3D& v1) {
+    //    double operator()( const TrackerHit* h, const dd4hep::rec::Vector3D& v1) {
+    double operator()( const ClupaHit* h, const dd4hep::rec::Vector3D& v1) {
 
 
-      //      DDSurfaces::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
-      const DDSurfaces::Vector3D& v0 = h->pos ;
+      //      dd4hep::rec::Vector3D v0( h->getPosition()[0] ,  h->getPosition()[1] ,  h->getPosition()[2] ) ;
+      const dd4hep::rec::Vector3D& v0 = h->pos ;
 
       double sigsr =  h->lcioHit->getCovMatrix()[0] + h->lcioHit->getCovMatrix()[2]  ;
       double sigsz =  h->lcioHit->getCovMatrix()[5] ;
@@ -231,7 +231,7 @@ namespace clupatra_new{
 	intersects  = theTrk->intersectionWithLayer( layerID, gxv, elementID , mode )  ; 
       }
 
-      DDSurfaces::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )   ;
+      dd4hep::rec::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )   ;
 	
 
       streamlog_out( DEBUG3 ) <<  "  -- addHitsAndFilter(): looked for intersection - "
@@ -269,11 +269,11 @@ namespace clupatra_new{
  	if( bestHit != 0 ){
 	  
 	  streamlog_out( DEBUG3 ) <<   " ************ bestHit "  << bestHit 
-				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  DDSurfaces::Vector3D() ) 
+				  <<   " pos : " <<   (bestHit ? bestHit->first->pos :  dd4hep::rec::Vector3D() )
 				  <<   " chi2: " <<  ch2Min 
 				  <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
 	  
-	  const DDSurfaces::Vector3D&  hPos = bestHit->first->pos  ;
+	  const dd4hep::rec::Vector3D&  hPos = bestHit->first->pos  ;
 	  
 	  if( ch2Min  < chi2Cut ) { 
 	    
@@ -349,7 +349,7 @@ namespace clupatra_new{
     
     int intersects = trk->intersectionWithLayer( layerID, gxv, elementID , IMarlinTrack::modeClosest  ) ; 
     
-    DDSurfaces::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )  ;
+    dd4hep::rec::Vector3D xv( gxv.x() , gxv.y(), gxv.z()  )  ;
  
  //  IMarlinTrack::modeBackward , IMarlinTrack::modeForward 
     
@@ -390,13 +390,13 @@ namespace clupatra_new{
       
       
       streamlog_out( DEBUG2 ) <<   " ************ bestHit "  << bestHit 
-			     <<   " pos : " <<   (bestHit ? bestHit->first->pos :  DDSurfaces::Vector3D() ) 
+			     <<   " pos : " <<   (bestHit ? bestHit->first->pos :  dd4hep::rec::Vector3D() )
 			     <<   " chi2: " <<  ch2Min 
 			     <<   " chi2Cut: " <<  chi2Cut <<   std::endl ;
       
       if( bestHit != 0 ){
 	
-	const DDSurfaces::Vector3D&  hPos = bestHit->first->pos  ;
+	const dd4hep::rec::Vector3D&  hPos = bestHit->first->pos  ;
 	
 	if( ch2Min  < chi2Cut ) { 
 	  
@@ -555,7 +555,7 @@ namespace clupatra_new{
     
     std::vector< CluTrack*> clu(n)  ;
     
-    std::vector< DDSurfaces::Vector3D > lastp(n) ;
+    std::vector< dd4hep::rec::Vector3D > lastp(n) ;
     
     for(unsigned i=0; i<n; ++i){
       
@@ -578,7 +578,7 @@ namespace clupatra_new{
       HitList::iterator iH = hL.begin() ;
       
       std::vector<Hit*> h(n) ;
-      std::vector< DDSurfaces::Vector3D>  p(n) ;
+      std::vector< dd4hep::rec::Vector3D>  p(n) ;
       
 
       streamlog_out(  DEBUG2 ) << " create_n_clusters  ---  layer " << l << std::endl ;
@@ -611,7 +611,7 @@ namespace clupatra_new{
       
       
       // unit vector in direction of current hits
-      std::vector< DDSurfaces::Vector3D > pu(n) ;
+      std::vector< dd4hep::rec::Vector3D > pu(n) ;
 
       for(unsigned i=0; i<n; ++i){
 
@@ -697,8 +697,8 @@ namespace clupatra_new{
     
     CluTrack* clu[3] ;
 
-    DDSurfaces::Vector3D lastp[3] ;
-    //    DDSurfaces::Vector3D cluDir[3] ;
+    dd4hep::rec::Vector3D lastp[3] ;
+    //    dd4hep::rec::Vector3D cluDir[3] ;
 
     clu[0] = new CluTrack ;
     clu[1] = new CluTrack ;
@@ -727,7 +727,7 @@ namespace clupatra_new{
       h[1] = *iH++   ;
       h[2] = *iH   ;
       
-      DDSurfaces::Vector3D p[3] ;
+      dd4hep::rec::Vector3D p[3] ;
       p[0] = h[0]->first->pos ;
       p[1] = h[1]->first->pos ;
       p[2] = h[2]->first->pos ;
@@ -760,7 +760,7 @@ namespace clupatra_new{
       
 
       // unit vector in direction of current hits
-      DDSurfaces::Vector3D pu[3] ;
+      dd4hep::rec::Vector3D pu[3] ;
       pu[0] = ( 1. / p[0].r() ) * p[0] ;
       pu[1] = ( 1. / p[1].r() ) * p[1] ;
       pu[2] = ( 1. / p[2].r() ) * p[2] ;
@@ -774,7 +774,7 @@ namespace clupatra_new{
   	for( int j = 0 ; j < 3 ; ++j ){
 	  
   	  // // unit vector in direction of last hit and 
-  	  // DDSurfaces::Vector3D pu = - ( p[0] - lastp[0] ) ;
+	  // dd4hep::rec::Vector3D pu = - ( p[0] - lastp[0] ) ;
   	  // pu[1] = - ( p[1] - lastp[1] ) ;
   	  // pu[2] = - ( p[2] - lastp[2] ) ;
   	  // pu[0] =  (  1. / pu[0].r() ) * pu[0]  ;
@@ -873,7 +873,7 @@ namespace clupatra_new{
     cluVec.push_back( clu1 ) ;
 
 
-    DDSurfaces::Vector3D lastDiffVec(0.,0.,0.) ;
+    dd4hep::rec::Vector3D lastDiffVec(0.,0.,0.) ;
     
     for( int l=tpcNRow-1 ; l >= 0 ; --l){
 
@@ -893,8 +893,8 @@ namespace clupatra_new{
       Hit* h0 = *iH++ ;
       Hit* h1 = *iH   ;
       
-      DDSurfaces::Vector3D& p0 = h0->first->pos ;
-      DDSurfaces::Vector3D& p1 = h1->first->pos ;
+      dd4hep::rec::Vector3D& p0 = h0->first->pos ;
+      dd4hep::rec::Vector3D& p1 = h1->first->pos ;
 
 
       streamlog_out(  DEBUG ) << " create_two_clusters  ---  layer " << l 
@@ -914,7 +914,7 @@ namespace clupatra_new{
   	continue ;  
       }
 
-      DDSurfaces::Vector3D d = p1 - p0 ;
+      dd4hep::rec::Vector3D d = p1 - p0 ;
       
       float s0 =  ( lastDiffVec + d ).r() ;
       float s1 =  ( lastDiffVec - d ).r() ;
@@ -957,7 +957,7 @@ namespace clupatra_new{
   //   for(CluTrack::iterator it= clu.begin() ; it != clu.end() ; ++it ){
       
   //     Hit* hit0 = *it ; 
-  //     DDSurfaces::Vector3D& pos0 =  hit0->first->pos ;
+  //     dd4hep::rec::Vector3D& pos0 =  hit0->first->pos ;
       
   //     int layer = hit0->first->layerID ;
       
@@ -972,7 +972,7 @@ namespace clupatra_new{
   // 	for( HitList::iterator iH = hL.begin() ; iH != hL.end() ; ++iH ) {
 	  
   // 	  Hit* hit1 = *iH ; 
-  // 	  DDSurfaces::Vector3D& pos1 = hit1->first->pos ;
+  // 	  dd4hep::rec::Vector3D& pos1 = hit1->first->pos ;
 	  
   // 	  double dist2 = ( pos0 - pos1 ).r2() ;
 	  
@@ -998,7 +998,7 @@ namespace clupatra_new{
   // 	for( HitList::iterator iH = hL.begin() ; iH != hL.end() ; ++iH ) {
 	  
   // 	  Hit* hit1 = *iH ; 
-  // 	  DDSurfaces::Vector3D&  pos1 =  hit1->first->pos ;
+  // 	  dd4hep::rec::Vector3D&  pos1 =  hit1->first->pos ;
 	  
   // 	  double dist2 = ( pos0 - pos1 ).r2() ;
 	  
@@ -1207,7 +1207,7 @@ namespace clupatra_new{
 	  EVENT::TrackerHit* last_constrained_hit = 0 ;     
 	  mtrk->getTrackerHitAtPositiveNDF( last_constrained_hit );
 	  code = mtrk->smooth() ;
-	  DDSurfaces::Vector3D last_hit_pos( lHit->getPosition() );
+	  dd4hep::rec::Vector3D last_hit_pos( lHit->getPosition() );
 	  code = mtrk->propagate( last_hit_pos, last_constrained_hit, *tsLH, chi2, ndf);
 
 #endif
@@ -1262,7 +1262,7 @@ namespace clupatra_new{
 
 	// ======= get TrackState at IP ========================
 	
-	const DDSurfaces::Vector3D ipv( 0.,0.,0. );
+	const dd4hep::rec::Vector3D ipv( 0.,0.,0. );
 	
 	// fg: propagate is quite slow  and might not really be needed for the TPC
 	
