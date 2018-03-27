@@ -20,7 +20,7 @@
 #include "UTIL/BitSet32.h"
 
 
-#include "DDSurfaces/Vector3D.h"
+#include "DDRec/Vector3D.h"
 
 
 //MarlinUtil
@@ -28,7 +28,7 @@
 
 // --- DD4hep ---
 #include "DD4hep/Detector.h"
-#include "DDSurfaces/Vector3D.h"
+#include "DDRec/Vector3D.h"
 #include "DD4hep/DD4hepUnits.h" 
 
 
@@ -453,9 +453,9 @@ void TrackCheckMCTruth::processEvent( LCEvent * evt ) {
     
     APPLY_CUT( DEBUG2, cut,  mcp->getGeneratorStatus() != 2   ) ;   // no documentation lines
 
-    DDSurfaces::Vector3D v( mcp->getVertex()[0], mcp->getVertex()[1], mcp->getVertex()[2] );
-    DDSurfaces::Vector3D e( mcp->getEndpoint()[0], mcp->getEndpoint()[1], mcp->getEndpoint()[2] );
-    DDSurfaces::Vector3D p( mcp->getMomentum()[0], mcp->getMomentum()[1], mcp->getMomentum()[2] );
+    dd4hep::rec::Vector3D v( mcp->getVertex()[0], mcp->getVertex()[1], mcp->getVertex()[2] );
+    dd4hep::rec::Vector3D e( mcp->getEndpoint()[0], mcp->getEndpoint()[1], mcp->getEndpoint()[2] );
+    dd4hep::rec::Vector3D p( mcp->getMomentum()[0], mcp->getMomentum()[1], mcp->getMomentum()[2] );
 
     APPLY_CUT( DEBUG2, cut, v.r() < 100.   ) ;   // start at IP+/-10cm
 
@@ -521,7 +521,7 @@ void TrackCheckMCTruth::processEvent( LCEvent * evt ) {
     mom[1] = trm->getMomentum()[1] ;
     mom[2] = trm->getMomentum()[2] ;
 
-    DDSurfaces::Vector3D p( trm->getMomentum()[0], trm->getMomentum()[1], trm->getMomentum()[2] );
+    dd4hep::rec::Vector3D p( trm->getMomentum()[0], trm->getMomentum()[1], trm->getMomentum()[2] );
     double costhmcp  = cos( p.theta() ) ;
 
     float q = trm->getCharge() ;
