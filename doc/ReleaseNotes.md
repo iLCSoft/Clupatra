@@ -1,3 +1,18 @@
+# v01-03
+
+* 2018-01-31 Frank Gaede ([PR#13](https://github.com/iLCSoft/Clupatra/pull/13))
+  - fix all compiler warnings (gcc54-ub1604)
+  - use private inheritance for std::list in NNClusterer 
+        - add wrapper functions instead
+
+* 2018-03-13 Marko Petric ([PR#14](https://github.com/iLCSoft/Clupatra/pull/14))
+  -  Fix for iLCSoft/LCIO#35
+
+* 2018-03-28 Marko Petric ([PR#15](https://github.com/iLCSoft/Clupatra/pull/15))
+  - Fix for the removal of DDSurfaces which have been merged into DDRec 
+    -  includes from `DDSurfaces` -> `DDRec`
+    - namespace `DDSurfaces` -> `dd4hep::rec`
+
 # v01-02
 
 * 2017-10-12 Frank Gaede ([PR#12](https://github.com/iLCSoft/Clupatra/pull/12))
