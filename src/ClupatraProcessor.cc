@@ -11,6 +11,7 @@
 #include <cmath>
 #include <memory>
 #include <float.h>
+#include <functional>
 
 //---- MarlinUtil 
 #include "MarlinCED.h"
