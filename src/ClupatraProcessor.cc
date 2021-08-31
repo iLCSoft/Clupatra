@@ -824,7 +824,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
     int padRangeRecluster = 50 ; // FIXME: make parameter 
     // define an inner cylinder where we exclude hits from re-clustering:
     double zMaxInnerHits   = driftLength * .67 ;   // FIXME: make parameter 
-    double rhoMaxInnerHits =  ( _tpc->rMinReadout +  0.67 * 
+    double rhoMaxInnerHits =  ( _tpc->rMinReadout / dd4hep::mm +  0.67 *
 				( _tpc->rMaxReadout - _tpc->rMinReadout ) ) /dd4hep::mm ; // FIXME: make parameter
 
     
