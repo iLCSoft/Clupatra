@@ -1,3 +1,12 @@
+# v01-03-01
+
+* 2024-01-17 tmadlener ([PR#19](https://github.com/iLCSoft/Clupatra/pull/19))
+  - Migrate to github actions for CI
+
+* 2020-04-13 Frank Gaede ([PR#16](https://github.com/iLCSoft/Clupatra/pull/16))
+  - make compatible w/ c++17 for macos/clang
+        - patch provided by K.Fujii
+
 # v01-03
 
 * 2018-01-31 Frank Gaede ([PR#13](https://github.com/iLCSoft/Clupatra/pull/13))
