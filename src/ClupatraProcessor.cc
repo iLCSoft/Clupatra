@@ -394,7 +394,18 @@ ClupatraProcessor::ClupatraProcessor() : Processor("ClupatraProcessor") ,
 			     _vxdColName ,
 			     std::string("VTXTrackerHits")  ) ;
   
-  registerProcessorParameter("CreateDebugCollections",
+  registerOptionalParameter( "SITDetectorName" ,
+			     "name of the SIT-like inner Si-tracking barrel detector ",
+			     _sitDetectorName ,
+			     std::string("SIT")  ) ;
+
+  registerOptionalParameter( "VXDDetectorName" , 
+			     "name of the VXD-like inner Si-tracking barrel detector ",
+			     _vxdDetectorName ,
+			     std::string("VXD")  ) ;
+
+
+   registerProcessorParameter("CreateDebugCollections",
 			     "optionally create some debug collection with intermediate track segments and used and unused hits",
 			     _createDebugCollections,
 			     bool(false));
@@ -1497,6 +1508,10 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
   if( _pickUpSiHits ){
     
+    streamlog_out( DEBUG5 ) << "===============================================================================================\n"
+			    << "  picking up inner Si-hits ... \n"
+			    << "===============================================================================================\n"  ;
+
     pickUpSiTrackerHits( outCol , evt ) ;
     
   }
@@ -1619,22 +1634,41 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
   
   int nSITLayers = 0 ;
   int nVXDLayers = 0 ;
+  int sitID = -1 ;
+  int vxdID = -1 ;
 
   dd4hep::Detector& lcdd = dd4hep::Detector::getInstance();
 
   try{
 
-    dd4hep::DetElement sitDE = lcdd.detector("SIT") ;
+    dd4hep::DetElement sitDE = lcdd.detector( _sitDetectorName ) ;
+
     dd4hep::rec::ZPlanarData* sit = sitDE.extension<dd4hep::rec::ZPlanarData>() ;
-    
+
+    sitID = sitDE.id() ;
     nSITLayers = sit->layers.size() ;
+
+  }catch(...){
+
+    streamlog_out( ERROR ) << " ==== in pickUpSiTrackerHits() : could not get detector info (ZPlanarData) for SIT  " << std::endl ;
+    return ;
+  }
     
-    dd4hep::DetElement vxdDE = lcdd.detector("VXD") ;
+
+  try{
+
+    dd4hep::DetElement vxdDE = lcdd.detector( _vxdDetectorName ) ;
+
     dd4hep::rec::ZPlanarData* vxd = vxdDE.extension<dd4hep::rec::ZPlanarData>() ;
     
+    vxdID = vxdDE.id() ;
     nVXDLayers = vxd->layers.size() ;
     
-  }catch(...){ } // fixme
+  }catch(...){
+
+    streamlog_out( ERROR ) << " ==== in pickUpSiTrackerHits() : could not get detector info (ZPlanarData) for SIT  " << std::endl ;
+    return ;
+  }
 
 
   int nLayers  = nVXDLayers + nSITLayers  ;
@@ -1668,12 +1702,8 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       
       std::unique_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack()  ) ;
 
-      const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtIP ) ; 
-      
-      //    const EVENT::TrackState* ts = trk->getClosestTrackState( 0., 0., 0. ) ;
-      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getClosestTrackState( 0., 0., 0. ) ) ;
-      //    const IMPL::TrackStateImpl* ts = dynamic_cast<const IMPL::TrackStateImpl*>( trk->getTrackState( EVENT::TrackState::AtOther ) ) ;
-      //  // FIXME:  what do we need here EVENT::TrackState::AtIP  or AtFirstHit ??
+      // use track state at last, innermost fitted hit !
+      const EVENT::TrackState* ts = trk->getTrackState( lcio::TrackState::AtFirstHit ) ;
       
       int nHit = trk->getTrackerHits().size() ;
       
@@ -1684,11 +1714,14 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       initial_chi2 = trk->getChi2() ;
       initial_ndf  = trk->getNdf() ;
 
-      streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( ts )    << std::endl ;
+      auto h  =  trk->getTrackerHits()[0] ; // fixme: make sure we got the right TPC hit here !??
+
+      streamlog_out( DEBUG3  )  << "  -- extrapolate TrackState : " << lcshort( ts )
+				<< " adding hit: " << h
+				<< std::endl ;
       
       //need to add a dummy hit to the track
-      mTrk->addHit(  trk->getTrackerHits()[0] ) ; // fixme: make sure we got the right TPC hit here !??
-      
+      mTrk->addHit(  h ) ;
       
       mTrk->initialise( *ts ,  _bfield ,  MarlinTrk::IMarlinTrack::backward ) ;
     
@@ -1711,12 +1744,12 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
     // get intersection points with SIT and VXD layers 
     //-------------------------------------------------
 
-    //    for( int l=nVXDLayers-1 ; l >=0 ; --l) {
 
     for( int lx=nLayers-1 ; lx >=0 ; --lx) {
 
-      int detID = (  lx >= nVXDLayers  ?  ILDDetID::SIT   :  ILDDetID::VXD  ) ;
-      int layer = (  lx >= nVXDLayers  ?  lx - nVXDLayers  :  lx              ) ;
+      int detID = (  lx >= nVXDLayers  ?  sitID   :  vxdID ) ;
+
+      int layer = (  lx >= nVXDLayers  ?  lx - nVXDLayers  :  lx  ) ;
 
       encoder.reset() ;
       encoder[ LCTrackerCellID::subdet() ] = detID ;
@@ -1727,6 +1760,11 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
       MarlinTrk::Vector3D point ;
       
       int sensorID = -1 ;
+
+      streamlog_out( DEBUG3 ) << " *******  pickUpSiTrackerHits - look for intersection with SIT/VXD layer " << layer
+			      << " layerID: " << encoder.valueString()
+			      << std::endl ;
+
 
       int intersects = mTrk->intersectionWithLayer( layerID, point, sensorID, MarlinTrk::IMarlinTrack::modeClosest ) ;
       
@@ -1749,14 +1787,12 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCE
 	 
 	std::list<TrackerHit*>::iterator bestIt ; 
 
-	if( detID == ILDDetID::SIT ) {
+	// SIT is no longer a strip detector ...
+	// if( detID == ILDDetID::SIT ) {
+	//   bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2<MarlinTrk::Vector3D>( point ) , min ) ;
+	// } else {
 
-	  bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2<MarlinTrk::Vector3D>( point ) , min ) ;
-
-	} else {
-
-	  bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2<MarlinTrk::Vector3D>( point ) , min ) ;
-	}
+	bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2<MarlinTrk::Vector3D>( point ) , min ) ;
 
 	if( bestIt == hL.end() || min  > maxDist ){
 

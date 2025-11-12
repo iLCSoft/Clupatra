@@ -63,7 +63,9 @@ namespace EVENT{
  *   @parameter pickUpSiHits             try to pick up hits from Si-trackers
  *   @parameter SITHitCollection         name of the SIT hit collections - used to extend TPC tracks if (pickUpSiHits==true)
  *   @parameter VXDHitCollection         name of the VXD hit collections - used to extend TPC tracks if (pickUpSiHits==true)
- * 
+ *   @parameter SITDetectorName          name of the SIT-like inner Si-tracking barrel detector  (default: SIT)
+ *   @parameter VXDDetectorName          name of the VXD-like vertex barrel detector  (default: VXD)
+ *
  *   @parameter Verbosity               verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")
  * 
  * @author F.Gaede, DESY, 2011/2012
@@ -119,6 +121,9 @@ class ClupatraProcessor : public marlin::Processor {
   std::string _vxdColName {};
   std::string _sitColName {};
   std::string _outColName {};
+  std::string _sitDetectorName {};
+  std::string _vxdDetectorName {};
+
   std::string  _segmentsOutColName {};
 
   float _distCut {};
