@@ -112,7 +112,7 @@ void DebugDigiProcessor::modifyEvent( LCEvent * evt ) {
       
       col = evt->getCollection( _hitColNames[ i ]  ) ;
     }
-    catch( DataNotAvailableException ) {}
+    catch( const DataNotAvailableException& ) {}
 
     if( col ) {
 
@@ -133,7 +133,7 @@ void DebugDigiProcessor::modifyEvent( LCEvent * evt ) {
       
     col = evt->getCollection( _trkColName ) ;
   }
-  catch( DataNotAvailableException ) {}
+  catch( const DataNotAvailableException& ) {}
 
   if( col ) {
     
