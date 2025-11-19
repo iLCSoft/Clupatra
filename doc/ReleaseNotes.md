@@ -1,3 +1,9 @@
+# v01-04
+
+* 2025-11-19 Thomas Madlener ([PR#20](https://github.com/iLCSoft/Clupatra/pull/20))
+  - Switch to existing releases and nightlies for the Key4hep based CI
+  - Fix warnings
+
 # v01-03-01
 
 * 2024-01-17 tmadlener ([PR#19](https://github.com/iLCSoft/Clupatra/pull/19))
