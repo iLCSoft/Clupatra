@@ -560,17 +560,13 @@ void TrackEfficiency::processEvent( LCEvent * evt ) {
 
       double minGoodHitFraction = _minPurity ; //0.75 ; // 90 ;
 
-      int nSplitSegments = 0 ;
-      
       // store split tracks collection
       if( trkV.size() >  1 ){
-	
+
 	for(unsigned i=0,N=trkV.size() ; i<N ; ++i ) {
-	  
+
 	  //	  if(  wV[i] > minGoodHitFraction ) {
-	    
-	    ++nSplitSegments ;
-	    
+
 	    splitTracks->addElement( trkV[i] ) ;
 	    //}
 	}
