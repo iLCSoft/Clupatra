@@ -45,6 +45,7 @@
 #include "MarlinTrk/IMarlinTrack.h"
 #include "MarlinTrk/IMarlinTrkSystem.h"
 #include "MarlinTrk/MarlinTrkUtils.h"
+#include <kaltest/TBField.h>
 
 
 using namespace lcio ;
@@ -109,17 +110,16 @@ template <class In, class Pred> In find_smallest(In first, In last, Pred p, doub
   return res ;
 }
 //----------------------------------------------------------------
-template <class VEC_3D>
-struct Distance3D2{
-  VEC_3D _pos ;
-  Distance3D2( const VEC_3D& pos) : _pos( pos ) {}
-  template <class T>
-  double operator()( const T* t) { 
-    VEC_3D p( t->getPosition() ) ;
-    return ( p - _pos ).r2() ; 
-
-  }
-};
+//template <class VEC_3D>
+//struct Distance3D2{
+//  VEC_3D _pos ;
+//  Distance3D2( const VEC_3D& pos) : _pos( pos ) {}
+//  template <class T>
+//  double operator()( const T* t) { 
+//    VEC_3D p( t->getPosition() ) ;
+//    return ( p - _pos ).r2() ; 
+//  }
+//};
 
 template <class VEC_3D>
 struct Distance3D2_zw{
@@ -458,7 +458,10 @@ void ClupatraProcessor::init() {
   _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::useQMS,        _MSOn ) ;
   _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::usedEdx,       _ElossOn) ;
   _trksystem->setOption( MarlinTrk::IMarlinTrkSystem::CFG::useSmoothing,  _SmoothOn) ;
-  _trksystem->init() ;  
+  _trksystem->init() ;
+
+  //TBField::SetUseUniformBfield(false);
+  //streamlog_out( MESSAGE ) << "TBField is uniform? " << TBField::IsUsingUniformBfield() << std::endl;
   
   _nRun = 0 ;
   _nEvt = 0 ;
@@ -1584,6 +1587,7 @@ void ClupatraProcessor::processEvent( LCEvent * evt ) {
 
 
   streamlog_out( DEBUG9 )  <<  timer.toString () << std::endl ;
+  streamlog_out( DEBUG ) << "TBField is uniform? " << TBField::IsUsingUniformBfield() << std::endl;
 
   _nEvt ++ ;
 
@@ -1620,10 +1624,10 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol, LCEv
 
   streamlog_out( DEBUG3 ) << "  *****  hitMap size : " <<   hLMap.size() << std::endl ;
 
-  for( std::map< int , std::list<TrackerHit*> >::iterator it= hLMap.begin(), End = hLMap.end() ; it != End ; ++it ){
+  for (const auto& [cellID, hitList] : hLMap) {
 
-    encoder.setValue( it->first );
-    streamlog_out( DEBUG3 ) << "  *****  sensor: " << encoder.valueString()  << " - nHits: " <<  it->second.size()  << std::endl;
+    encoder.setValue(cellID);
+    streamlog_out(DEBUG3) << "  *****  sensor: " << encoder.valueString() << " - nHits: " << hitList.size() << std::endl;
   }
 
   int nInnerLayers = nVXDLayers + nSITLayers;
@@ -1632,22 +1636,16 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol, LCEv
   if (nInnerLayers + nOuterLayers == 0) return;
 
 
-  // ============ sort tracks wrt pt (1./omega) ===============
-
+  // sort tracks wrt pt (1./omega)
   std::sort( tv->begin(), tv->end(),  PtSort() );
   
   for( LCIterator<TrackImpl> it( trackCol ); TrackImpl* trk = it.next(); ) {
 
-    //--------------------------------------------
     // create a temporary MarlinTrk
-    //--------------------------------------------
-
-    //---------------------------------------------------------------
-    // get intersection points with SIT and VXD layers, then with SET
-    //---------------------------------------------------------------
-
     std::unique_ptr<MarlinTrk::IMarlinTrack> mTrk( _trksystem->createTrack() );
 
+    // get intersection points with SIT and VXD layers, then with SET
+     //FIXME: hard-coded parameters maxDist and z_weight in getIntersectionAddHit
     if (nInnerLayers > 0) {
 
       prepareTrackHelper(trk, mTrk.get(), lcio::TrackState::AtFirstHit, MarlinTrk::IMarlinTrack::backward);
@@ -1665,18 +1663,6 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol, LCEv
       updateTrackStates(trk, mTrk.get(), initial_chi2, initial_ndf);
     }
 
-//     TrackStateVec tsv  = trk->trackStates();
-//     streamlog_out( MESSAGE ) << " track state properties after inner pick up - size: " << tsv.size() << std::endl;
-//     streamlog_out( MESSAGE ) << "    IP location: " << lcio::TrackState::AtIP << std::endl;
-
-//     for (unsigned int i=0; i < tsv.size(); ++i) {
-//
-//       auto ts = trk->getTrackState(i);
-//
-//       streamlog_out( MESSAGE ) << i << "    ts location: " << ts->getLocation() << "  ts d0: " << ts->getD0() << std::endl;
-//     }
-
-
     if (nOuterLayers > 0) {
 
       mTrk = std::unique_ptr<MarlinTrk::IMarlinTrack>(_trksystem->createTrack());
@@ -1692,17 +1678,13 @@ void ClupatraProcessor::pickUpSiTrackerHits( EVENT::LCCollection* trackCol, LCEv
       }
       updateTrackStates(trk, mTrk.get(), initial_chi2, initial_ndf);
     }
-
-    //tsv  = trk->trackStates();
-    //streamlog_out( MESSAGE ) << " track state properties after SET pick up - size: " << tsv.size() << std::endl;
-
   }
 }
 
  /*************************************************************************************************/
 
 std::pair<int, int> ClupatraProcessor::loadSubdetectorData(std::string collectionParameter, std::string collectionName,
-                                                           std::string detectorName,                                                          std::map< int, std::list<TrackerHit*> >& hLMap,
+                                                           std::string detectorName, std::map< int, std::list<TrackerHit*> >& hLMap,
                                                            dd4hep::Detector& lcdd, LCEvent* evt){
 
   int detElID = -1, nLayers = 0;
@@ -1781,37 +1763,27 @@ void ClupatraProcessor::getIntersectionAddHit(int detID, int layer, TrackImpl* t
 
     streamlog_out( DEBUG3 ) << "    **** found candidate hits: " << hL.size()
                             << "         for point " << point << std::endl;
-    for (auto hLit=hL.begin(); hLit!=hL.end(); hLit++) {
-      auto pos = (*hLit)->getPosition();
+    for (const auto* hit : hL) {
+      auto pos = hit->getPosition();
       streamlog_out( DEBUG3 ) << "    **** with TrackerHit: " << pos[0] << " " << pos[1] << " " << pos[2] <<
-      " of type " << (*hLit)->getType() << std::endl;
+      " of type " << hit->getType() << std::endl;
     }
 
-    double min = 1.e99 ;
-    //double maxDist = 10. ; //FIXME: make parameter - what is reasonable here ?
+    double min = 1.e99;
 
-    std::list<TrackerHit*>::iterator bestIt ;
-
-    // SIT is no longer a strip detector ...
-    // if( detID == ILDDetID::SIT ) {
-    //   bestIt = find_smallest( hL.begin(), hL.end() , StripDistance2<MarlinTrk::Vector3D>( point ) , min ) ;
-    // } else {
-
-    bestIt = find_smallest( hL.begin(), hL.end() , Distance3D2_zw<MarlinTrk::Vector3D>( point, z_weight ) , min ) ;
+    std::list<TrackerHit*>::iterator bestIt;
+    bestIt = find_smallest(hL.begin(), hL.end(), Distance3D2_zw<MarlinTrk::Vector3D>(point, z_weight), min);
 
     if( bestIt == hL.end() || min  > maxDist ){
-
       streamlog_out( DEBUG3 ) << " ######### no close by hit found !! "
                               << " (bestIt == hL.end())" << (bestIt == hL.end())
                               << " (min=" << min << " > maxDist=" << maxDist <<")" << (min  > maxDist)
                               << std::endl ;
       return; // FIXME: need to limit the number of layers w/o hits !!!!!!
     }
-
-    double deltaChi;
-
     streamlog_out( DEBUG3 ) << " will add best matching hit : " << *bestIt << " with distance : " << min << std::endl;
 
+    double deltaChi;
     int addHit = mTrk->addAndFit( *bestIt , deltaChi, _dChi2Max );
 
     streamlog_out( DEBUG3 ) << "    ****  best matching hit : " <<  dd4hep::rec::Vector3D( (*bestIt)->getPosition() )
@@ -1821,17 +1793,12 @@ void ClupatraProcessor::getIntersectionAddHit(int detID, int layer, TrackImpl* t
 
     if( addHit ==  MarlinTrk::IMarlinTrack::success ){
 
-//       if ((*bestIt)->getType() != 0){
-//         streamlog_out( DEBUG3 ) << " type is not regular point - setting to 0 " << std::endl;
-//         //TrackerHitImpl* hitCopy = new TrackerHitImpl;
-//         //fillTrackerHitCopyType0(*bestIt, hitCopy);
-//         //trk->addHit( hitCopy );
-//       }
       trk->addHit( *bestIt );
       hL.erase( bestIt );
 
       IMPL::TrackStateImpl tsi;
-      double chi2N; int ndfN;
+      double chi2N;
+      int ndfN;
 
       mTrk->getTrackState( tsi, chi2N, ndfN );
 
@@ -1840,7 +1807,6 @@ void ClupatraProcessor::getIntersectionAddHit(int detID, int layer, TrackImpl* t
                               << " ndfN: " << ndfN
                               << std::endl ;
     }
-
   }
 }
 
@@ -1878,8 +1844,8 @@ void ClupatraProcessor::updateTrackStates(TrackImpl* trk, MarlinTrk::IMarlinTrac
       }
     } //-----------------------------------------------------------------
 
-    trk->setChi2( chi2 + ini_chi2 );
-    trk->setNdf(  ndf  + ini_ndf  );
+    trk->setChi2(chi2 + ini_chi2);
+    trk->setNdf(ndf + ini_ndf);
 
   } else {
     delete tsi;
