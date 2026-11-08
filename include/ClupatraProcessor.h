@@ -9,6 +9,11 @@
 
 #include "DDRec/DetectorData.h"
 
+#include "IMPL/TrackImpl.h"
+#include "IMPL/TrackerHitImpl.h"
+#include "MarlinTrk/IMarlinTrack.h"
+#include "UTIL/CellIDDecoder.h"
+
 #include <string>
 
 
@@ -68,7 +73,7 @@ namespace EVENT{
  *
  *   @parameter Verbosity               verbosity level of this processor ("DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT")
  * 
- * @author F.Gaede, DESY, 2011/2012
+ * @author F.Gaede, DESY, 2011/2012, U. Einhaus, KIT, 2026
  * 
  */
 class ClupatraProcessor : public marlin::Processor {
@@ -108,21 +113,47 @@ class ClupatraProcessor : public marlin::Processor {
   
  protected:
 
-  /** helper method to compute a few track segment parameters (start and end points, z spread,...) 
+  /** Helper method to compute a few track segment parameters (start and end points, z spread,...)
    */
-  void computeTrackInfo(  lcio::Track* lTrk  ) ;
+  void computeTrackInfo(lcio::Track* lTrk);
 
 
-  void pickUpSiTrackerHits( EVENT::LCCollection* trackCol , LCEvent* evt) ;
+  /** Function to pick up the Si hits from the inner tracking (VXD+SIT) and the SET:
+      First, the track is extrapolated to the intersection point with the corresponding detector layer.
+      If hits are found within a reasonable distance from the intersection point, a track fit is performed per additional candidate hit.
+      If the added chi2 is within a reasonable value, the hit is added to the track.
+      Finally the track states are updated.
+      This is performed separately for the inner and outer Si detectors. Any combination of VXD, SET and SIT can be used.
+      Below are additional helper function that are used in the main pickUp function.
+  */
+  void pickUpSiTrackerHits(EVENT::LCCollection* trackCol, LCEvent* evt);
+
+  // Helper method: checks existence of Si collections, adds hits to hit map, returns Si detecor IDs and layer counts
+  std::pair<int, int> loadSubdetectorData(std::string, std::string, std::string,
+                                          std::map< int, std::list<TrackerHit*> >&, dd4hep::Detector&, LCEvent* );
+
+  // Helper method: initialises the IMarlinTrack, depending on extrapolation direction (inner or outer)
+  void prepareTrackHelper(TrackImpl*, MarlinTrk::IMarlinTrack*, int, bool );
+
+  // Helper method: calculates intersection of track with specific layer of subdetector,
+  // If a hit is found there it is added to the hit map
+  void getIntersectionAddHit(int detID, int layer, TrackImpl* trk, MarlinTrk::IMarlinTrack* mTrk,
+                             std::map<int, std::list<TrackerHit*> >&, UTIL::BitField64&, float, float);
+
+  // Helper method: updates the track states of the track
+  void updateTrackStates(TrackImpl*, MarlinTrk::IMarlinTrack*, double, int);
+
 
   /** Input collection name.
    */
   std::string _colName {};
   std::string _vxdColName {};
   std::string _sitColName {};
+  std::string _setColName {};
   std::string _outColName {};
   std::string _sitDetectorName {};
   std::string _vxdDetectorName {};
+  std::string _setDetectorName {};
 
   std::string  _segmentsOutColName {};
 
