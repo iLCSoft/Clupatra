@@ -2,7 +2,7 @@
 # cmake file for building Clupatra 
 # - based on $MARLIN/example/mymarlin/CMakeLists.txt
 #   by @author Jan Engels, Desy IT
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10 FATAL_ERROR)
 ########################################################
 
 
