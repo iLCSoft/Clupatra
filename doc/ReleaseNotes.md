@@ -1,3 +1,18 @@
+# v01-05
+
+* 2026-11-11 Juan Miguel Carceller ([PR#24](https://github.com/iLCSoft/Clupatra/pull/24))
+  - Require CMake 3.10 to fix `Compatibility with CMake < 3.5 has been removed from CMake.`
+
+* 2026-11-08 Ulrich Einhaus ([PR#23](https://github.com/iLCSoft/Clupatra/pull/23))
+  - In addition to the existing pick-up of inner Si hits, this adds a pick-up of the SET hits.
+  - If pickUpSiHits is set true, then the hits of subdetectors whose names and hit collections are specified in the optional parameters are added to the TPC-based Clupatra tracks.
+  - Compared to the previous version, the method pickUpSiTrackerHits is split into several helper methods, which are called separately for inwards (VXD+SIT) and outwards (SET) extrapolation of tracks and hit pick-up.
+  - Note that the resulting tracks that include SET hits now end with a SpacePoint hit rather than a TPC hit, which means an IMarlinTrk object can only be initialised via a given TrackState, not via (first, middle, last track hit), as SpacePoints are not allowed. This is relevant for the steering of the RefitProcessor.
+
+* 2026-09-10 Thomas Madlener ([PR#22](https://github.com/iLCSoft/Clupatra/pull/22))
+  - Switch to the latest version of the key4hep-build workflow
+  - Fix `-Werror=unused-but-set-variable` build failure in TrackEfficiency (nightly gcc16/C++23)
+
 # v01-04
 
 * 2025-11-19 Thomas Madlener ([PR#20](https://github.com/iLCSoft/Clupatra/pull/20))
